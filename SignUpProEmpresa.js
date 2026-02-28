@@ -1,254 +1,109 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  ScrollView,
-  Alert,
-  ActivityIndicator
-} from 'react-native';
-
-import { db, auth } from "./firebaseConfig";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { auth, db } from "./firebaseConfig";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
 import colors from "./colors";
 import CustomButton from './components/CustomButton';
 
-
-// =========================
-// 🔹 MÁSCARAS MANUAIS
-// =========================
-
-function formatCPFCNPJ(value) {
-  const cleaned = value.replace(/\D/g, '');
-
-  if (cleaned.length <= 11) {
-    return cleaned
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  } else {
-    return cleaned
-      .replace(/^(\d{2})(\d)/, '$1.$2')
-      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-      .replace(/\.(\d{3})(\d)/, '.$1/$2')
-      .replace(/(\d{4})(\d)/, '$1-$2');
-  }
-}
-
-function formatCEP(value) {
-  return value
-    .replace(/\D/g, '')
-    .replace(/(\d{5})(\d)/, '$1-$2');
-}
-
-function formatTelefone(value) {
-  return value
-    .replace(/\D/g, '')
-    .replace(/(\d{2})(\d)/, '($1) $2')
-    .replace(/(\d{5})(\d)/, '$1-$2');
-}
-
-
-// =========================
-// 🔹 COMPONENTE
-// =========================
-
 export default function SignUpProEmpresa({ navigation }) {
-
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
-  const [documento, setDocumento] = useState('');
   const [especialidade, setEspecialidade] = useState('');
-  const [telefone, setTelefone] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [cep, setCep] = useState('');
   const [endereco, setEndereco] = useState('');
   const [numero, setNumero] = useState('');
-  const [descricao, setDescricao] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingCep, setLoadingCep] = useState(false);
+  const [aceitouTermos, setAceitouTermos] = useState(false);
 
-  const handleCadastroPro = async () => {
+  const formatPhone = (value) => {
+    return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2').substring(0, 15);
+  };
 
-    if (!nome || !documento || !especialidade || !cep || !endereco || !numero) {
-      Alert.alert("Erro", "Preencha todos os campos obrigatórios.");
-      return;
-    }
-
-    const user = auth.currentUser;
-    if (!user) {
-      Alert.alert("Erro", "Usuário não autenticado.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-
-      // 🔥 Geocoding
-      let latitude = -23.5505;
-      let longitude = -46.6333;
-
+  const handleCepBlur = async () => {
+    if (cep.length === 8) {
+      setLoadingCep(true);
       try {
-        const query = `${endereco}, ${numero}, ${cep}, Brasil`;
-
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
-          { headers: { 'User-Agent': 'ConectaServicos/1.0' } }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.length > 0) {
-            latitude = parseFloat(data[0].lat);
-            longitude = parseFloat(data[0].lon);
-          }
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await response.json();
+        if (data.erro) {
+          Alert.alert("Erro", "CEP não encontrado.");
+        } else {
+          setEndereco(`${data.logradouro}, ${data.bairro} - ${data.localidade}/${data.uf}`);
         }
-
-      } catch (geoError) {
-        console.log("Erro geocoding:", geoError);
+      } catch (e) {
+        Alert.alert("Erro", "Falha ao buscar CEP.");
+      } finally {
+        setLoadingCep(false);
       }
+    }
+  };
 
-      const location = {
-        latitude,
-        longitude
-      };
+  const handleSignUp = async () => {
+    if (!nome || !email || !password || !especialidade || !cep || !numero) {
+      Alert.alert("Erro", "Por favor, preencha todos os campos.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // =========================
-      // 🔒 DADOS PRIVADOS
-      // =========================
+      // BUSCA COORDENADAS REAIS
+      let lat = -23.5505; let lng = -46.6333;
+      try {
+        const fullAddr = `${endereco}, ${numero}, Brazil`;
+        const geo = await Location.geocodeAsync(fullAddr);
+        if (geo.length > 0) {
+          lat = geo[0].latitude;
+          lng = geo[0].longitude;
+        }
+      } catch (e) { console.log("Erro GPS:", e); }
 
-      await setDoc(doc(db, "usuarios", user.uid), {
-        nome,
-        email: user.email,
-        documento,
-        telefone,
-        tipo: "profissional",
-        createdAt: serverTimestamp()
-      }, { merge: true });
-
-      // =========================
-      // 🌍 DADOS PÚBLICOS
-      // =========================
-
-      await setDoc(doc(db, "profissionais", user.uid), {
-        nome,
-        especialidade,
-        descricao: descricao || "",
-        location,
-        ativo: true,
-        createdAt: serverTimestamp()
+      await setDoc(doc(db, "usuarios", userCredential.user.uid), {
+        nome, email, especialidade, whatsapp, cep,
+        enderecoCompleto: `${endereco}, ${numero}`,
+        tipo: "profissional", status: "ativo",
+        dataCadastro: new Date(),
+        latitude: lat, longitude: lng,
       });
 
-      Alert.alert("Sucesso!", "Perfil profissional criado com sucesso.");
-      navigation.replace("ConfigurarAgenda");
-
-    } catch (error) {
-      console.error("Erro cadastro profissional:", error);
-      Alert.alert("Erro", "Falha ao criar perfil profissional.");
-    } finally {
-      setLoading(false);
-    }
+      navigation.replace("Main");
+    } catch (error) { Alert.alert("Erro", error.message); }
+    finally { setLoading(false); }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Perfil Profissional</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Nome *"
-        value={nome}
-        onChangeText={setNome}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="CPF ou CNPJ *"
-        keyboardType="numeric"
-        value={documento}
-        onChangeText={(text) => setDocumento(formatCPFCNPJ(text))}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Especialidade *"
-        value={especialidade}
-        onChangeText={setEspecialidade}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="CEP *"
-        keyboardType="numeric"
-        value={cep}
-        onChangeText={(text) => setCep(formatCEP(text))}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Rua *"
-        value={endereco}
-        onChangeText={setEndereco}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Número *"
-        keyboardType="numeric"
-        value={numero}
-        onChangeText={setNumero}
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Telefone"
-        keyboardType="numeric"
-        value={telefone}
-        onChangeText={(text) => setTelefone(formatTelefone(text))}
-      />
-
-      <TextInput
-        style={[styles.input, { height: 80 }]}
-        placeholder="Descrição"
-        value={descricao}
-        onChangeText={setDescricao}
-        multiline
-      />
-
-      <View style={styles.buttonContainer}>
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} />
-        ) : (
-          <CustomButton
-            title="Salvar Perfil"
-            icon="checkmark-circle"
-            color={colors.success}
-            onPress={handleCadastroPro}
-          />
-        )}
+      <Text style={styles.title}>Cadastro Profissional</Text>
+      <TextInput style={styles.input} placeholder="Nome da Empresa" value={nome} onChangeText={setNome} />
+      <TextInput style={styles.input} placeholder="Especialidade" value={especialidade} onChangeText={setEspecialidade} />
+      <TextInput style={styles.input} placeholder="WhatsApp" value={whatsapp} onChangeText={(t) => setWhatsapp(formatPhone(t))} keyboardType="phone-pad" />
+      <View style={styles.row}>
+        <TextInput style={[styles.input, { flex: 1, marginRight: 10 }]} placeholder="CEP" value={cep} onChangeText={setCep} onBlur={handleCepBlur} keyboardType="numeric" maxLength={8} />
+        {loadingCep && <ActivityIndicator color={colors.primary} />}
       </View>
+      <TextInput style={styles.input} placeholder="Endereço" value={endereco} onChangeText={setEndereco} />
+      <TextInput style={styles.input} placeholder="Número" value={numero} onChangeText={setNumero} />
+      <TextInput style={styles.input} placeholder="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="Senha" value={password} onChangeText={setPassword} secureTextEntry />
+      <TouchableOpacity style={styles.checkboxContainer} onPress={() => setAceitouTermos(!aceitouTermos)}>
+        <Ionicons name={aceitouTermos ? "checkbox" : "square-outline"} size={24} color={colors.primary} />
+        <Text style={{ marginLeft: 8 }}>Aceito os termos</Text>
+      </TouchableOpacity>
+      {loading ? <ActivityIndicator size="large" /> : <CustomButton title="Cadastrar" onPress={handleSignUp} color={colors.primary} />}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 20,
-    backgroundColor: colors.background
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: colors.textDark
-  },
-  input: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12
-  },
-  buttonContainer: {
-    marginTop: 10
-  }
+  container: { padding: 25 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  input: { backgroundColor: '#FFF', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#EEE' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  checkboxContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 }
 });

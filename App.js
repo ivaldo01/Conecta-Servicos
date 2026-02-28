@@ -17,7 +17,14 @@ import EditarPerfil from './EditarPerfil';
 import ConfigurarAgenda from './ConfigurarAgenda';
 import BuscaProfissionais from './BuscaProfissionais';
 import PerfilProfissional from './PerfilProfissional';
-import AgendamentoFinal from './AgendamentoFinal'; // Verifique se o nome do arquivo está correto
+import AgendamentoFinal from './AgendamentoFinal';
+import TermosUso from './TermosUso';
+import ConfigurarServicos from './ConfigurarServicos';
+import GerenciarColaboradores from './GerenciarColaboradores';
+import AgendaProfissional from './AgendaProfissional';
+import MeusAgendamentosCliente from './MeusAgendamentosCliente';
+// 1. IMPORTAÇÃO DA NOVA TELA
+import DetalhesAgendamento from './DetalhesAgendamento';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -26,41 +33,96 @@ const Drawer = createDrawerNavigator();
 function DrawerRoutes() {
   return (
     <Drawer.Navigator initialRouteName="TelaInicio">
-      <Drawer.Screen name="TelaInicio" component={HomeScreen} options={{ title: 'Início' }} />
-      <Drawer.Screen name="ListaMenores" component={ListaMenores} />
-      <Drawer.Screen name="CadastroMenor" component={CadastroMenor} />
-      <Drawer.Screen name="Perfil" component={PerfilScreen} />
+      <Drawer.Screen
+        name="TelaInicio"
+        component={HomeScreen}
+        options={{ title: 'Início' }}
+      />
+
+      {/* SEÇÃO DO CLIENTE */}
       <Drawer.Screen
         name="BuscaProfissionais"
         component={BuscaProfissionais}
         options={{ title: 'Mapa de Profissionais' }}
       />
+      <Drawer.Screen
+        name="MeusAgendamentosCliente"
+        component={MeusAgendamentosCliente}
+        options={{ title: 'Meus Agendamentos' }}
+      />
+      <Drawer.Screen
+        name="ListaMenores"
+        component={ListaMenores}
+        options={{ title: 'Meus Dependentes' }}
+      />
+
+      {/* SEÇÃO DO PROFISSIONAL / EMPRESA */}
+      <Drawer.Screen
+        name="AgendaProfissional"
+        component={AgendaProfissional}
+        options={{ title: 'Agenda de Pedidos (Empresa)' }}
+      />
+      <Drawer.Screen
+        name="ConfigurarServicos"
+        component={ConfigurarServicos}
+        options={{ title: 'Serviços e Preços' }}
+      />
+      <Drawer.Screen
+        name="GerenciarColaboradores"
+        component={GerenciarColaboradores}
+        options={{ title: 'Equipe / Colaboradores' }}
+      />
+
+      {/* CONFIGURAÇÕES GERAIS */}
+      <Drawer.Screen
+        name="Perfil"
+        component={PerfilScreen}
+        options={{ title: 'Meu Perfil' }}
+      />
+      <Drawer.Screen
+        name="TermosMenu"
+        component={TermosUso}
+        options={{ title: 'Termos e Privacidade' }}
+      />
     </Drawer.Navigator>
   );
 }
 
-// 2. Estrutura Principal do App (Stack)
-// ... (imports iguais aos que você enviou)
-
+// 2. Estrutura Principal do App (Navegação em Pilha)
 export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
-        {/* Telas de Acesso */}
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="ChooseProfile" component={ChooseProfileScreen} />
-        <Stack.Screen name="SignUpCliente" component={SignUpCliente} />
-        <Stack.Screen name="SignUpProEmpresa" component={SignUpProEmpresa} />
 
-        {/* Rota Principal com Menu Lateral */}
+        {/* Telas de Acesso e Cadastro */}
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ChooseProfile" component={ChooseProfileScreen} options={{ title: 'Escolha seu perfil' }} />
+        <Stack.Screen name="SignUpCliente" component={SignUpCliente} options={{ title: 'Cadastro Cliente' }} />
+        <Stack.Screen name="SignUpProEmpresa" component={SignUpProEmpresa} options={{ title: 'Cadastro Profissional' }} />
+
+        {/* Tela de Termos (LGPD) */}
+        <Stack.Screen name="TermosUso" component={TermosUso} options={{ headerShown: false }} />
+
+        {/* Rota Principal (Após Login) - Chama o Menu Lateral */}
         <Stack.Screen name="Main" component={DrawerRoutes} options={{ headerShown: false }} />
 
-        {/* Fluxo de Agendamento */}
-        <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} />
-        <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} />
+        {/* Fluxo de Agendamento (Visão do Cliente) */}
+        <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} options={{ title: 'Perfil' }} />
+        <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Finalizar' }} />
 
-        {/* Outras telas */}
-        <Stack.Screen name="EditarMenor" component={EditarMenor} />
+        {/* NOVA TELA DE DETALHES (Visão do Profissional/Empresa) */}
+        <Stack.Screen
+          name="DetalhesAgendamento"
+          component={DetalhesAgendamento}
+          options={{ title: 'Detalhes do Agendamento' }}
+        />
+
+        {/* Telas de Edição e Configuração */}
+        <Stack.Screen name="EditarMenor" component={EditarMenor} options={{ title: 'Editar Dependente' }} />
+        <Stack.Screen name="CadastroMenor" component={CadastroMenor} options={{ title: 'Cadastrar Menor' }} />
+        <Stack.Screen name="EditarPerfil" component={EditarPerfil} options={{ title: 'Editar Perfil' }} />
+        <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Horários da Empresa' }} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
