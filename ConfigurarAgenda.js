@@ -1,110 +1,142 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, TextInput } from 'react-native';
-import { db, auth } from "./firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { auth, db } from "./firebaseConfig";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import colors from "./colors";
-import CustomButton from './components/CustomButton';
 
-const DIAS_SEMANA = [
-  { id: 'seg', nome: 'Seg' }, { id: 'ter', nome: 'Ter' },
-  { id: 'qua', nome: 'Qua' }, { id: 'qui', nome: 'Qui' },
-  { id: 'sex', nome: 'Sex' }, { id: 'sab', nome: 'Sáb' },
-  { id: 'dom', nome: 'Dom' },
-];
+// ADICIONADO: { route } para receber os dados do colaborador
+export default function ConfigurarAgenda({ route }) {
+  // ADICIONADO: Pega o ID e Nome se vierem da tela de colaboradores
+  const { colaboradorId, colaboradorNome } = route.params || {};
 
-export default function ConfigurarAgenda({ navigation }) {
+  const [loading, setLoading] = useState(false);
+  const [salvando, setSalvando] = useState(false);
   const [diasSelecionados, setDiasSelecionados] = useState([]);
-  const [inicio, setInicio] = useState('08:00');
-  const [fim, setFim] = useState('18:00');
-  const [duracao, setDuracao] = useState('60');
+  const [horarios, setHorarios] = useState([]);
 
-  const toggleDia = (id) => {
-    setDiasSelecionados(prev => 
-      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+  const user = auth.currentUser;
+  const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+  const listaHorariosPadrao = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
+
+  useEffect(() => {
+    carregarConfiguracoes();
+  }, [colaboradorId]); // Recarrega se mudar o colaborador
+
+  const carregarConfiguracoes = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // LÓGICA DE CAMINHO DINÂMICO:
+      // Se tiver colaboradorId, salva na pasta dele. Se não, salva na agenda geral da empresa.
+      const docRef = colaboradorId
+        ? doc(db, "usuarios", user.uid, "colaboradores", colaboradorId, "configuracoes", "agenda")
+        : doc(db, "usuarios", user.uid, "configuracoes", "agenda");
+
+      const snap = await getDoc(docRef);
+
+      if (snap.exists()) {
+        setDiasSelecionados(snap.data().dias || []);
+        setHorarios(snap.data().horarios || []);
+      } else {
+        // Se não houver configuração, limpa a tela para o novo cadastro
+        setDiasSelecionados([]);
+        setHorarios([]);
+      }
+    } catch (e) {
+      console.log("Erro ao carregar:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleDia = (index) => {
+    setDiasSelecionados(prev =>
+      prev.includes(index) ? prev.filter(d => d !== index) : [...prev, index]
+    );
+  };
+
+  const toggleHorario = (h) => {
+    setHorarios(prev =>
+      prev.includes(h) ? prev.filter(item => item !== h) : [...prev, h]
     );
   };
 
   const salvarAgenda = async () => {
-    if (diasSelecionados.length === 0) {
-      Alert.alert("Atenção", "Selecione os dias que você atende.");
-      return;
-    }
-
+    setSalvando(true);
     try {
-      const user = auth.currentUser;
-      await updateDoc(doc(db, "usuarios", user.uid), {
-        agendaConfig: {
-          dias: diasSelecionados,
-          horarioInicio: inicio,
-          horarioFim: fim,
-          duracaoAtendimento: duracao
-        }
+      // MESMA LÓGICA DE CAMINHO DINÂMICO PARA SALVAR
+      const docRef = colaboradorId
+        ? doc(db, "usuarios", user.uid, "colaboradores", colaboradorId, "configuracoes", "agenda")
+        : doc(db, "usuarios", user.uid, "configuracoes", "agenda");
+
+      await setDoc(docRef, {
+        dias: diasSelecionados,
+        horarios: horarios,
+        ultimaAtualizacao: new Date(),
+        nomeReferencia: colaboradorNome || "Empresa" // Apenas para facilitar a leitura no banco
       });
-      
-      Alert.alert("Sucesso!", "Sua agenda foi configurada.");
-      
-      // --- CORREÇÃO AQUI ---
-      // Mudamos de "Home" para "Main" para bater com o App.js
-      navigation.replace("Main"); 
-      
-    } catch (error) {
-      Alert.alert("Erro", "Falha ao salvar horários.");
+      Alert.alert("Sucesso", `Agenda de ${colaboradorNome || "sua empresa"} atualizada!`);
+    } catch (e) {
+      Alert.alert("Erro", "Falha ao salvar configurações.");
+    } finally {
+      setSalvando(false);
     }
   };
 
+  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={colors.primary} />;
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Horários de Atendimento</Text>
-      
-      <Text style={styles.label}>Em quais dias você atende?</Text>
+    <ScrollView style={styles.container}>
+      {/* Título dinâmico para você saber de quem é a agenda */}
+      <Text style={styles.title}>
+        {colaboradorNome ? `Agenda: ${colaboradorNome}` : "Minha Agenda Geral"}
+      </Text>
+
+      <Text style={styles.subtitle}>Em quais dias atende?</Text>
       <View style={styles.diasContainer}>
-        {DIAS_SEMANA.map(dia => (
-          <TouchableOpacity 
-            key={dia.id} 
-            onPress={() => toggleDia(dia.id)}
-            style={[styles.diaCard, diasSelecionados.includes(dia.id) && styles.diaAtivo]}
+        {diasSemana.map((dia, index) => (
+          <TouchableOpacity
+            key={dia}
+            style={[styles.diaBox, diasSelecionados.includes(index) && styles.boxSelected]}
+            onPress={() => toggleDia(index)}
           >
-            <Text style={[styles.diaTexto, diasSelecionados.includes(dia.id) && styles.textoAtivo]}>{dia.nome}</Text>
+            <Text style={[styles.diaText, diasSelecionados.includes(index) && styles.textSelected]}>{dia}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <View style={styles.row}>
-        <View style={styles.col}>
-          <Text style={styles.label}>Início</Text>
-          <TextInput style={styles.input} value={inicio} onChangeText={setInicio} placeholder="08:00" />
-        </View>
-        <View style={styles.col}>
-          <Text style={styles.label}>Fim</Text>
-          <TextInput style={styles.input} value={fim} onChangeText={setFim} placeholder="18:00" />
-        </View>
+      <Text style={styles.subtitle}>Quais horários disponíveis?</Text>
+      <View style={styles.horariosGrid}>
+        {listaHorariosPadrao.map(h => (
+          <TouchableOpacity
+            key={h}
+            style={[styles.horaBox, horarios.includes(h) && styles.boxSelected]}
+            onPress={() => toggleHorario(h)}
+          >
+            <Text style={[styles.horaText, horarios.includes(h) && styles.textSelected]}>{h}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <Text style={styles.label}>Duração de cada serviço (minutos)</Text>
-      <TextInput 
-        style={styles.input} 
-        value={duracao} 
-        onChangeText={setDuracao} 
-        keyboardType="numeric" 
-      />
-
-      <View style={{ marginTop: 20 }}>
-        <CustomButton title="Concluir e Ir para Home" icon="calendar" color={colors.primary} onPress={salvarAgenda} />
-      </View>
+      <TouchableOpacity style={styles.btnSalvar} onPress={salvarAgenda} disabled={salvando}>
+        {salvando ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnText}>SALVAR CONFIGURAÇÕES</Text>}
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: colors.background },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: colors.textDark },
-  label: { fontSize: 16, marginBottom: 8, color: '#444', fontWeight: '500' },
-  diasContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 20, justifyContent: 'space-between' },
-  diaCard: { width: '23%', padding: 12, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, alignItems: 'center', marginBottom: 10, backgroundColor: '#fff' },
-  diaAtivo: { backgroundColor: colors.primary, borderColor: colors.primary },
-  diaTexto: { fontWeight: 'bold', color: '#666' },
-  textoAtivo: { color: '#fff' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  col: { width: '48%' },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, fontSize: 16 }
+  container: { flex: 1, backgroundColor: '#F5F5F5', padding: 20 },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, marginTop: 40, color: colors.primary },
+  subtitle: { fontSize: 16, fontWeight: 'bold', marginTop: 20, marginBottom: 10, color: '#444' },
+  diasContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  diaBox: { padding: 10, borderRadius: 8, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#DDD', width: '13%', alignItems: 'center' },
+  horariosGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  horaBox: { width: '30%', padding: 12, backgroundColor: '#FFF', borderRadius: 8, marginBottom: 10, alignItems: 'center', borderWidth: 1, borderColor: '#DDD' },
+  boxSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  diaText: { fontSize: 10, fontWeight: 'bold', color: '#666' },
+  horaText: { fontWeight: 'bold', color: '#666' },
+  textSelected: { color: '#FFF' },
+  btnSalvar: { backgroundColor: '#28a745', padding: 20, borderRadius: 12, alignItems: 'center', marginTop: 30, marginBottom: 50 },
+  btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
 });

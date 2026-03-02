@@ -23,7 +23,6 @@ import ConfigurarServicos from './ConfigurarServicos';
 import GerenciarColaboradores from './GerenciarColaboradores';
 import AgendaProfissional from './AgendaProfissional';
 import MeusAgendamentosCliente from './MeusAgendamentosCliente';
-// 1. IMPORTAÇÃO DA NOVA TELA
 import DetalhesAgendamento from './DetalhesAgendamento';
 
 const Stack = createStackNavigator();
@@ -73,6 +72,13 @@ function DrawerRoutes() {
         options={{ title: 'Equipe / Colaboradores' }}
       />
 
+      {/* NOVO: Atalho para configurar a agenda geral da clínica direto no menu */}
+      <Drawer.Screen
+        name="ConfigurarAgendaGeral"
+        component={ConfigurarAgenda}
+        options={{ title: 'Minha Agenda Geral' }}
+      />
+
       {/* CONFIGURAÇÕES GERAIS */}
       <Drawer.Screen
         name="Perfil"
@@ -110,18 +116,20 @@ export default function App() {
         <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} options={{ title: 'Perfil' }} />
         <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Finalizar' }} />
 
-        {/* NOVA TELA DE DETALHES (Visão do Profissional/Empresa) */}
+        {/* Telas de Detalhes (Visão do Profissional/Empresa) */}
         <Stack.Screen
           name="DetalhesAgendamento"
           component={DetalhesAgendamento}
           options={{ title: 'Detalhes do Agendamento' }}
         />
 
-        {/* Telas de Edição e Configuração */}
+        {/* Telas de Edição e Configuração - Deixamos no Stack para facilitar a navegação com parâmetros */}
         <Stack.Screen name="EditarMenor" component={EditarMenor} options={{ title: 'Editar Dependente' }} />
         <Stack.Screen name="CadastroMenor" component={CadastroMenor} options={{ title: 'Cadastrar Menor' }} />
         <Stack.Screen name="EditarPerfil" component={EditarPerfil} options={{ title: 'Editar Perfil' }} />
-        <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Horários da Empresa' }} />
+
+        {/* A tela abaixo recebe parâmetros como colaboradorId ao vir de GerenciarColaboradores */}
+        <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Configurar Agenda' }} />
 
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Platform } from 'react-native';
 import { auth, db } from "./firebaseConfig";
-import { doc, getDoc, addDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection } from "firebase/firestore";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "./colors";
@@ -9,6 +9,7 @@ import colors from "./colors";
 export default function AgendamentoFinal({ route, navigation }) {
     const { clinicaId, servico, colaborador } = route.params || {};
     const [loading, setLoading] = useState(false);
+    const [loadingAgenda, setLoadingAgenda] = useState(true); // Para o esqueleto da agenda
     const [perfilCliente, setPerfilCliente] = useState(null);
 
     // ESTADOS PARA DATA E HORA
@@ -16,29 +17,63 @@ export default function AgendamentoFinal({ route, navigation }) {
     const [showPicker, setShowPicker] = useState(false);
     const [horarioSelecionado, setHorarioSelecionado] = useState(null);
 
-    // Exemplo de horários (Isso pode vir do banco futuramente)
-    const horariosDisponiveis = ["08:00", "09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"];
+    // Agora os horários começam vazios e vêm do banco
+    const [horariosDisponiveis, setHorariosDisponiveis] = useState([]);
+    const [diasAtendimento, setDiasAtendimento] = useState([]); // Dias que o prof. trabalha
 
     const user = auth.currentUser;
 
     useEffect(() => {
-        if (user) carregarPerfilCliente();
-    }, []);
+        if (user) {
+            carregarPerfilCliente();
+            buscarConfiguracaoAgenda();
+        }
+    }, [clinicaId]);
 
     const carregarPerfilCliente = async () => {
         const docSnap = await getDoc(doc(db, "usuarios", user.uid));
         if (docSnap.exists()) setPerfilCliente(docSnap.data());
     };
 
+    // BUSCA A AGENDA QUE O PROFISSIONAL CONFIGUROU
+    const buscarConfiguracaoAgenda = async () => {
+        setLoadingAgenda(true);
+        try {
+            const agendaRef = doc(db, "usuarios", clinicaId, "configuracoes", "agenda");
+            const snap = await getDoc(agendaRef);
+
+            if (snap.exists()) {
+                const dados = snap.data();
+                setHorariosDisponiveis(dados.horarios || []);
+                setDiasAtendimento(dados.dias || []);
+            } else {
+                setHorariosDisponiveis([]); // Profissional não configurou
+            }
+        } catch (error) {
+            console.error("Erro ao carregar agenda:", error);
+        } finally {
+            setLoadingAgenda(false);
+        }
+    };
+
     const onChangeDate = (event, selectedDate) => {
         const currentDate = selectedDate || date;
-        setShowPicker(Platform.OS === 'ios'); // No iOS o picker fica aberto
+        setShowPicker(Platform.OS === 'ios');
+
+        // Validação: O profissional trabalha nesse dia da semana?
+        const diaDaSemana = currentDate.getDay(); // 0 = Domingo, 1 = Segunda...
+        if (diasAtendimento.length > 0 && !diasAtendimento.includes(diaDaSemana)) {
+            Alert.alert("Indisponível", "Este profissional não atende no dia da semana selecionado.");
+            return;
+        }
+
         setDate(currentDate);
+        setHorarioSelecionado(null); // Reseta o horário ao mudar a data
     };
 
     const finalizarAgendamento = async () => {
         if (!horarioSelecionado) {
-            return Alert.alert("Atenção", "Por favor, selecione um horário para o atendimento.");
+            return Alert.alert("Atenção", "Por favor, selecione um horário.");
         }
 
         setLoading(true);
@@ -53,11 +88,8 @@ export default function AgendamentoFinal({ route, navigation }) {
                 clienteNome: perfilCliente.nome || "Não informado",
                 clienteWhatsapp: perfilCliente.whatsapp || "Sem contato",
                 enderecoCliente: perfilCliente.enderecoResidencial || "Não informado",
-
-                // DATA FORMATADA PARA O BANCO
                 data: date.toLocaleDateString('pt-BR'),
                 horario: horarioSelecionado,
-
                 status: "pendente",
                 dataCriacao: new Date()
             });
@@ -78,7 +110,6 @@ export default function AgendamentoFinal({ route, navigation }) {
                 <Text style={styles.label}>Profissional: <Text style={styles.val}>{colaborador?.nome}</Text></Text>
             </View>
 
-            {/* SELETOR DE DATA */}
             <Text style={styles.sectionTitle}>1. Escolha a Data</Text>
             <TouchableOpacity style={styles.dateButton} onPress={() => setShowPicker(true)}>
                 <Ionicons name="calendar-outline" size={20} color={colors.primary} />
@@ -90,27 +121,39 @@ export default function AgendamentoFinal({ route, navigation }) {
                     value={date}
                     mode="date"
                     display="default"
-                    minimumDate={new Date()} // Impede agendar no passado
+                    minimumDate={new Date()}
                     onChange={onChangeDate}
                 />
             )}
 
-            {/* SELETOR DE HORÁRIO */}
             <Text style={styles.sectionTitle}>2. Escolha o Horário</Text>
-            <View style={styles.horariosContainer}>
-                {horariosDisponiveis.map((h) => (
-                    <TouchableOpacity
-                        key={h}
-                        style={[styles.horaBadge, horarioSelecionado === h && styles.horaSelected]}
-                        onPress={() => setHorarioSelecionado(h)}
-                    >
-                        <Text style={[styles.horaText, horarioSelecionado === h && styles.horaTextSelected]}>{h}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+
+            {loadingAgenda ? (
+                <ActivityIndicator color={colors.primary} />
+            ) : (
+                <View style={styles.horariosContainer}>
+                    {horariosDisponiveis.length > 0 ? (
+                        horariosDisponiveis.map((h) => (
+                            <TouchableOpacity
+                                key={h}
+                                style={[styles.horaBadge, horarioSelecionado === h && styles.horaSelected]}
+                                onPress={() => setHorarioSelecionado(h)}
+                            >
+                                <Text style={[styles.horaText, horarioSelecionado === h && styles.horaTextSelected]}>{h}</Text>
+                            </TouchableOpacity>
+                        ))
+                    ) : (
+                        <Text style={styles.txtAviso}>O profissional não possui horários configurados para este dia.</Text>
+                    )}
+                </View>
+            )}
 
             {loading ? <ActivityIndicator size="large" color={colors.primary} /> : (
-                <TouchableOpacity style={styles.btnConfirmar} onPress={finalizarAgendamento}>
+                <TouchableOpacity
+                    style={[styles.btnConfirmar, (!horarioSelecionado || horariosDisponiveis.length === 0) && { backgroundColor: '#CCC' }]}
+                    onPress={finalizarAgendamento}
+                    disabled={!horarioSelecionado}
+                >
                     <Text style={styles.btnText}>FINALIZAR AGENDAMENTO</Text>
                 </TouchableOpacity>
             )}
@@ -126,33 +169,14 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 20, marginBottom: 10 },
     label: { fontSize: 14, color: '#666', marginBottom: 5 },
     val: { fontWeight: 'bold', color: '#333' },
-
-    dateButton: {
-        backgroundColor: '#FFF',
-        padding: 15,
-        borderRadius: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#DDD'
-    },
+    dateButton: { backgroundColor: '#FFF', padding: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#DDD' },
     dateText: { marginLeft: 10, fontSize: 16, fontWeight: '500' },
-
     horariosContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    horaBadge: {
-        backgroundColor: '#FFF',
-        width: '23%',
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#DDD'
-    },
+    horaBadge: { backgroundColor: '#FFF', width: '23%', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#DDD' },
     horaSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
     horaText: { fontWeight: 'bold', color: '#666' },
     horaTextSelected: { color: '#FFF' },
-
     btnConfirmar: { backgroundColor: colors.primary, padding: 20, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-    btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
+    btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+    txtAviso: { color: 'red', fontSize: 12, textAlign: 'center', width: '100%', marginTop: 10 }
 });
