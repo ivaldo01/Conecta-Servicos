@@ -26,10 +26,11 @@ export default function SignUpProEmpresa({ navigation }) {
   };
 
   const handleCepBlur = async () => {
-    if (cep.length === 8) {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
       setLoadingCep(true);
       try {
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
         const data = await response.json();
         if (data.erro) {
           Alert.alert("Erro", "CEP não encontrado.");
@@ -37,7 +38,7 @@ export default function SignUpProEmpresa({ navigation }) {
           setEndereco(`${data.logradouro}, ${data.bairro} - ${data.localidade}/${data.uf}`);
         }
       } catch (e) {
-        Alert.alert("Erro", "Falha ao buscar CEP.");
+        Alert.alert("Aviso", "Busca de CEP indisponível. Digite manualmente.");
       } finally {
         setLoadingCep(false);
       }
@@ -45,27 +46,25 @@ export default function SignUpProEmpresa({ navigation }) {
   };
 
   const handleSignUp = async () => {
-    if (!nome || !email || !password || !especialidade || !cep || !numero) {
-      Alert.alert("Erro", "Por favor, preencha todos os campos.");
+    if (!nome || !email || !password || !especialidade || !cep || !numero || !endereco) {
+      Alert.alert("Erro", "Preencha todos os campos.");
       return;
     }
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // BUSCA COORDENADAS REAIS
       let lat = -23.5505; let lng = -46.6333;
       try {
-        const fullAddr = `${endereco}, ${numero}, Brazil`;
-        const geo = await Location.geocodeAsync(fullAddr);
+        const geo = await Location.geocodeAsync(`${endereco}, ${numero}, Brazil`);
         if (geo.length > 0) {
-          lat = geo[0].latitude;
-          lng = geo[0].longitude;
+          lat = geo[0].latitude; lng = geo[0].longitude;
         }
-      } catch (e) { console.log("Erro GPS:", e); }
+      } catch (e) { console.log("GPS ignorado:", e); }
 
       await setDoc(doc(db, "usuarios", userCredential.user.uid), {
-        nome, email, especialidade, whatsapp, cep,
+        nome, email, especialidade, whatsapp,
+        cep: cep.replace(/\D/g, ''),
         enderecoCompleto: `${endereco}, ${numero}`,
         tipo: "profissional", status: "ativo",
         dataCadastro: new Date(),
@@ -83,25 +82,37 @@ export default function SignUpProEmpresa({ navigation }) {
       <TextInput style={styles.input} placeholder="Nome da Empresa" value={nome} onChangeText={setNome} />
       <TextInput style={styles.input} placeholder="Especialidade" value={especialidade} onChangeText={setEspecialidade} />
       <TextInput style={styles.input} placeholder="WhatsApp" value={whatsapp} onChangeText={(t) => setWhatsapp(formatPhone(t))} keyboardType="phone-pad" />
+
       <View style={styles.row}>
-        <TextInput style={[styles.input, { flex: 1, marginRight: 10 }]} placeholder="CEP" value={cep} onChangeText={setCep} onBlur={handleCepBlur} keyboardType="numeric" maxLength={8} />
+        <TextInput
+          style={[styles.input, { flex: 1, marginRight: 10 }]}
+          placeholder="CEP"
+          value={cep}
+          onChangeText={setCep}
+          onBlur={handleCepBlur}
+          keyboardType="numeric"
+          maxLength={8}
+        />
         {loadingCep && <ActivityIndicator color={colors.primary} />}
       </View>
+
       <TextInput style={styles.input} placeholder="Endereço" value={endereco} onChangeText={setEndereco} />
       <TextInput style={styles.input} placeholder="Número" value={numero} onChangeText={setNumero} />
       <TextInput style={styles.input} placeholder="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <TextInput style={styles.input} placeholder="Senha" value={password} onChangeText={setPassword} secureTextEntry />
+
       <TouchableOpacity style={styles.checkboxContainer} onPress={() => setAceitouTermos(!aceitouTermos)}>
         <Ionicons name={aceitouTermos ? "checkbox" : "square-outline"} size={24} color={colors.primary} />
         <Text style={{ marginLeft: 8 }}>Aceito os termos</Text>
       </TouchableOpacity>
+
       {loading ? <ActivityIndicator size="large" /> : <CustomButton title="Cadastrar" onPress={handleSignUp} color={colors.primary} />}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 25 },
+  container: { padding: 25, backgroundColor: '#FFF' },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
   input: { backgroundColor: '#FFF', padding: 12, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: '#EEE' },
   row: { flexDirection: 'row', alignItems: 'center' },

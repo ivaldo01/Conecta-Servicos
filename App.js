@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
-// Importando suas telas
+// Importando telas existentes
 import ChooseProfileScreen from './ChooseProfileScreen';
 import SignUpCliente from './SignUpCliente';
 import SignUpProEmpresa from './SignUpProEmpresa';
@@ -24,6 +24,11 @@ import GerenciarColaboradores from './GerenciarColaboradores';
 import AgendaProfissional from './AgendaProfissional';
 import MeusAgendamentosCliente from './MeusAgendamentosCliente';
 import DetalhesAgendamento from './DetalhesAgendamento';
+import DetalhesAgendamentoPro from './DetalhesAgendamentoPro';
+
+// NOVAS TELAS: Relatórios e Avaliação
+import RelatoriosPro from './RelatoriosPro';
+import AvaliarServico from './AvaliarServico';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -59,8 +64,16 @@ function DrawerRoutes() {
       <Drawer.Screen
         name="AgendaProfissional"
         component={AgendaProfissional}
-        options={{ title: 'Agenda de Pedidos (Empresa)' }}
+        options={{ title: 'Agenda de Pedidos' }}
       />
+
+      {/* NOVO: Atalho para Relatórios Financeiros no Menu */}
+      <Drawer.Screen
+        name="RelatoriosPro"
+        component={RelatoriosPro}
+        options={{ title: 'Financeiro / Ganhos' }}
+      />
+
       <Drawer.Screen
         name="ConfigurarServicos"
         component={ConfigurarServicos}
@@ -71,8 +84,6 @@ function DrawerRoutes() {
         component={GerenciarColaboradores}
         options={{ title: 'Equipe / Colaboradores' }}
       />
-
-      {/* NOVO: Atalho para configurar a agenda geral da clínica direto no menu */}
       <Drawer.Screen
         name="ConfigurarAgendaGeral"
         component={ConfigurarAgenda}
@@ -105,30 +116,26 @@ export default function App() {
         <Stack.Screen name="ChooseProfile" component={ChooseProfileScreen} options={{ title: 'Escolha seu perfil' }} />
         <Stack.Screen name="SignUpCliente" component={SignUpCliente} options={{ title: 'Cadastro Cliente' }} />
         <Stack.Screen name="SignUpProEmpresa" component={SignUpProEmpresa} options={{ title: 'Cadastro Profissional' }} />
-
-        {/* Tela de Termos (LGPD) */}
         <Stack.Screen name="TermosUso" component={TermosUso} options={{ headerShown: false }} />
 
-        {/* Rota Principal (Após Login) - Chama o Menu Lateral */}
+        {/* Rota Principal (Chama o Drawer) */}
         <Stack.Screen name="Main" component={DrawerRoutes} options={{ headerShown: false }} />
 
-        {/* Fluxo de Agendamento (Visão do Cliente) */}
+        {/* Fluxo de Agendamento e Avaliação */}
         <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} options={{ title: 'Perfil' }} />
-        <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Finalizar' }} />
+        <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Finalizar Agendamento' }} />
 
-        {/* Telas de Detalhes (Visão do Profissional/Empresa) */}
-        <Stack.Screen
-          name="DetalhesAgendamento"
-          component={DetalhesAgendamento}
-          options={{ title: 'Detalhes do Agendamento' }}
-        />
+        {/* NOVO: Tela de Avaliação registrada no Stack */}
+        <Stack.Screen name="AvaliarServico" component={AvaliarServico} options={{ title: 'Avaliar Atendimento' }} />
 
-        {/* Telas de Edição e Configuração - Deixamos no Stack para facilitar a navegação com parâmetros */}
+        {/* Telas de Detalhes */}
+        <Stack.Screen name="DetalhesAgendamento" component={DetalhesAgendamento} options={{ title: 'Detalhes' }} />
+        <Stack.Screen name="DetalhesAgendamentoPro" component={DetalhesAgendamentoPro} options={{ title: 'Informações do Pedido' }} />
+
+        {/* Telas de Edição e Configuração */}
         <Stack.Screen name="EditarMenor" component={EditarMenor} options={{ title: 'Editar Dependente' }} />
         <Stack.Screen name="CadastroMenor" component={CadastroMenor} options={{ title: 'Cadastrar Menor' }} />
         <Stack.Screen name="EditarPerfil" component={EditarPerfil} options={{ title: 'Editar Perfil' }} />
-
-        {/* A tela abaixo recebe parâmetros como colaboradorId ao vir de GerenciarColaboradores */}
         <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Configurar Agenda' }} />
 
       </Stack.Navigator>

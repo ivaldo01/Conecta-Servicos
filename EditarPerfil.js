@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { auth, db } from "./firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { Ionicons } from '@expo/vector-icons';
 import colors from "./colors";
-import CustomButton from './components/CustomButton';
 
 function EditarPerfil({ navigation }) {
   const [perfil, setPerfil] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     const fetchPerfil = async () => {
@@ -20,7 +21,7 @@ function EditarPerfil({ navigation }) {
           setPerfil(perfilSnap.data());
         }
       } catch (error) {
-        alert("Erro ao carregar perfil: " + error.message);
+        Alert.alert("Erro", "Erro ao carregar perfil: " + error.message);
       } finally {
         setLoading(false);
       }
@@ -31,71 +32,137 @@ function EditarPerfil({ navigation }) {
   const handleUpdate = async () => {
     const user = auth.currentUser;
     if (!user) return;
+    setSalvando(true);
     try {
       const perfilRef = doc(db, "usuarios", user.uid);
       await updateDoc(perfilRef, {
         ...perfil,
         updatedAt: new Date().toISOString()
       });
-      alert("Perfil atualizado com sucesso!");
+      Alert.alert("Sucesso", "Perfil atualizado com sucesso!");
       navigation.goBack();
     } catch (error) {
-      alert("Erro ao atualizar perfil: " + error.message);
+      Alert.alert("Erro", "Erro ao atualizar perfil: " + error.message);
+    } finally {
+      setSalvando(false);
     }
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  if (!perfil) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Perfil não encontrado</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>Editar Perfil</Text>
 
-      <TextInput style={styles.input} placeholder="Nome" value={perfil.nome} onChangeText={(text) => setPerfil({ ...perfil, nome: text })} />
-      <TextInput style={styles.input} placeholder="Email" value={perfil.email} onChangeText={(text) => setPerfil({ ...perfil, email: text })} keyboardType="email-address" autoCapitalize="none" />
-      {perfil.telefone !== undefined && (
-        <TextInput style={styles.input} placeholder="Telefone" value={perfil.telefone} onChangeText={(text) => setPerfil({ ...perfil, telefone: text })} />
-      )}
-      {perfil.cpf !== undefined && (
-        <TextInput style={styles.input} placeholder="CPF" value={perfil.cpf} onChangeText={(text) => setPerfil({ ...perfil, cpf: text })} />
-      )}
-      {perfil.rg !== undefined && (
-        <TextInput style={styles.input} placeholder="RG" value={perfil.rg} onChangeText={(text) => setPerfil({ ...perfil, rg: text })} />
-      )}
-      {perfil.cnpj !== undefined && (
-        <TextInput style={styles.input} placeholder="CNPJ" value={perfil.cnpj} onChangeText={(text) => setPerfil({ ...perfil, cnpj: text })} />
-      )}
-      {perfil.endereco !== undefined && (
-        <TextInput style={styles.input} placeholder="Endereço" value={perfil.endereco} onChangeText={(text) => setPerfil({ ...perfil, endereco: text })} />
-      )}
+      <View style={styles.card}>
+        <Text style={styles.label}>Nome Completo / Razão Social</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nome"
+          value={perfil.nome}
+          onChangeText={(text) => setPerfil({ ...perfil, nome: text })}
+        />
 
-      <View style={styles.buttonContainer}>
-        <CustomButton title="Salvar Alterações" icon="save" color={colors.success} onPress={handleUpdate} />
+        <Text style={styles.label}>E-mail</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: '#f0f0f0' }]}
+          placeholder="Email"
+          value={perfil.email}
+          editable={false} // E-mail geralmente não se muda assim por segurança
+        />
+
+        <Text style={styles.label}>WhatsApp (Importante para OS)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Telefone/WhatsApp"
+          value={perfil.telefone || perfil.whatsapp}
+          onChangeText={(text) => setPerfil({ ...perfil, whatsapp: text, telefone: text })}
+          keyboardType="phone-pad"
+        />
+
+        {/* Campos Dinâmicos que você criou */}
+        {perfil.cpf !== undefined && (
+          <>
+            <Text style={styles.label}>CPF</Text>
+            <TextInput style={styles.input} placeholder="CPF" value={perfil.cpf} onChangeText={(text) => setPerfil({ ...perfil, cpf: text })} />
+          </>
+        )}
+
+        {perfil.cnpj !== undefined && (
+          <>
+            <Text style={styles.label}>CNPJ</Text>
+            <TextInput style={styles.input} placeholder="CNPJ" value={perfil.cnpj} onChangeText={(text) => setPerfil({ ...perfil, cnpj: text })} />
+          </>
+        )}
+
+        <Text style={styles.label}>Endereço Completo</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Rua, Número, Bairro, Cidade"
+          value={perfil.endereco}
+          onChangeText={(text) => setPerfil({ ...perfil, endereco: text })}
+        />
+
+        {/* Campo de Bio para o Profissional */}
+        <Text style={styles.label}>Sobre / Descrição</Text>
+        <TextInput
+          style={[styles.input, { height: 80 }]}
+          placeholder="Fale um pouco sobre seus serviços..."
+          value={perfil.bio}
+          onChangeText={(text) => setPerfil({ ...perfil, bio: text })}
+          multiline
+        />
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.success }]}
+          onPress={handleUpdate}
+          disabled={salvando}
+        >
+          {salvando ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <>
+              <Ionicons name="save-outline" size={20} color="#FFF" style={{ marginRight: 10 }} />
+              <Text style={styles.buttonText}>Salvar Alterações</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: colors.textDark, textAlign: 'center' },
-  input: { width: '100%', padding: 12, borderWidth: 1, borderColor: '#ccc', marginBottom: 15, borderRadius: 8 },
-  buttonContainer: { marginTop: 10 },
-  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8, marginVertical: 8 },
-  buttonText: { color: colors.textLight, fontSize: 16, fontWeight: 'bold' }
+  container: { flex: 1, backgroundColor: '#F5F5F5', padding: 20 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: colors.primary, textAlign: 'center', marginTop: 40 },
+  card: { backgroundColor: '#FFF', padding: 20, borderRadius: 15, elevation: 3, marginBottom: 30 },
+  label: { fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 5 },
+  input: {
+    width: '100%',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 15,
+    borderRadius: 8,
+    fontSize: 16,
+    color: '#333'
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginTop: 10
+  },
+  buttonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
 });
 
 export default EditarPerfil;

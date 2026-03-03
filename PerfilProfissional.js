@@ -6,145 +6,96 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from "./colors";
 
 export default function PerfilProfissional({ route, navigation }) {
-  // Pegamos o proId garantindo que não seja nulo
   const { proId } = route.params || {};
-
   const [perfil, setPerfil] = useState(null);
   const [servicos, setServicos] = useState([]);
-  const [servicoSelecionado, setServicoSelecionado] = useState(null);
-  const [colaboradoresHabilitados, setColaboradoresHabilitados] = useState([]);
-  const [colaboradorEscolhido, setColaboradorEscolhido] = useState(null);
+  const [servicosSelecionados, setServicosSelecionados] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (proId) {
-      carregarDados();
-    } else {
-      Alert.alert("Erro", "ID do profissional inválido.");
-      navigation.goBack();
-    }
+    if (proId) carregarDados();
   }, [proId]);
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       const pSnap = await getDoc(doc(db, "usuarios", proId));
-
       if (pSnap.exists()) {
-        const dadosPerfil = pSnap.data();
-        setPerfil(dadosPerfil);
-
-        // Busca serviços
+        setPerfil(pSnap.data());
         const sSnap = await getDocs(collection(db, "usuarios", proId, "servicos"));
         setServicos(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } else {
-        Alert.alert("Erro", "Este perfil não existe mais.");
-        navigation.goBack();
       }
-    } catch (error) {
-      console.log("Erro ao carregar dados:", error);
-    } finally {
-      setLoading(false);
+    } catch (error) { console.log(error); }
+    finally { setLoading(false); }
+  };
+
+  const toggleServico = (servico) => {
+    const jaSelecionado = servicosSelecionados.find(s => s.id === servico.id);
+    if (jaSelecionado) {
+      setServicosSelecionados(servicosSelecionados.filter(s => s.id !== servico.id));
+    } else {
+      setServicosSelecionados([...servicosSelecionados, servico]);
     }
   };
 
-  const tratarSelecaoServico = async (servico) => {
-    setServicoSelecionado(servico);
-    setColaboradorEscolhido(null);
+  const total = servicosSelecionados.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0);
 
-    try {
-      const colabSnap = await getDocs(collection(db, "usuarios", proId, "colaboradores"));
-      const todosColab = colabSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      if (todosColab.length === 0) {
-        // CORREÇÃO AQUI: Verificamos se perfil e perfil.nome existem antes de usar
-        const nomeDono = perfil && perfil.nome ? perfil.nome : "Profissional";
-        setColaboradorEscolhido({ id: proId, nome: nomeDono, cargo: 'Proprietário' });
-        setColaboradoresHabilitados([]);
-      } else {
-        // Proteção para o filtro: garante que c.servicosHabilitados existe antes do includes
-        const filtrados = todosColab.filter(c =>
-          c.servicosHabilitados && Array.isArray(c.servicosHabilitados) && c.servicosHabilitados.includes(servico.id)
-        );
-        setColaboradoresHabilitados([{ id: 'qualquer', nome: 'Qualquer Profissional', cargo: 'Disponibilidade imediata' }, ...filtrados]);
-      }
-    } catch (error) {
-      console.log("Erro ao processar serviço:", error);
-    }
-  };
-
-  if (loading) return (
-    <View style={styles.loadingCenter}>
-      <ActivityIndicator size="large" color={colors.primary} />
-    </View>
-  );
+  if (loading) return <ActivityIndicator style={{ flex: 1 }} size="large" color={colors.primary} />;
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        {/* Uso de ?. e || para evitar o erro de undefined */}
-        <Text style={styles.nomeClinica}>{perfil?.nome || "Carregando..."}</Text>
-        <Text style={styles.especialidade}>{perfil?.especialidade || ""}</Text>
+        <Text style={styles.nomeClinica}>{perfil?.nome || "Empresa"}</Text>
+        <Text style={styles.especialidade}>{perfil?.especialidade}</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>1. Escolha o Serviço</Text>
-      {servicos.map(s => (
-        <TouchableOpacity
-          key={s.id}
-          style={[styles.card, servicoSelecionado?.id === s.id && styles.selected]}
-          onPress={() => tratarSelecaoServico(s)}
-        >
-          <Text style={styles.txtServico}>{s?.nome || "Serviço"}</Text>
-          <Text style={{ fontWeight: 'bold' }}>R$ {parseFloat(s?.preco || 0).toFixed(2)}</Text>
-        </TouchableOpacity>
-      ))}
+      <Text style={styles.sectionTitle}>1. Selecione os Serviços</Text>
+      {servicos.map(s => {
+        const selecionado = servicosSelecionados.find(sel => sel.id === s.id);
+        return (
+          <TouchableOpacity
+            key={s.id}
+            style={[styles.card, selecionado && styles.selected]}
+            onPress={() => toggleServico(s)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name={selecionado ? "checkbox" : "square-outline"} size={24} color={selecionado ? colors.primary : "#ccc"} />
+              <Text style={[styles.txtServico, { marginLeft: 10 }]}>{s.nome}</Text>
+            </View>
+            <Text style={{ fontWeight: 'bold' }}>R$ {parseFloat(s.preco).toFixed(2)}</Text>
+          </TouchableOpacity>
+        );
+      })}
 
-      {servicoSelecionado && colaboradoresHabilitados.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>2. Com quem agendar?</Text>
-          {colaboradoresHabilitados.map(c => (
-            <TouchableOpacity
-              key={c.id}
-              style={[styles.card, colaboradorEscolhido?.id === c.id && styles.selected]}
-              onPress={() => setColaboradorEscolhido(c)}
-            >
-              <View>
-                {/* Proteção para nome do colaborador */}
-                <Text style={{ fontWeight: 'bold' }}>{c?.nome || "Colaborador"}</Text>
-                <Text style={{ fontSize: 12, color: '#666' }}>{c?.cargo || ""}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </>
+      {servicosSelecionados.length > 0 && (
+        <View style={styles.footerFix}>
+          <Text style={styles.txtTotal}>Total: R$ {total.toFixed(2)}</Text>
+          <TouchableOpacity
+            style={styles.btnFinal}
+            onPress={() => navigation.navigate("AgendamentoFinal", {
+              clinicaId: proId,
+              servicos: servicosSelecionados
+            })}
+          >
+            <Text style={styles.btnText}>Escolher Data e Hora</Text>
+          </TouchableOpacity>
+        </View>
       )}
-
-      {colaboradorEscolhido && (
-        <TouchableOpacity
-          style={styles.btnFinal}
-          onPress={() => navigation.navigate("AgendamentoFinal", {
-            clinicaId: proId,
-            servico: servicoSelecionado,
-            colaborador: colaboradorEscolhido
-          })}
-        >
-          <Text style={styles.btnText}>Ver Horários</Text>
-        </TouchableOpacity>
-      )}
-      <View style={{ height: 30 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { padding: 30, backgroundColor: '#fff', alignItems: 'center', elevation: 2 },
   nomeClinica: { fontSize: 22, fontWeight: 'bold' },
   especialidade: { color: '#666' },
   sectionTitle: { margin: 20, fontSize: 18, fontWeight: 'bold', color: colors.primary },
-  card: { backgroundColor: '#fff', marginHorizontal: 20, marginBottom: 10, padding: 15, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 1 },
-  selected: { borderColor: colors.primary, borderWidth: 2 },
+  card: { backgroundColor: '#fff', marginHorizontal: 20, marginBottom: 10, padding: 15, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#eee' },
+  selected: { borderColor: colors.primary, backgroundColor: '#F0F7FF' },
   txtServico: { fontSize: 16 },
-  btnFinal: { backgroundColor: colors.success || '#4CAF50', margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
+  footerFix: { padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#eee', marginTop: 20 },
+  txtTotal: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
+  btnFinal: { backgroundColor: colors.primary, padding: 18, borderRadius: 12, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });
