@@ -7,7 +7,6 @@ expo-env.d.ts
 
 # --- FIREBASE & SEGURANÇA (Importante) ---
 # O arquivo abaixo contém chaves privadas do seu projeto
-google-services.json
 .eas/
 eas-build-pre-install.sh
 
