@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { auth, db } from "./firebaseConfig";
-import { doc, getDoc, getDocs, addDoc, collection, serverTimestamp } from "firebase/firestore"; // Adicionado serverTimestamp
+import { doc, getDoc, getDocs, setDoc, collection, serverTimestamp, query, where } from "firebase/firestore";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "./colors";
 
-// --- FUNÇÃO PARA ENVIAR A NOTIFICAÇÃO EXTERNA ---
 async function enviarPushNotificacao(expoPushToken, clienteNome, data, horario) {
     const message = {
         to: expoPushToken,
@@ -15,7 +14,6 @@ async function enviarPushNotificacao(expoPushToken, clienteNome, data, horario) 
         body: `${clienteNome} agendou para o dia ${data} às ${horario}`,
         data: { screen: 'AgendaProfissional' },
     };
-
     try {
         await fetch('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
@@ -39,23 +37,32 @@ export default function AgendamentoFinal({ route, navigation }) {
     const [horarioSelecionado, setHorarioSelecionado] = useState(null);
     const [colaboradorEscolhido, setColaboradorEscolhido] = useState(null);
     const [perfilCliente, setPerfilCliente] = useState(null);
-
     const [equipe, setEquipe] = useState([]);
     const [agendaClinica, setAgendaClinica] = useState({ horarios: [], dias: [] });
+    const [ocupacaoGeral, setOcupacaoGeral] = useState([]);
 
     useEffect(() => {
         carregarDadosIniciais();
         carregarPerfilCliente();
     }, []);
 
+    useEffect(() => {
+        buscarOcupacaoNoBanco();
+    }, [date]);
+
+    const formatarDataFiltro = (dataObj) => {
+        const d = dataObj.getDate().toString().padStart(2, '0');
+        const m = (dataObj.getMonth() + 1).toString().padStart(2, '0');
+        const y = dataObj.getFullYear();
+        return `${y}-${m}-${d}`;
+    };
+
     const carregarPerfilCliente = async () => {
         try {
             const user = auth.currentUser;
             if (user) {
                 const docSnap = await getDoc(doc(db, "usuarios", user.uid));
-                if (docSnap.exists()) {
-                    setPerfilCliente(docSnap.data());
-                }
+                if (docSnap.exists()) setPerfilCliente(docSnap.data());
             }
         } catch (e) { console.log("Erro ao carregar perfil:", e); }
     };
@@ -68,7 +75,6 @@ export default function AgendamentoFinal({ route, navigation }) {
 
             const colabSnap = await getDocs(collection(db, "usuarios", clinicaId, "colaboradores"));
             const listaColabs = [];
-
             for (const d of colabSnap.docs) {
                 const dados = d.data();
                 const agendaRef = doc(db, "usuarios", clinicaId, "colaboradores", d.id, "configuracoes", "agenda");
@@ -83,28 +89,68 @@ export default function AgendamentoFinal({ route, navigation }) {
         } catch (e) { console.log(e); }
     };
 
-    const verificarDisponibilidade = (colab) => {
+    const buscarOcupacaoNoBanco = async () => {
+        const dataFiltro = formatarDataFiltro(date);
+        try {
+            const q = query(
+                collection(db, "agendamentos"),
+                where("clinicaId", "==", clinicaId),
+                where("dataFiltro", "==", dataFiltro),
+                where("status", "!=", "cancelado")
+            );
+            const snap = await getDocs(q);
+            const ocupados = snap.docs.map(d => ({
+                horario: d.data().horario,
+                colabId: d.data().colaboradorId
+            }));
+            setOcupacaoGeral(ocupados);
+        } catch (e) { console.log("Erro ocupação:", e); }
+    };
+
+    const isHorarioDisponivelGeral = (h) => {
+        const diaSemana = date.getDay();
+        return equipe.some(colab => {
+            const agenda = colab.agenda || agendaClinica;
+            const trabalhaDia = agenda.dias?.includes(diaSemana);
+            const trabalhaHora = agenda.horarios?.includes(h);
+            const fazServicos = servicos.every(s => colab.servicosHabilitados?.includes(s.id));
+            const jaOcupado = ocupacaoGeral.some(o => o.horario === h && o.colabId === colab.id);
+            return trabalhaDia && trabalhaHora && fazServicos && !jaOcupado;
+        });
+    };
+
+    const verificarDisponibilidadeColab = (colab) => {
         if (!horarioSelecionado) return { ok: false, msg: "Escolha um horário" };
         const diaSemana = date.getDay();
         const agenda = colab.agenda || agendaClinica;
+        const jaOcupado = ocupacaoGeral.some(o => o.horario === horarioSelecionado && o.colabId === colab.id);
+        if (jaOcupado) return { ok: false, msg: "Já ocupado" };
         const trabalhaDia = agenda.dias?.includes(diaSemana);
         const trabalhaHora = agenda.horarios?.includes(horarioSelecionado);
         const fazServicos = servicos.every(s => colab.servicosHabilitados?.includes(s.id));
-
         if (trabalhaDia && trabalhaHora && fazServicos) return { ok: true };
-        if (!fazServicos) return { ok: false, msg: "Não faz estes serviços" };
-        return { ok: false, msg: "Fora de escala" };
+        if (!fazServicos) return { ok: false, msg: "Não realiza este serviço" };
+        return { ok: false, msg: "Indisponível" };
     };
 
     const finalizar = async () => {
-        if (!colaboradorEscolhido) return Alert.alert("Atenção", "Selecione um profissional disponível.");
+        if (!colaboradorEscolhido || !horarioSelecionado) return Alert.alert("Atenção", "Selecione data, hora e profissional.");
         setLoading(true);
         try {
-            const dataFormatada = date.toLocaleDateString('pt-BR');
-            const nomeCliente = perfilCliente?.nome || "Cliente Particular";
+            const dataFiltro = formatarDataFiltro(date);
+            const dataExibicao = date.toLocaleDateString('pt-BR');
+            const agendamentoID = `${dataFiltro}_${horarioSelecionado.replace(':', '')}_${colaboradorEscolhido.id}`;
+            const agendamentoRef = doc(db, "agendamentos", agendamentoID);
+            const checkSnap = await getDoc(agendamentoRef);
 
-            // 1. SALVAR NO FIRESTORE
-            await addDoc(collection(db, "agendamentos"), {
+            if (checkSnap.exists() && checkSnap.data().status !== "cancelado") {
+                setLoading(false);
+                buscarOcupacaoNoBanco();
+                return Alert.alert("Horário Ocupado", "Alguém acabou de reservar.");
+            }
+
+            const nomeCliente = perfilCliente?.nome || "Cliente";
+            await setDoc(agendamentoRef, {
                 clinicaId,
                 servicos: servicos.map(s => ({ id: s.id, nome: s.nome, preco: s.preco })),
                 colaboradorId: colaboradorEscolhido.id,
@@ -112,124 +158,167 @@ export default function AgendamentoFinal({ route, navigation }) {
                 clienteId: auth.currentUser.uid,
                 clienteNome: nomeCliente,
                 clienteWhatsapp: perfilCliente?.whatsapp || "Não informado",
-                enderecoCliente: perfilCliente?.enderecoResidencial || perfilCliente?.endereco || "Não informado",
-                data: dataFormatada,
+                data: dataExibicao,
+                dataFiltro: dataFiltro,
                 horario: horarioSelecionado,
                 status: "pendente",
-                notificado: false,
-                vistoPeloPro: false,
-                avaliado: false,
-                dataCriacao: serverTimestamp() // Usando o tempo do servidor
+                dataCriacao: serverTimestamp()
             });
 
-            // 2. BUSCAR TOKEN DO PROFISSIONAL PARA NOTIFICAÇÃO EXTERNA
-            const proRef = doc(db, "usuarios", clinicaId);
-            const proSnap = await getDoc(proRef);
-
-            if (proSnap.exists()) {
-                const proDados = proSnap.data();
-                if (proDados.pushToken) {
-                    // DISPARA O ALERTA PARA O CELULAR DELE
-                    await enviarPushNotificacao(
-                        proDados.pushToken,
-                        nomeCliente,
-                        dataFormatada,
-                        horarioSelecionado
-                    );
-                }
+            const proSnap = await getDoc(doc(db, "usuarios", clinicaId));
+            if (proSnap.exists() && proSnap.data().pushToken) {
+                await enviarPushNotificacao(proSnap.data().pushToken, nomeCliente, dataExibicao, horarioSelecionado);
             }
 
-            Alert.alert("Sucesso!", "Agendamento enviado e profissional notificado!");
+            Alert.alert("Sucesso!", "Agendamento realizado!");
             navigation.navigate("Main");
-
         } catch (e) {
-            console.log(e);
-            Alert.alert("Erro", "Falha ao agendar");
-        } finally {
-            setLoading(false);
-        }
+            console.error(e);
+            Alert.alert("Erro", "Falha ao agendar.");
+        } finally { setLoading(false); }
     };
 
-    // ... O restante do seu código (return e styles) permanece o mesmo
     return (
-        <ScrollView style={styles.container}>
-            <Text style={styles.sectionTitle}>1. Quando deseja ser atendido?</Text>
-            <View style={styles.row}>
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowPicker(true)}>
-                    <Text style={styles.dateText}>{date.toLocaleDateString('pt-BR')}</Text>
+        <View style={styles.mainContainer}>
+            <ScrollView style={styles.container}>
+                <View style={styles.headerInfo}>
+                    <Text style={styles.title}>Finalizar Agendamento</Text>
+                    <Text style={styles.subtitle}>{servicos.length} serviço(s) selecionado(s)</Text>
+                </View>
+
+                <Text style={styles.sectionLabel}>Selecione a Data</Text>
+                <TouchableOpacity style={styles.dateSelector} onPress={() => setShowPicker(true)}>
+                    <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+                    <Text style={styles.dateSelectorText}>{date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+                    <Ionicons name="chevron-down" size={20} color={colors.secondary} />
                 </TouchableOpacity>
-            </View>
 
-            {showPicker && (
-                <DateTimePicker
-                    value={date}
-                    mode="date"
-                    minimumDate={new Date()}
-                    onChange={(e, d) => { setShowPicker(false); setDate(d || date); setHorarioSelecionado(null); }}
-                />
-            )}
+                {showPicker && (
+                    <DateTimePicker
+                        value={date}
+                        mode="date"
+                        minimumDate={new Date()}
+                        onChange={(e, d) => { setShowPicker(false); setDate(d || date); setHorarioSelecionado(null); setColaboradorEscolhido(null); }}
+                    />
+                )}
 
-            <View style={styles.horariosGrid}>
-                {agendaClinica.horarios.map(h => (
-                    <TouchableOpacity
-                        key={h}
-                        style={[styles.horaItem, horarioSelecionado === h && styles.horaSelected]}
-                        onPress={() => { setHorarioSelecionado(h); setColaboradorEscolhido(null); }}
-                    >
-                        <Text style={{ color: horarioSelecionado === h ? '#fff' : '#333' }}>{h}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {horarioSelecionado && (
-                <>
-                    <Text style={styles.sectionTitle}>2. Quem pode atender-lhe?</Text>
-                    {equipe.map(colab => {
-                        const status = verificarDisponibilidade(colab);
-                        const selecionado = colaboradorEscolhido?.id === colab.id;
+                <Text style={styles.sectionLabel}>Horários Disponíveis</Text>
+                <View style={styles.horariosGrid}>
+                    {agendaClinica.horarios.map(h => {
+                        const disponivel = isHorarioDisponivelGeral(h);
+                        const selecionado = horarioSelecionado === h;
                         return (
                             <TouchableOpacity
-                                key={colab.id}
-                                disabled={!status.ok}
-                                style={[styles.colabCard, selecionado && styles.colabSelected, !status.ok && { opacity: 0.4 }]}
-                                onPress={() => setColaboradorEscolhido(colab)}
+                                key={h}
+                                disabled={!disponivel}
+                                style={[
+                                    styles.horaChip,
+                                    disponivel ? styles.horaChipLivre : styles.horaChipIndisponivel,
+                                    selecionado && styles.horaChipSelected
+                                ]}
+                                onPress={() => { setHorarioSelecionado(h); setColaboradorEscolhido(null); }}
                             >
-                                <View>
-                                    <Text style={styles.nomeColab}>{colab.nome}</Text>
-                                    {!status.ok && <Text style={styles.txtErro}>{status.msg}</Text>}
-                                </View>
-                                {status.ok && <Ionicons name={selecionado ? "checkmark-circle" : "person-add"} size={24} color={colors.primary} />}
+                                <Text style={[
+                                    styles.horaChipText,
+                                    selecionado ? styles.horaChipTextSelected : (disponivel ? styles.horaChipTextLivre : styles.horaChipTextIndisponivel)
+                                ]}>
+                                    {h}
+                                </Text>
                             </TouchableOpacity>
                         );
                     })}
-                </>
-            )}
+                </View>
 
-            <TouchableOpacity
-                style={[styles.btnFinal, (!colaboradorEscolhido || loading) && { backgroundColor: '#ccc' }]}
-                onPress={finalizar}
-                disabled={!colaboradorEscolhido || loading}
-            >
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>FINALIZAR AGENDAMENTO</Text>}
-            </TouchableOpacity>
-            <View style={{ height: 40 }} />
-        </ScrollView>
+                {horarioSelecionado && (
+                    <View style={styles.colabSection}>
+                        <Text style={styles.sectionLabel}>Escolha o Profissional</Text>
+                        {equipe.map(colab => {
+                            const status = verificarDisponibilidadeColab(colab);
+                            const selecionado = colaboradorEscolhido?.id === colab.id;
+                            return (
+                                <TouchableOpacity
+                                    key={colab.id}
+                                    disabled={!status.ok}
+                                    style={[
+                                        styles.colabCard,
+                                        selecionado && styles.colabSelected,
+                                        !status.ok && styles.colabDisabled
+                                    ]}
+                                    onPress={() => setColaboradorEscolhido(colab)}
+                                >
+                                    <View style={[styles.colabAvatar, !status.ok && { backgroundColor: '#EEE' }]}>
+                                        <Text style={[styles.colabAvatarText, !status.ok && { color: '#999' }]}>{colab.nome.charAt(0)}</Text>
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 15 }}>
+                                        <Text style={[styles.nomeColab, !status.ok && { color: '#999' }]}>{colab.nome}</Text>
+                                        {!status.ok && <Text style={styles.txtErro}>{status.msg}</Text>}
+                                    </View>
+                                    {status.ok && (
+                                        <Ionicons
+                                            name={selecionado ? "radio-button-on" : "radio-button-off"}
+                                            size={24}
+                                            color={selecionado ? colors.primary : colors.border}
+                                        />
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                )}
+                <View style={{ height: 100 }} />
+            </ScrollView>
+
+            <View style={styles.footer}>
+                <TouchableOpacity
+                    style={[styles.btnFinal, (!colaboradorEscolhido || loading) && styles.btnDisabled]}
+                    onPress={finalizar}
+                    disabled={!colaboradorEscolhido || loading}
+                >
+                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>CONFIRMAR AGENDAMENTO</Text>}
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9f9f9', padding: 20 },
-    sectionTitle: { fontSize: 16, fontWeight: 'bold', marginVertical: 15, color: '#444' },
-    row: { flexDirection: 'row', marginBottom: 10 },
-    dateBtn: { backgroundColor: '#fff', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#ddd', flex: 1, alignItems: 'center' },
-    dateText: { fontSize: 16, fontWeight: '500' },
-    horariosGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    horaItem: { backgroundColor: '#fff', width: '23%', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#eee' },
-    horaSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-    colabCard: { backgroundColor: '#fff', padding: 15, borderRadius: 12, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 2 },
-    colabSelected: { borderColor: colors.primary, borderWidth: 2 },
-    nomeColab: { fontWeight: 'bold', fontSize: 16 },
-    txtErro: { fontSize: 11, color: 'red' },
-    btnFinal: { backgroundColor: '#28a745', padding: 20, borderRadius: 12, alignItems: 'center', marginTop: 30 },
-    btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+    mainContainer: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, padding: 20 },
+    headerInfo: { marginBottom: 25, marginTop: 20 },
+    title: { fontSize: 24, fontWeight: 'bold', color: colors.textDark },
+    subtitle: { fontSize: 14, color: colors.secondary },
+    sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: colors.textDark, marginTop: 10 },
+    dateSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 18, borderRadius: 15, elevation: 2, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
+    dateSelectorText: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: '600', color: colors.textDark, textTransform: 'capitalize' },
+
+    horariosGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
+    horaChip: {
+        paddingVertical: 12,
+        paddingHorizontal: 18,
+        borderRadius: 12,
+        marginRight: 10,
+        marginBottom: 10,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        minWidth: 80
+    },
+    horaChipLivre: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
+    horaChipTextLivre: { color: '#2E7D32', fontWeight: 'bold' },
+    horaChipIndisponivel: { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2', opacity: 0.6 },
+    horaChipTextIndisponivel: { color: '#C62828' },
+    horaChipSelected: { backgroundColor: '#918a8a', borderColor: '#212121', elevation: 4 },
+    horaChipTextSelected: { color: '#FFF', fontWeight: 'bold' },
+
+    colabSection: { marginTop: 10 },
+    colabCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, elevation: 2, borderWidth: 1, borderColor: colors.border },
+    colabSelected: { borderColor: colors.primary, backgroundColor: '#F0F7FF' },
+    colabDisabled: { opacity: 0.5, backgroundColor: '#F8F8F8' },
+    colabAvatar: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: colors.inputFill, justifyContent: 'center', alignItems: 'center' },
+    colabAvatarText: { fontWeight: 'bold', color: colors.primary },
+    nomeColab: { fontWeight: 'bold', fontSize: 16, color: colors.textDark },
+    txtErro: { fontSize: 12, color: colors.danger, fontWeight: '500' },
+    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: 'transparent' },
+    btnFinal: { backgroundColor: colors.success, padding: 18, borderRadius: 15, alignItems: 'center', elevation: 5 },
+    btnDisabled: { backgroundColor: '#CCC', elevation: 0 },
+    btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 }
 });
