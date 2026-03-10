@@ -28,7 +28,7 @@ import DetalhesAgendamentoPro from './DetalhesAgendamentoPro';
 // Importando Telas do Cliente
 import MeusAgendamentosCliente from './MeusAgendamentosCliente';
 import DetalhesAgendamento from './DetalhesAgendamento';
-import AvaliarServico from './AvaliarServico';
+import AvaliarAtendimento from './AvaliarAtendimento';
 import ListaMenores from './ListaMenores';
 import CadastroMenor from './CadastroMenor';
 import EditarMenor from './EditarMenor';
@@ -84,7 +84,6 @@ function DrawerRoutes() {
         options={{ title: 'Serviços e Preços' }}
       />
 
-      {/* ADICIONADO AQUI: Agora vai aparecer no Menu Lateral */}
       <Drawer.Screen
         name="ConfigurarAgendaGeral"
         component={ConfigurarAgenda}
@@ -128,7 +127,7 @@ export default function App() {
 
         <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} options={{ title: 'Perfil do Profissional' }} />
         <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Confirmar Agendamento' }} />
-        <Stack.Screen name="AvaliarServico" component={AvaliarServico} options={{ title: 'Avaliar Atendimento' }} />
+        <Stack.Screen name="AvaliarAtendimento" component={AvaliarAtendimento} options={{ title: 'Avaliar Atendimento' }} />
 
         <Stack.Screen name="DetalhesAgendamento" component={DetalhesAgendamento} options={{ title: 'Detalhes' }} />
         <Stack.Screen name="DetalhesAgendamentoPro" component={DetalhesAgendamentoPro} options={{ title: 'Informações do Pedido' }} />
@@ -136,7 +135,6 @@ export default function App() {
         <Stack.Screen name="ConfigurarPerfil" component={ConfigurarPerfil} options={{ title: 'Editar Perfil Público' }} />
         <Stack.Screen name="EditarPerfil" component={EditarPerfil} options={{ title: 'Dados Cadastrais' }} />
 
-        {/* Mantive aqui também para navegação interna entre telas */}
         <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Horários de Atendimento' }} />
 
         <Stack.Screen name="CadastroMenor" component={CadastroMenor} options={{ title: 'Cadastrar Dependente' }} />

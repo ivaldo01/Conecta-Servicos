@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaLogado() {
+      return request.auth != null;
+    }
+
+    function ehDono(userId) {
+      return estaLogado() && request.auth.uid == userId;
+    }
+
+    // =========================
+    // USUÁRIOS
+    // =========================
+
+    match /usuarios/{userId} {
+
+      allow read: if estaLogado();
+      allow create: if ehDono(userId);
+      allow update: if ehDono(userId);
+      allow delete: if false;
+
+      match /servicos/{servicoId} {
+        allow read: if estaLogado();
+        allow write: if ehDono(userId);
+      }
+
+      match /colaboradores/{colaboradorId} {
+        allow read: if estaLogado();
+        allow write: if ehDono(userId);
+      }
+
+      match /configuracoes/{configId} {
+        allow read: if estaLogado();
+        allow write: if ehDono(userId);
+      }
+
+      match /menores/{menorId} {
+        allow read, write: if ehDono(userId);
+      }
+
+    }
+
+    // =========================
+    // AGENDAMENTOS
+    // =========================
+
+    match /agendamentos/{docId} {
+
+      // qualquer usuário logado pode ver horários
+      allow read: if estaLogado();
+
+      // cliente pode criar
+      allow create: if estaLogado();
+
+      // só envolvidos podem alterar
+      allow update: if estaLogado() && (
+        request.auth.uid == resource.data.clienteId ||
+        request.auth.uid == resource.data.colaboradorId ||
+        request.auth.uid == resource.data.clinicaId
+      );
+
+      // só profissional ou clínica podem deletar
+      allow delete: if estaLogado() && (
+        request.auth.uid == resource.data.colaboradorId ||
+        request.auth.uid == resource.data.clinicaId
+      );
+    }
+
+    // =========================
+    // AVALIAÇÕES
+    // =========================
+
+    match /avaliacoes/{avaliacaoId} {
+      allow read: if true;
+      allow create: if estaLogado();
+      allow update, delete: if false;
+    }
+
+    // =========================
+    // BLOQUEIO GERAL
+    // =========================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+  }
+}

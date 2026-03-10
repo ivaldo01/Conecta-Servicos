@@ -1,8 +1,14 @@
 import { initializeApp } from "firebase/app";
-// Mudamos o getAuth para initializeAuth e incluímos o persistence
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+
+// Auth com persistência no React Native
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
+
+// Firestore
 import { getFirestore } from "firebase/firestore";
+
+// Cloud Functions
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAzG2dnGzcipvraVdXEKJOj4JdjR8vRmzs",
@@ -14,12 +20,18 @@ const firebaseConfig = {
   measurementId: "G-3F0TDM3BLB"
 };
 
-// Inicializa Firebase
+// Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 
-// Configura o Auth para NÃO perder a sessão no React Native
+// Auth com persistência (não perde login no React Native)
 export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
 });
 
+// Firestore
 export const db = getFirestore(app);
+
+// Cloud Functions
+export const functions = getFunctions(app);
+
+export default app;
