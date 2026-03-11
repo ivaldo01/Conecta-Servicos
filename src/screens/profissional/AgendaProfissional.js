@@ -20,51 +20,21 @@ import {
     onSnapshot,
     getDoc,
 } from "firebase/firestore";
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 
-async function enviarPushAoCliente(expoPushToken, status) {
-    let titulo = 'Atualização do Agendamento';
-    let corpo = 'Seu agendamento foi atualizado.';
-
-    if (status === 'confirmado') {
-        titulo = 'Agendamento Confirmado! ✅';
-        corpo = 'Seu agendamento foi aceito. Nos vemos em breve!';
-    } else if (status === 'recusado') {
-        titulo = 'Agendamento Recusado ❌';
-        corpo = 'O profissional não pôde aceitar seu pedido no momento.';
-    } else if (status === 'cancelado') {
-        titulo = 'Agendamento Cancelado ❌';
-        corpo = 'Seu agendamento foi cancelado.';
-    } else if (status === 'concluido') {
-        titulo = 'Atendimento Concluído ✅';
-        corpo = 'Seu atendimento foi concluído com sucesso.';
-    }
-
-    const message = {
-        to: expoPushToken,
-        sound: 'default',
-        title: titulo,
-        body: corpo,
-        data: { screen: 'MeusAgendamentosCliente' },
-    };
-
-    try {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Accept-encoding': 'gzip, deflate',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(message),
-        });
-    } catch (error) {
-        console.log("Erro ao enviar push:", error);
-    }
-}
+import { enviarPushAoCliente } from '../../utils/notificationUtils';
+import { getStatusColor, getMensagemStatus } from '../../utils/statusUtils';
+import {
+    getHojeStr,
+    calcularTotalAgendamento,
+    getResumoServicos,
+    filtrarAgendamentosPorStatus,
+    contarAgendamentosPorStatus,
+    montarDashboardHoje,
+    ordenarAgendamentosPorCriacao,
+} from '../../utils/agendamentoUtils';
+import { imprimirOrdemServico } from '../../utils/pdfUtils';
 
 export default function AgendaProfissional({ navigation }) {
     const [agendamentos, setAgendamentos] = useState([]);
@@ -107,11 +77,7 @@ export default function AgendaProfissional({ navigation }) {
                         ...d.data(),
                     }));
 
-                    const ordenados = dados.sort((a, b) => {
-                        const dataA = a.dataCriacao?.seconds || 0;
-                        const dataB = b.dataCriacao?.seconds || 0;
-                        return dataB - dataA;
-                    });
+                    const ordenados = ordenarAgendamentosPorCriacao(dados);
 
                     if (ordenados.some((item) => item.vistoPeloPro === false)) {
                         Vibration.vibrate(500);
@@ -133,40 +99,18 @@ export default function AgendaProfissional({ navigation }) {
         };
     }, []);
 
-    const hojeStr = useMemo(() => {
-        const hoje = new Date();
-        const dia = String(hoje.getDate()).padStart(2, '0');
-        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-        const ano = hoje.getFullYear();
-        return `${ano}-${mes}-${dia}`;
-    }, []);
+    const hojeStr = useMemo(() => getHojeStr(), []);
 
     const agendamentosFiltrados = useMemo(() => {
-        if (filtroStatus === 'todos') return agendamentos;
-        return agendamentos.filter((item) => (item.status || 'pendente') === filtroStatus);
+        return filtrarAgendamentosPorStatus(agendamentos, filtroStatus);
     }, [agendamentos, filtroStatus]);
 
     const contagemPorStatus = useMemo(() => {
-        return {
-            todos: agendamentos.length,
-            pendente: agendamentos.filter((a) => (a.status || 'pendente') === 'pendente').length,
-            confirmado: agendamentos.filter((a) => a.status === 'confirmado').length,
-            concluido: agendamentos.filter((a) => a.status === 'concluido').length,
-            cancelado: agendamentos.filter((a) => a.status === 'cancelado').length,
-            recusado: agendamentos.filter((a) => a.status === 'recusado').length,
-        };
+        return contarAgendamentosPorStatus(agendamentos);
     }, [agendamentos]);
 
     const dashboardHoje = useMemo(() => {
-        const hoje = agendamentos.filter((item) => item.dataFiltro === hojeStr);
-
-        return {
-            totalHoje: hoje.length,
-            pendentesHoje: hoje.filter((a) => (a.status || 'pendente') === 'pendente').length,
-            confirmadosHoje: hoje.filter((a) => a.status === 'confirmado').length,
-            concluidosHoje: hoje.filter((a) => a.status === 'concluido').length,
-            canceladosHoje: hoje.filter((a) => a.status === 'cancelado').length,
-        };
+        return montarDashboardHoje(agendamentos, hojeStr);
     }, [agendamentos, hojeStr]);
 
     const alterarStatus = async (item, novoStatus) => {
@@ -182,13 +126,7 @@ export default function AgendaProfissional({ navigation }) {
                 await enviarPushAoCliente(clienteSnap.data().pushToken, novoStatus);
             }
 
-            let mensagem = "Status atualizado com sucesso.";
-            if (novoStatus === 'confirmado') mensagem = "Agendamento confirmado.";
-            if (novoStatus === 'recusado') mensagem = "Agendamento recusado.";
-            if (novoStatus === 'cancelado') mensagem = "Agendamento cancelado.";
-            if (novoStatus === 'concluido') mensagem = "Atendimento concluído.";
-
-            Alert.alert("Sucesso", mensagem);
+            Alert.alert("Sucesso", getMensagemStatus(novoStatus));
         } catch (e) {
             console.log("Erro ao atualizar status:", e);
             Alert.alert("Erro", "Falha ao atualizar status.");
@@ -240,33 +178,8 @@ export default function AgendaProfissional({ navigation }) {
     };
 
     const imprimirOS = async (item) => {
-        const listaServicosHtml = item.servicos?.map((s) =>
-            `<li>${s.nome} - R$ ${parseFloat(s.preco || 0).toFixed(2)}</li>`
-        ).join('') || `<li>${item.servicoNome || 'Serviço'} - R$ ${parseFloat(item.preco || 0).toFixed(2)}</li>`;
-
-        const valorTotal = item.servicos
-            ? item.servicos.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0).toFixed(2)
-            : parseFloat(item.preco || 0).toFixed(2);
-
-        const html = `
-      <html>
-        <body style="padding:40px; font-family:sans-serif;">
-          <h1 style="color:${colors.primary}">ORDEM DE SERVIÇO</h1>
-          <p><strong>Cliente:</strong> ${item.clienteNome || 'Cliente'}</p>
-          <p><strong>WhatsApp:</strong> ${item.clienteWhatsapp || 'Não informado'}</p>
-          <p><strong>Data:</strong> ${item.data} às ${item.horario}</p>
-          <p><strong>Status:</strong> ${item.status || 'pendente'}</p>
-          <hr/>
-          <h3>Serviços:</h3>
-          <ul>${listaServicosHtml}</ul>
-          <h2>Total: R$ ${valorTotal}</h2>
-        </body>
-      </html>
-    `;
-
         try {
-            const { uri } = await Print.printToFileAsync({ html });
-            await Sharing.shareAsync(uri);
+            await imprimirOrdemServico(item);
         } catch (error) {
             console.log("Erro ao gerar PDF:", error);
             Alert.alert("Erro", "Falha ao gerar PDF.");
@@ -287,23 +200,6 @@ export default function AgendaProfissional({ navigation }) {
         } catch (error) {
             console.log("Erro ao abrir detalhes:", error);
             Alert.alert("Erro", "Não foi possível abrir os detalhes.");
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'pendente':
-                return colors.warning || '#FFCC00';
-            case 'confirmado':
-                return colors.success || '#28a745';
-            case 'recusado':
-                return colors.danger || '#dc3545';
-            case 'cancelado':
-                return '#6c757d';
-            case 'concluido':
-                return '#1565C0';
-            default:
-                return colors.secondary || '#999';
         }
     };
 
@@ -378,10 +274,7 @@ export default function AgendaProfissional({ navigation }) {
     };
 
     const renderCard = ({ item }) => {
-        const totalCard = item.servicos
-            ? item.servicos.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0)
-            : parseFloat(item.preco || 0);
-
+        const totalCard = calcularTotalAgendamento(item);
         const statusColor = getStatusColor(item.status);
         const ehNovo = item.vistoPeloPro === false;
 
@@ -395,9 +288,7 @@ export default function AgendaProfissional({ navigation }) {
                     <View style={styles.clientInfo}>
                         <Text style={styles.clienteNome}>{item.clienteNome || "Cliente"}</Text>
                         <Text style={styles.servicoResumo}>
-                            {item.servicos?.length
-                                ? item.servicos.map((s) => s.nome).join(', ')
-                                : item.servicoNome || "Serviço"}
+                            {getResumoServicos(item)}
                         </Text>
                     </View>
 

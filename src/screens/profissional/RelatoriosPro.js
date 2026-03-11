@@ -11,6 +11,8 @@ import { auth, db } from "../../services/firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+import { formatCurrency } from "../../utils/formatCurrency";
+import { calcTotalServicos } from "../../utils/calcTotalServicos";
 
 export default function RelatoriosPro() {
     const [loading, setLoading] = useState(true);
@@ -21,18 +23,8 @@ export default function RelatoriosPro() {
         carregarDadosFinanceiros();
     }, []);
 
-    const formatarMoeda = (valor) => {
-        return valor.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        });
-    };
-
     const valorDoAgendamento = (data) => {
-        if (data?.servicos && Array.isArray(data.servicos)) {
-            return data.servicos.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0);
-        }
-        return parseFloat(data?.preco || 0);
+        return calcTotalServicos(data?.servicos, data?.preco);
     };
 
     const carregarDadosFinanceiros = async () => {
@@ -194,7 +186,7 @@ export default function RelatoriosPro() {
 
             <View style={styles.mainCard}>
                 <Text style={styles.cardLabel}>Faturamento Total</Text>
-                <Text style={styles.totalValue}>{formatarMoeda(resumo.faturamentoTotal)}</Text>
+                <Text style={styles.totalValue}>{formatCurrency(resumo.faturamentoTotal)}</Text>
 
                 <View style={styles.divider} />
 
@@ -210,21 +202,21 @@ export default function RelatoriosPro() {
                 <View style={styles.infoCard}>
                     <Ionicons name="today-outline" size={22} color={colors.primary} />
                     <Text style={styles.smallLabel}>Hoje</Text>
-                    <Text style={styles.smallValue}>{formatarMoeda(resumo.faturamentoHoje)}</Text>
+                    <Text style={styles.smallValue}>{formatCurrency(resumo.faturamentoHoje)}</Text>
                     <Text style={styles.smallSub}>{resumo.atendimentosHoje} atendimento(s)</Text>
                 </View>
 
                 <View style={styles.infoCard}>
                     <Ionicons name="calendar-outline" size={22} color={colors.primary} />
                     <Text style={styles.smallLabel}>Este mês</Text>
-                    <Text style={styles.smallValue}>{formatarMoeda(resumo.faturamentoMes)}</Text>
+                    <Text style={styles.smallValue}>{formatCurrency(resumo.faturamentoMes)}</Text>
                     <Text style={styles.smallSub}>{resumo.atendimentosMes} atendimento(s)</Text>
                 </View>
 
                 <View style={styles.infoCard}>
                     <Ionicons name="trending-up-outline" size={22} color={colors.primary} />
                     <Text style={styles.smallLabel}>Ticket médio</Text>
-                    <Text style={styles.smallValue}>{formatarMoeda(resumo.ticketMedio)}</Text>
+                    <Text style={styles.smallValue}>{formatCurrency(resumo.ticketMedio)}</Text>
                     <Text style={styles.smallSub}>por atendimento</Text>
                 </View>
 
@@ -247,7 +239,7 @@ export default function RelatoriosPro() {
                     <View key={item.label} style={styles.barItem}>
                         <View style={styles.barHeader}>
                             <Text style={styles.barLabel}>{item.label}</Text>
-                            <Text style={styles.barValue}>{formatarMoeda(item.valor)}</Text>
+                            <Text style={styles.barValue}>{formatCurrency(item.valor)}</Text>
                         </View>
 
                         <View style={styles.barTrack}>
@@ -275,7 +267,7 @@ export default function RelatoriosPro() {
                             </View>
 
                             <Text style={styles.atendimentoValor}>
-                                {formatarMoeda(item.valorTotal)}
+                                {formatCurrency(item.valorTotal)}
                             </Text>
                         </View>
                     ))
