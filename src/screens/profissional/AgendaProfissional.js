@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -10,18 +10,18 @@ import {
     Vibration,
     ScrollView,
 } from 'react-native';
-import { auth, db } from "../../services/firebaseConfig";
+import { db } from "../../services/firebaseConfig";
 import {
-    collection,
-    query,
-    where,
     doc,
     updateDoc,
-    onSnapshot,
     getDoc,
 } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+
+import { useAuth } from '../../hooks/useAuth';
+import { useUsuario } from '../../hooks/useUsuario';
+import { useAgendamentos } from '../../hooks/useAgendamentos';
 
 import { enviarPushAoCliente } from '../../utils/notificationUtils';
 import { getStatusColor, getMensagemStatus } from '../../utils/statusUtils';
@@ -32,14 +32,18 @@ import {
     filtrarAgendamentosPorStatus,
     contarAgendamentosPorStatus,
     montarDashboardHoje,
-    ordenarAgendamentosPorCriacao,
 } from '../../utils/agendamentoUtils';
 import { imprimirOrdemServico } from '../../utils/pdfUtils';
 
 export default function AgendaProfissional({ navigation }) {
-    const [agendamentos, setAgendamentos] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [filtroStatus, setFiltroStatus] = useState('todos');
+
+    const { usuario, loadingAuth } = useAuth();
+    const { dadosUsuario, loadingUsuario } = useUsuario(usuario?.uid);
+    const { agendamentos, loadingAgendamentos } = useAgendamentos(
+        usuario?.uid,
+        dadosUsuario?.perfil
+    );
 
     const filtros = [
         { key: 'todos', label: 'Todos' },
@@ -51,53 +55,10 @@ export default function AgendaProfissional({ navigation }) {
     ];
 
     useEffect(() => {
-        let unsubscribe = null;
-
-        const iniciar = async () => {
-            const user = auth.currentUser;
-            if (!user) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const perfilRef = doc(db, "usuarios", user.uid);
-                const perfilSnap = await getDoc(perfilRef);
-                const perfilData = perfilSnap.exists() ? perfilSnap.data() : {};
-
-                const ehColaborador = perfilData?.perfil === "colaborador";
-
-                const q = ehColaborador
-                    ? query(collection(db, "agendamentos"), where("colaboradorId", "==", user.uid))
-                    : query(collection(db, "agendamentos"), where("clinicaId", "==", user.uid));
-
-                unsubscribe = onSnapshot(q, async (snapshot) => {
-                    const dados = snapshot.docs.map((d) => ({
-                        id: d.id,
-                        ...d.data(),
-                    }));
-
-                    const ordenados = ordenarAgendamentosPorCriacao(dados);
-
-                    if (ordenados.some((item) => item.vistoPeloPro === false)) {
-                        Vibration.vibrate(500);
-                    }
-
-                    setAgendamentos(ordenados);
-                    setLoading(false);
-                });
-            } catch (error) {
-                console.log("Erro ao carregar agenda profissional:", error);
-                setLoading(false);
-            }
-        };
-
-        iniciar();
-
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
-    }, []);
+        if (agendamentos.some((item) => item.vistoPeloPro === false)) {
+            Vibration.vibrate(500);
+        }
+    }, [agendamentos]);
 
     const hojeStr = useMemo(() => getHojeStr(), []);
 
@@ -352,7 +313,7 @@ export default function AgendaProfissional({ navigation }) {
         </View>
     );
 
-    if (loading) {
+    if (loadingAuth || loadingUsuario || loadingAgendamentos) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
