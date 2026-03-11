@@ -3,27 +3,27 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
 // Importando todas as telas
-import LoginScreen from './LoginScreen';
-import ChooseProfileScreen from './ChooseProfileScreen';
-import SignUpCliente from './SignUpCliente';
-import SignUpProEmpresa from './SignUpProEmpresa'; 
-import HomeScreen from './HomeScreen';
-import CadastroMenor from './CadastroMenor';
-import EditarMenor from './EditarMenor';
-import ListaMenores from './ListaMenores';
-import PerfilScreen from './PerfilScreen';
-import EditarPerfil from './EditarPerfil';
-import ConfigurarAgenda from './ConfigurarAgenda'; // <-- ADICIONE ESTA LINHA AQUI!
-import BuscaProfissionais from './BuscaProfissionais';
+import LoginScreen from './src/screens/auth/LoginScreen';
+import ChooseProfileScreen from './src/screens/auth/ChooseProfileScreen';
+import SignUpCliente from './src/screens/auth/SignUpCliente';
+import SignUpProEmpresa from './src/screens/auth/SignUpProEmpresa';
+import HomeScreen from './src/screens/comum/HomeScreen';
+import CadastroMenor from './src/screens/cliente/CadastroMenor';
+import EditarMenor from './src/screens/cliente/EditarMenor';
+import ListaMenores from './src/screens/cliente/ListaMenores';
+import PerfilScreen from './src/screens/comum/PerfilScreen';
+import EditarPerfil from './src/screens/comum/EditarPerfil';
+import ConfigurarAgenda from './src/screens/profissional/ConfigurarAgenda';
+import BuscaProfissionais from './src/screens/cliente/BuscaProfissionais';
 
 const Stack = createStackNavigator();
 
 function Navigation() {
   return (
     <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName="Login" 
-        screenOptions={{ 
+      <Stack.Navigator
+        initialRouteName="Login"
+        screenOptions={{
           headerShown: true,
           headerStyle: { backgroundColor: '#2196F3' },
           headerTintColor: '#fff',

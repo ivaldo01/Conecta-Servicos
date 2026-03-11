@@ -4,38 +4,39 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
 // Importando Telas de Acesso
-import ChooseProfileScreen from './ChooseProfileScreen';
-import SignUpCliente from './SignUpCliente';
-import SignUpProEmpresa from './SignUpProEmpresa';
-import LoginScreen from './LoginScreen';
-import TermosUso from './TermosUso';
+import ChooseProfileScreen from './src/screens/auth/ChooseProfileScreen';
+import SignUpCliente from './src/screens/auth/SignUpCliente';
+import SignUpProEmpresa from './src/screens/auth/SignUpProEmpresa';
+import LoginScreen from './src/screens/auth/LoginScreen';
+import TermosUso from './src/screens/auth/TermosUso';
 
 // Importando Telas Principais
-import HomeScreen from './HomeScreen';
-import BuscaProfissionais from './BuscaProfissionais';
-import PerfilProfissional from './PerfilProfissional';
-import AgendamentoFinal from './AgendamentoFinal';
+import HomeScreen from './src/screens/comum/HomeScreen';
+import BuscaProfissionais from './src/screens/cliente/BuscaProfissionais';
+import PerfilProfissional from './src/screens/cliente/PerfilProfissional';
+import AgendamentoFinal from './src/screens/cliente/AgendamentoFinal';
 
 // Importando Telas do Profissional
-import AgendaProfissional from './AgendaProfissional';
-import ConfigurarServicos from './ConfigurarServicos';
-import ConfigurarPerfil from './ConfigurarPerfil';
-import ConfigurarAgenda from './ConfigurarAgenda';
-import GerenciarColaboradores from './GerenciarColaboradores';
-import RelatoriosPro from './RelatoriosPro';
-import DetalhesAgendamentoPro from './DetalhesAgendamentoPro';
+import AgendaProfissional from './src/screens/profissional/AgendaProfissional';
+import ConfigurarServicos from './src/screens/profissional/ConfigurarServicos';
+import ConfigurarPerfil from './src/screens/profissional/ConfigurarPerfil';
+import ConfigurarAgenda from './src/screens/profissional/ConfigurarAgenda';
+import GerenciarColaboradores from './src/screens/profissional/GerenciarColaboradores';
+import RelatoriosPro from './src/screens/profissional/RelatoriosPro';
+import DetalhesAgendamentoPro from './src/screens/profissional/DetalhesAgendamentoPro';
 
 // Importando Telas do Cliente
-import MeusAgendamentosCliente from './MeusAgendamentosCliente';
-import DetalhesAgendamento from './DetalhesAgendamento';
-import AvaliarAtendimento from './AvaliarAtendimento';
-import ListaMenores from './ListaMenores';
-import CadastroMenor from './CadastroMenor';
-import EditarMenor from './EditarMenor';
+import MeusAgendamentosCliente from './src/screens/cliente/MeusAgendamentosCliente';
+import DetalhesAgendamento from './src/screens/cliente/DetalhesAgendamento';
+import AvaliarAtendimento from './src/screens/cliente/AvaliarAtendimento';
+import ListaMenores from './src/screens/cliente/ListaMenores';
+import CadastroMenor from './src/screens/cliente/CadastroMenor';
+import EditarMenor from './src/screens/cliente/EditarMenor';
+import FavoritosCliente from './src/screens/cliente/FavoritosCliente';
 
 // Importando Telas de Perfil Geral
-import PerfilScreen from './PerfilScreen';
-import EditarPerfil from './EditarPerfil';
+import PerfilScreen from './src/screens/comum/PerfilScreen';
+import EditarPerfil from './src/screens/comum/EditarPerfil';
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -55,6 +56,11 @@ function DrawerRoutes() {
         name="BuscaProfissionais"
         component={BuscaProfissionais}
         options={{ title: 'Explorar Profissionais' }}
+      />
+      <Drawer.Screen
+        name="FavoritosCliente"
+        component={FavoritosCliente}
+        options={{ title: 'Profissionais Favoritos' }}
       />
       <Drawer.Screen
         name="MeusAgendamentosCliente"
@@ -83,13 +89,11 @@ function DrawerRoutes() {
         component={ConfigurarServicos}
         options={{ title: 'Serviços e Preços' }}
       />
-
       <Drawer.Screen
         name="ConfigurarAgendaGeral"
         component={ConfigurarAgenda}
         options={{ title: 'Horários de Atendimento' }}
       />
-
       <Drawer.Screen
         name="GerenciarColaboradores"
         component={GerenciarColaboradores}
@@ -116,7 +120,6 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
-
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ChooseProfile" component={ChooseProfileScreen} options={{ title: 'Tipo de Conta' }} />
         <Stack.Screen name="SignUpCliente" component={SignUpCliente} options={{ title: 'Cadastro Cliente' }} />
@@ -128,18 +131,17 @@ export default function App() {
         <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} options={{ title: 'Perfil do Profissional' }} />
         <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Confirmar Agendamento' }} />
         <Stack.Screen name="AvaliarAtendimento" component={AvaliarAtendimento} options={{ title: 'Avaliar Atendimento' }} />
+        <Stack.Screen name="FavoritosCliente" component={FavoritosCliente} options={{ title: 'Profissionais Favoritos' }} />
 
         <Stack.Screen name="DetalhesAgendamento" component={DetalhesAgendamento} options={{ title: 'Detalhes' }} />
         <Stack.Screen name="DetalhesAgendamentoPro" component={DetalhesAgendamentoPro} options={{ title: 'Informações do Pedido' }} />
 
         <Stack.Screen name="ConfigurarPerfil" component={ConfigurarPerfil} options={{ title: 'Editar Perfil Público' }} />
         <Stack.Screen name="EditarPerfil" component={EditarPerfil} options={{ title: 'Dados Cadastrais' }} />
-
         <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Horários de Atendimento' }} />
 
         <Stack.Screen name="CadastroMenor" component={CadastroMenor} options={{ title: 'Cadastrar Dependente' }} />
         <Stack.Screen name="EditarMenor" component={EditarMenor} options={{ title: 'Editar Dependente' }} />
-
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -15,7 +15,6 @@ service cloud.firestore {
     // =========================
 
     match /usuarios/{userId} {
-
       allow read: if estaLogado();
       allow create: if ehDono(userId);
       allow update: if ehDono(userId);
@@ -40,6 +39,9 @@ service cloud.firestore {
         allow read, write: if ehDono(userId);
       }
 
+      match /favoritos/{favoritoId} {
+        allow read, write: if ehDono(userId);
+      }
     }
 
     // =========================
@@ -47,21 +49,13 @@ service cloud.firestore {
     // =========================
 
     match /agendamentos/{docId} {
-
-      // qualquer usuário logado pode ver horários
       allow read: if estaLogado();
-
-      // cliente pode criar
       allow create: if estaLogado();
-
-      // só envolvidos podem alterar
       allow update: if estaLogado() && (
         request.auth.uid == resource.data.clienteId ||
         request.auth.uid == resource.data.colaboradorId ||
         request.auth.uid == resource.data.clinicaId
       );
-
-      // só profissional ou clínica podem deletar
       allow delete: if estaLogado() && (
         request.auth.uid == resource.data.colaboradorId ||
         request.auth.uid == resource.data.clinicaId
@@ -85,6 +79,5 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if false;
     }
-
   }
 }
