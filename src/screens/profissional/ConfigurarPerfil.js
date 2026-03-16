@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,10 @@ import {
     ScrollView,
     Alert,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableWithoutFeedback,
+    Keyboard,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { auth, db } from "../../services/firebaseConfig";
@@ -16,6 +20,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import CustomButton from '../../components/CustomButton';
+import { prepararDadosCategoriaParaProfissional } from '../../utils/categoriaUtils';
 
 export default function ConfigurarPerfil() {
     const [loading, setLoading] = useState(true);
@@ -35,6 +40,16 @@ export default function ConfigurarPerfil() {
     const [cep, setCep] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
+
+    const telefoneRef = useRef(null);
+    const especialidadeRef = useRef(null);
+    const bioRef = useRef(null);
+    const enderecoRef = useRef(null);
+    const cidadeRef = useRef(null);
+    const estadoRef = useRef(null);
+    const cepRef = useRef(null);
+    const latitudeRef = useRef(null);
+    const longitudeRef = useRef(null);
 
     useEffect(() => {
         carregarDados();
@@ -74,6 +89,7 @@ export default function ConfigurarPerfil() {
                 );
             }
         } catch (error) {
+            console.log("Erro ao carregar dados do perfil:", error);
             Alert.alert("Erro", "Falha ao carregar dados.");
         } finally {
             setLoading(false);
@@ -88,6 +104,8 @@ export default function ConfigurarPerfil() {
     };
 
     const buscarCoordenadasPeloEndereco = async () => {
+        Keyboard.dismiss();
+
         if (!endereco.trim() || !cidade.trim() || !estado.trim()) {
             Alert.alert(
                 "Endereço incompleto",
@@ -136,6 +154,7 @@ export default function ConfigurarPerfil() {
     };
 
     const usarLocalizacaoAtual = async () => {
+        Keyboard.dismiss();
         setBuscandoLocalAtual(true);
 
         try {
@@ -178,9 +197,21 @@ export default function ConfigurarPerfil() {
     };
 
     const salvarPerfil = async () => {
+        Keyboard.dismiss();
+
         const user = auth.currentUser;
         if (!user) {
             Alert.alert("Erro", "Usuário não autenticado.");
+            return;
+        }
+
+        if (!nome.trim()) {
+            Alert.alert("Atenção", "Informe o nome do estabelecimento ou profissional.");
+            return;
+        }
+
+        if (!especialidade.trim()) {
+            Alert.alert("Atenção", "Informe sua especialidade.");
             return;
         }
 
@@ -190,12 +221,16 @@ export default function ConfigurarPerfil() {
             const latNum = parseCoordenada(latitude);
             const lngNum = parseCoordenada(longitude);
 
+            const dadosCategoria = await prepararDadosCategoriaParaProfissional(especialidade);
+
             await updateDoc(doc(db, "usuarios", user.uid), {
                 nome: nome.trim(),
                 bio: bio.trim(),
                 telefone: telefone.trim(),
                 whatsapp: telefone.trim(),
-                especialidade: especialidade.trim(),
+
+                ...dadosCategoria,
+
                 endereco: endereco.trim(),
                 latitude: latNum,
                 longitude: lngNum,
@@ -210,7 +245,10 @@ export default function ConfigurarPerfil() {
             Alert.alert("Sucesso", "Dados atualizados com sucesso!");
         } catch (error) {
             console.log("Erro ao salvar perfil:", error);
-            Alert.alert("Erro", "Falha ao salvar.");
+            Alert.alert(
+                "Erro",
+                error?.message || "Falha ao salvar."
+            );
         } finally {
             setSalvando(false);
         }
@@ -227,172 +265,287 @@ export default function ConfigurarPerfil() {
     }
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Meu Perfil</Text>
-                <Text style={styles.subtitle}>Como os clientes verão você no app</Text>
-            </View>
-
-            <View style={styles.photoSection}>
-                <TouchableOpacity onPress={selecionarImagem} style={styles.avatarContainer}>
-                    {fotoPerfil ? (
-                        <Image source={{ uri: fotoPerfil }} style={styles.avatar} />
-                    ) : (
-                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                            <Ionicons name="camera" size={40} color="#CCC" />
-                        </View>
-                    )}
-                    <View style={styles.editBadge}>
-                        <Ionicons name="pencil" size={16} color="#FFF" />
+        <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <ScrollView
+                    style={styles.container}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Meu Perfil</Text>
+                        <Text style={styles.subtitle}>Como os clientes verão você no app</Text>
                     </View>
-                </TouchableOpacity>
-                <Text style={styles.photoTip}>Foto (indisponível neste fluxo)</Text>
-            </View>
 
-            <View style={styles.form}>
-                <Text style={styles.label}>Nome do Estabelecimento / Profissional</Text>
-                <TextInput
-                    style={styles.input}
-                    value={nome}
-                    onChangeText={setNome}
-                    placeholder="Ex: Barbearia do Ivaldo"
-                />
+                    <View style={styles.photoSection}>
+                        <TouchableOpacity onPress={selecionarImagem} style={styles.avatarContainer}>
+                            {fotoPerfil ? (
+                                <Image source={{ uri: fotoPerfil }} style={styles.avatar} />
+                            ) : (
+                                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                                    <Ionicons name="camera" size={40} color="#CCC" />
+                                </View>
+                            )}
+                            <View style={styles.editBadge}>
+                                <Ionicons name="pencil" size={16} color="#FFF" />
+                            </View>
+                        </TouchableOpacity>
+                        <Text style={styles.photoTip}>Foto (indisponível neste fluxo)</Text>
+                    </View>
 
-                <Text style={styles.label}>Telefone</Text>
-                <TextInput
-                    style={styles.input}
-                    value={telefone}
-                    onChangeText={setTelefone}
-                    placeholder="(00) 00000-0000"
-                    keyboardType="phone-pad"
-                />
+                    <View style={styles.form}>
+                        <Text style={styles.label}>Nome do Estabelecimento / Profissional</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={nome}
+                            onChangeText={setNome}
+                            placeholder="Ex: Barbearia do Ivaldo"
+                            returnKeyType="next"
+                            onSubmitEditing={() => telefoneRef.current?.focus()}
+                        />
 
-                <Text style={styles.label}>Especialidade</Text>
-                <TextInput
-                    style={styles.input}
-                    value={especialidade}
-                    onChangeText={setEspecialidade}
-                    placeholder="Ex: Barbeiro, Manicure, Fisioterapeuta"
-                />
+                        <Text style={styles.label}>Telefone</Text>
+                        <TextInput
+                            ref={telefoneRef}
+                            style={styles.input}
+                            value={telefone}
+                            onChangeText={setTelefone}
+                            placeholder="(00) 00000-0000"
+                            keyboardType="phone-pad"
+                            returnKeyType="next"
+                            onSubmitEditing={() => especialidadeRef.current?.focus()}
+                        />
 
-                <Text style={styles.label}>Bio / Especialidades</Text>
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    value={bio}
-                    onChangeText={setBio}
-                    placeholder="Descrição para os clientes..."
-                    multiline
-                    numberOfLines={4}
-                />
+                        <Text style={styles.label}>Especialidade</Text>
+                        <TextInput
+                            ref={especialidadeRef}
+                            style={styles.input}
+                            value={especialidade}
+                            onChangeText={setEspecialidade}
+                            placeholder="Ex: Barbeiro, Manicure, Fisioterapeuta"
+                            returnKeyType="next"
+                            onSubmitEditing={() => bioRef.current?.focus()}
+                        />
 
-                <Text style={styles.sectionDivider}>Localização</Text>
+                        <Text style={styles.label}>Bio / Especialidades</Text>
+                        <TextInput
+                            ref={bioRef}
+                            style={[styles.input, styles.textArea]}
+                            value={bio}
+                            onChangeText={setBio}
+                            placeholder="Descrição para os clientes..."
+                            multiline
+                            numberOfLines={4}
+                            textAlignVertical="top"
+                            returnKeyType="next"
+                            onSubmitEditing={() => enderecoRef.current?.focus()}
+                        />
 
-                <Text style={styles.label}>Endereço</Text>
-                <TextInput
-                    style={styles.input}
-                    value={endereco}
-                    onChangeText={setEndereco}
-                    placeholder="Rua, número e bairro"
-                />
+                        <Text style={styles.sectionDivider}>Localização</Text>
 
-                <Text style={styles.label}>Cidade</Text>
-                <TextInput
-                    style={styles.input}
-                    value={cidade}
-                    onChangeText={setCidade}
-                    placeholder="Sua cidade"
-                />
+                        <Text style={styles.label}>Endereço</Text>
+                        <TextInput
+                            ref={enderecoRef}
+                            style={styles.input}
+                            value={endereco}
+                            onChangeText={setEndereco}
+                            placeholder="Rua, número e bairro"
+                            returnKeyType="next"
+                            onSubmitEditing={() => cidadeRef.current?.focus()}
+                        />
 
-                <Text style={styles.label}>Estado</Text>
-                <TextInput
-                    style={styles.input}
-                    value={estado}
-                    onChangeText={setEstado}
-                    placeholder="UF"
-                    maxLength={2}
-                    autoCapitalize="characters"
-                />
+                        <Text style={styles.label}>Cidade</Text>
+                        <TextInput
+                            ref={cidadeRef}
+                            style={styles.input}
+                            value={cidade}
+                            onChangeText={setCidade}
+                            placeholder="Sua cidade"
+                            returnKeyType="next"
+                            onSubmitEditing={() => estadoRef.current?.focus()}
+                        />
 
-                <Text style={styles.label}>CEP</Text>
-                <TextInput
-                    style={styles.input}
-                    value={cep}
-                    onChangeText={setCep}
-                    placeholder="00000-000"
-                    keyboardType="numeric"
-                />
+                        <Text style={styles.label}>Estado</Text>
+                        <TextInput
+                            ref={estadoRef}
+                            style={styles.input}
+                            value={estado}
+                            onChangeText={setEstado}
+                            placeholder="UF"
+                            maxLength={2}
+                            autoCapitalize="characters"
+                            returnKeyType="next"
+                            onSubmitEditing={() => cepRef.current?.focus()}
+                        />
 
-                <TouchableOpacity
-                    style={[styles.geoButton, buscandoCoordenadas && { opacity: 0.7 }]}
-                    onPress={buscarCoordenadasPeloEndereco}
-                    disabled={buscandoCoordenadas}
-                >
-                    {buscandoCoordenadas ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <Text style={styles.geoButtonText}>BUSCAR COORDENADAS PELO ENDEREÇO</Text>
-                    )}
-                </TouchableOpacity>
+                        <Text style={styles.label}>CEP</Text>
+                        <TextInput
+                            ref={cepRef}
+                            style={styles.input}
+                            value={cep}
+                            onChangeText={setCep}
+                            placeholder="00000-000"
+                            keyboardType="numeric"
+                            returnKeyType="next"
+                            onSubmitEditing={() => latitudeRef.current?.focus()}
+                        />
 
-                <TouchableOpacity
-                    style={[styles.geoButtonSecondary, buscandoLocalAtual && { opacity: 0.7 }]}
-                    onPress={usarLocalizacaoAtual}
-                    disabled={buscandoLocalAtual}
-                >
-                    {buscandoLocalAtual ? (
-                        <ActivityIndicator color={colors.primary} />
-                    ) : (
-                        <Text style={styles.geoButtonSecondaryText}>USAR MINHA LOCALIZAÇÃO ATUAL</Text>
-                    )}
-                </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.geoButton, buscandoCoordenadas && { opacity: 0.7 }]}
+                            onPress={buscarCoordenadasPeloEndereco}
+                            disabled={buscandoCoordenadas}
+                        >
+                            {buscandoCoordenadas ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.geoButtonText}>BUSCAR COORDENADAS PELO ENDEREÇO</Text>
+                            )}
+                        </TouchableOpacity>
 
-                <Text style={styles.label}>Latitude</Text>
-                <TextInput
-                    style={styles.input}
-                    value={latitude}
-                    onChangeText={setLatitude}
-                    placeholder="-23.5505"
-                    keyboardType="numeric"
-                />
+                        <TouchableOpacity
+                            style={[styles.geoButtonSecondary, buscandoLocalAtual && { opacity: 0.7 }]}
+                            onPress={usarLocalizacaoAtual}
+                            disabled={buscandoLocalAtual}
+                        >
+                            {buscandoLocalAtual ? (
+                                <ActivityIndicator color={colors.primary} />
+                            ) : (
+                                <Text style={styles.geoButtonSecondaryText}>USAR MINHA LOCALIZAÇÃO ATUAL</Text>
+                            )}
+                        </TouchableOpacity>
 
-                <Text style={styles.label}>Longitude</Text>
-                <TextInput
-                    style={styles.input}
-                    value={longitude}
-                    onChangeText={setLongitude}
-                    placeholder="-46.6333"
-                    keyboardType="numeric"
-                />
+                        <Text style={styles.label}>Latitude</Text>
+                        <TextInput
+                            ref={latitudeRef}
+                            style={styles.input}
+                            value={latitude}
+                            onChangeText={setLatitude}
+                            placeholder="-23.5505"
+                            keyboardType="numeric"
+                            returnKeyType="next"
+                            onSubmitEditing={() => longitudeRef.current?.focus()}
+                        />
 
-                <CustomButton
-                    title={salvando ? "Salvando..." : "Salvar Alterações"}
-                    onPress={salvarPerfil}
-                    color={colors.primary}
-                    disabled={salvando}
-                />
-            </View>
-        </ScrollView>
+                        <Text style={styles.label}>Longitude</Text>
+                        <TextInput
+                            ref={longitudeRef}
+                            style={styles.input}
+                            value={longitude}
+                            onChangeText={setLongitude}
+                            placeholder="-46.6333"
+                            keyboardType="numeric"
+                            returnKeyType="done"
+                            onSubmitEditing={salvarPerfil}
+                        />
+
+                        <CustomButton
+                            title={salvando ? "Salvando..." : "Salvar Alterações"}
+                            onPress={salvarPerfil}
+                            color={colors.primary}
+                            disabled={salvando}
+                        />
+                    </View>
+                </ScrollView>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
+    flex: {
+        flex: 1,
+    },
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: { padding: 25, paddingTop: 60, backgroundColor: '#FFF' },
     title: { fontSize: 24, fontWeight: 'bold', color: colors.textDark },
     subtitle: { fontSize: 14, color: colors.secondary, marginTop: 4 },
     photoSection: { alignItems: 'center', marginVertical: 30 },
-    avatarContainer: { width: 120, height: 120, borderRadius: 60, elevation: 5, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10 },
-    avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: '#FFF' },
-    avatarPlaceholder: { backgroundColor: '#E9ECEF', justifyContent: 'center', alignItems: 'center' },
-    editBadge: { position: 'absolute', bottom: 5, right: 5, backgroundColor: colors.primary, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#FFF' },
+    avatarContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 10
+    },
+    avatar: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        borderWidth: 4,
+        borderColor: '#FFF'
+    },
+    avatarPlaceholder: {
+        backgroundColor: '#E9ECEF',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 5,
+        right: 5,
+        backgroundColor: colors.primary,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#FFF'
+    },
     photoTip: { fontSize: 12, color: colors.secondary, marginTop: 10 },
     form: { paddingHorizontal: 25, paddingBottom: 40 },
-    sectionDivider: { fontSize: 16, fontWeight: 'bold', color: colors.primary, marginBottom: 14, marginTop: 10 },
-    label: { fontSize: 14, fontWeight: 'bold', color: colors.textDark, marginBottom: 8, marginLeft: 4 },
-    input: { backgroundColor: '#FFF', padding: 15, borderRadius: 15, fontSize: 16, marginBottom: 20, borderWidth: 1, borderColor: '#E9ECEF', color: '#333' },
+    sectionDivider: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: colors.primary,
+        marginBottom: 14,
+        marginTop: 10
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: colors.textDark,
+        marginBottom: 8,
+        marginLeft: 4
+    },
+    input: {
+        backgroundColor: '#FFF',
+        padding: 15,
+        borderRadius: 15,
+        fontSize: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#E9ECEF',
+        color: '#333'
+    },
     textArea: { height: 100, textAlignVertical: 'top' },
-    geoButton: { backgroundColor: colors.success || '#28a745', padding: 15, borderRadius: 14, alignItems: 'center', marginBottom: 12 },
+    geoButton: {
+        backgroundColor: colors.success || '#28a745',
+        padding: 15,
+        borderRadius: 14,
+        alignItems: 'center',
+        marginBottom: 12
+    },
     geoButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-    geoButtonSecondary: { backgroundColor: '#F0F7FF', padding: 15, borderRadius: 14, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: colors.primary },
-    geoButtonSecondaryText: { color: colors.primary, fontWeight: 'bold', fontSize: 14 },
+    geoButtonSecondary: {
+        backgroundColor: '#F0F7FF',
+        padding: 15,
+        borderRadius: 14,
+        alignItems: 'center',
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: colors.primary
+    },
+    geoButtonSecondaryText: {
+        color: colors.primary,
+        fontWeight: 'bold',
+        fontSize: 14
+    },
 });

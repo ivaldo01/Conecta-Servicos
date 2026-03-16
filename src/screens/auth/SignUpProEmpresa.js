@@ -1,203 +1,200 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
   ScrollView,
   Alert,
   Switch,
-  ActivityIndicator,
-  KeyboardAvoidingView,
+  TouchableOpacity,
   Platform,
+  KeyboardAvoidingView,
+  Image,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from "../../services/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import colors from "../../constants/colors";
+import PrimaryButton from "../../components/PrimaryButton";
+import { prepararDadosCategoriaParaProfissional } from "../../utils/categoriaUtils";
+
+import logo from '../../../assets/logo.png';
 
 export default function SignUpProEmpresa({ navigation }) {
-  const [tipoRegistro, setTipoRegistro] = useState('autonomo');
+  const [tipoCadastro, setTipoCadastro] = useState('autonomo');
 
-  const [nomeResponsavel, setNomeResponsavel] = useState('');
+  const [nomeCompleto, setNomeCompleto] = useState('');
   const [nomeNegocio, setNomeNegocio] = useState('');
-  const [documento, setDocumento] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [cpfCnpj, setCpfCnpj] = useState('');
   const [especialidade, setEspecialidade] = useState('');
   const [bio, setBio] = useState('');
 
   const [pais, setPais] = useState('Brasil');
   const [estado, setEstado] = useState('');
   const [cidade, setCidade] = useState('');
-  const [endereco, setEndereco] = useState('');
   const [cep, setCep] = useState('');
+  const [endereco, setEndereco] = useState('');
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [aceitaTermos, setAceitaTermos] = useState(false);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
 
-  const [salvando, setSalvando] = useState(false);
+  const [aceitaTermos, setAceitaTermos] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const nomeNegocioRef = useRef(null);
+  const telefoneRef = useRef(null);
+  const cpfCnpjRef = useRef(null);
+  const especialidadeRef = useRef(null);
+  const bioRef = useRef(null);
+  const cidadeRef = useRef(null);
+  const cepRef = useRef(null);
+  const enderecoRef = useRef(null);
+  const emailRef = useRef(null);
+  const senhaRef = useRef(null);
+  const confirmarSenhaRef = useRef(null);
+
+  const paises = [
+    "Brasil", "Portugal", "Argentina", "Chile", "Uruguai", "Paraguai",
+    "Bolívia", "Peru", "Colômbia", "Venezuela", "Equador", "México",
+    "Estados Unidos", "Canadá", "Espanha", "França", "Alemanha",
+    "Itália", "Reino Unido", "Irlanda", "Suíça", "Bélgica",
+    "Holanda", "Luxemburgo", "Austrália", "Japão",
+  ];
 
   const estadosBrasil = [
     { label: "Selecione o Estado", value: "" },
-    { label: "Acre", value: "AC" }, { label: "Alagoas", value: "AL" }, { label: "Amapá", value: "AP" },
-    { label: "Amazonas", value: "AM" }, { label: "Bahia", value: "BA" }, { label: "Ceará", value: "CE" },
-    { label: "Distrito Federal", value: "DF" }, { label: "Espírito Santo", value: "ES" }, { label: "Goiás", value: "GO" },
-    { label: "Maranhão", value: "MA" }, { label: "Mato Grosso", value: "MT" }, { label: "Mato Grosso do Sul", value: "MS" },
-    { label: "Minas Gerais", value: "MG" }, { label: "Pará", value: "PA" }, { label: "Paraíba", value: "PB" },
-    { label: "Paraná", value: "PR" }, { label: "Pernambuco", value: "PE" }, { label: "Piauí", value: "PI" },
-    { label: "Rio de Janeiro", value: "RJ" }, { label: "Rio Grande do Norte", value: "RN" }, { label: "Rio Grande do Sul", value: "RS" },
-    { label: "Rondônia", value: "RO" }, { label: "Roraima", value: "RR" }, { label: "Santa Catarina", value: "SC" },
-    { label: "São Paulo", value: "SP" }, { label: "Sergipe", value: "SE" }, { label: "Tocantins", value: "TO" }
+    { label: "Acre", value: "AC" }, { label: "Alagoas", value: "AL" },
+    { label: "Amapá", value: "AP" }, { label: "Amazonas", value: "AM" },
+    { label: "Bahia", value: "BA" }, { label: "Ceará", value: "CE" },
+    { label: "Distrito Federal", value: "DF" }, { label: "Espírito Santo", value: "ES" },
+    { label: "Goiás", value: "GO" }, { label: "Maranhão", value: "MA" },
+    { label: "Mato Grosso", value: "MT" }, { label: "Mato Grosso do Sul", value: "MS" },
+    { label: "Minas Gerais", value: "MG" }, { label: "Pará", value: "PA" },
+    { label: "Paraíba", value: "PB" }, { label: "Paraná", value: "PR" },
+    { label: "Pernambuco", value: "PE" }, { label: "Piauí", value: "PI" },
+    { label: "Rio de Janeiro", value: "RJ" }, { label: "Rio Grande do Norte", value: "RN" },
+    { label: "Rio Grande do Sul", value: "RS" }, { label: "Rondônia", value: "RO" },
+    { label: "Roraima", value: "RR" }, { label: "Santa Catarina", value: "SC" },
+    { label: "São Paulo", value: "SP" }, { label: "Sergipe", value: "SE" },
+    { label: "Tocantins", value: "TO" },
   ];
 
-  const tituloDocumento = useMemo(() => {
-    return tipoRegistro === 'empresa' ? 'CNPJ' : 'CPF';
-  }, [tipoRegistro]);
+  const estadosGenericos = [
+    { label: "Selecione a Região / Estado", value: "" },
+    { label: "Não informado", value: "N/I" },
+  ];
 
-  const placeholderDocumento = useMemo(() => {
-    return tipoRegistro === 'empresa' ? 'Digite o CNPJ' : 'Digite o CPF';
-  }, [tipoRegistro]);
+  const estadosParaMostrar = useMemo(() => {
+    if (pais === 'Brasil') return estadosBrasil;
+    return estadosGenericos;
+  }, [pais]);
 
-  const nomeExibicao = useMemo(() => {
-    if (tipoRegistro === 'empresa') {
-      return nomeNegocio.trim();
-    }
-    return nomeResponsavel.trim();
-  }, [tipoRegistro, nomeNegocio, nomeResponsavel]);
+  const tituloDocumento = tipoCadastro === 'empresa' ? 'CNPJ' : 'CPF';
+  const placeholderDocumento =
+    tipoCadastro === 'empresa' ? '00.000.000/0000-00' : '000.000.000-00';
 
-  const limparSomenteNumeros = (texto) => texto.replace(/\D/g, '');
+  const tituloPrincipal =
+    tipoCadastro === 'empresa'
+      ? 'Criar Conta Profissional'
+      : 'Criar Perfil Profissional';
 
-  const formatarTelefone = (texto) => {
-    const numeros = limparSomenteNumeros(texto).slice(0, 11);
+  const subtituloPrincipal =
+    tipoCadastro === 'empresa'
+      ? 'Cadastre sua empresa para oferecer serviços no Conecta Serviços'
+      : 'Cadastre seu perfil para atender clientes no Conecta Serviços';
 
-    if (numeros.length <= 10) {
-      return numeros
-        .replace(/^(\d{0,2})/, '($1')
-        .replace(/^(\(\d{2})(\d)/, '$1) $2')
-        .replace(/(\d{4})(\d)/, '$1-$2')
-        .replace(/(-\d{4})\d+?$/, '$1');
-    }
-
-    return numeros
-      .replace(/^(\d{0,2})/, '($1')
-      .replace(/^(\(\d{2})(\d)/, '$1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .replace(/(-\d{4})\d+?$/, '$1');
-  };
-
-  const formatarCPF = (texto) => {
-    const numeros = limparSomenteNumeros(texto).slice(0, 11);
-    return numeros
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-  };
-
-  const formatarCNPJ = (texto) => {
-    const numeros = limparSomenteNumeros(texto).slice(0, 14);
-    return numeros
-      .replace(/^(\d{2})(\d)/, '$1.$2')
-      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-      .replace(/\.(\d{3})(\d)/, '.$1/$2')
-      .replace(/(\d{4})(\d)/, '$1-$2');
-  };
-
-  const formatarCEP = (texto) => {
-    const numeros = limparSomenteNumeros(texto).slice(0, 8);
-    return numeros.replace(/^(\d{5})(\d)/, '$1-$2');
-  };
-
-  const handleDocumentoChange = (texto) => {
-    if (tipoRegistro === 'empresa') {
-      setDocumento(formatarCNPJ(texto));
-      return;
-    }
-    setDocumento(formatarCPF(texto));
-  };
-
-  const validarFormulario = () => {
+  const validarCampos = () => {
     if (!aceitaTermos) {
       Alert.alert("Termos de Uso", "Você precisa aceitar os termos para criar sua conta.");
       return false;
     }
-
-    if (!nomeResponsavel.trim()) {
-      Alert.alert("Atenção", "Informe o nome do responsável.");
+    if (!nomeCompleto.trim()) {
+      Alert.alert(
+        "Atenção",
+        tipoCadastro === 'empresa'
+          ? "Informe o nome do responsável."
+          : "Informe seu nome completo."
+      );
       return false;
     }
-
-    if (tipoRegistro === 'empresa' && !nomeNegocio.trim()) {
-      Alert.alert("Atenção", "Informe o nome do negócio ou empresa.");
+    if (tipoCadastro === 'empresa' && !nomeNegocio.trim()) {
+      Alert.alert("Atenção", "Informe o nome da empresa ou negócio.");
       return false;
     }
-
-    if (!documento.trim()) {
-      Alert.alert("Atenção", `Informe o ${tituloDocumento}.`);
-      return false;
-    }
-
     if (!telefone.trim()) {
-      Alert.alert("Atenção", "Informe o telefone/WhatsApp.");
+      Alert.alert("Atenção", "Informe o telefone ou WhatsApp.");
       return false;
     }
-
+    if (!cpfCnpj.trim()) {
+      Alert.alert(
+        "Atenção",
+        tipoCadastro === 'empresa'
+          ? "Informe o CNPJ."
+          : "Informe o CPF."
+      );
+      return false;
+    }
     if (!especialidade.trim()) {
       Alert.alert("Atenção", "Informe a especialidade principal.");
       return false;
     }
-
-    if (!estado || !cidade.trim()) {
-      Alert.alert("Atenção", "Informe estado e cidade.");
+    if (!pais.trim()) {
+      Alert.alert("Atenção", "Informe o país.");
       return false;
     }
-
+    if (!estado) {
+      Alert.alert("Atenção", "Selecione o estado ou região.");
+      return false;
+    }
+    if (!cidade.trim()) {
+      Alert.alert("Atenção", "Informe a cidade.");
+      return false;
+    }
+    if (!cep.trim()) {
+      Alert.alert("Atenção", "Informe o CEP.");
+      return false;
+    }
+    if (!endereco.trim()) {
+      Alert.alert("Atenção", "Informe o endereço.");
+      return false;
+    }
     if (!email.trim()) {
       Alert.alert("Atenção", "Informe o e-mail.");
       return false;
     }
-
-    if (!/\S+@\S+\.\S+/.test(email.trim())) {
-      Alert.alert("Atenção", "Informe um e-mail válido.");
+    if (!senha.trim()) {
+      Alert.alert("Atenção", "Informe a senha.");
       return false;
     }
-
-    if (!senha) {
-      Alert.alert("Atenção", "Informe uma senha.");
+    if (senha.trim().length < 6) {
+      Alert.alert("Erro", "A senha deve ter pelo menos 6 caracteres.");
       return false;
     }
-
-    if (senha.length < 6) {
-      Alert.alert("Atenção", "A senha deve ter no mínimo 6 caracteres.");
+    if (!confirmarSenha.trim()) {
+      Alert.alert("Atenção", "Confirme a senha.");
       return false;
     }
-
     if (senha !== confirmarSenha) {
       Alert.alert("Erro", "As senhas não coincidem.");
       return false;
     }
-
-    const documentoNumerico = limparSomenteNumeros(documento);
-    if (tipoRegistro === 'empresa' && documentoNumerico.length !== 14) {
-      Alert.alert("Atenção", "CNPJ inválido.");
-      return false;
-    }
-
-    if (tipoRegistro === 'autonomo' && documentoNumerico.length !== 11) {
-      Alert.alert("Atenção", "CPF inválido.");
-      return false;
-    }
-
     return true;
   };
 
   const handleCadastro = async () => {
-    if (!validarFormulario()) return;
+    Keyboard.dismiss();
 
-    setSalvando(true);
+    if (!validarCampos()) return;
+    setLoading(true);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -207,22 +204,31 @@ export default function SignUpProEmpresa({ navigation }) {
       );
 
       const user = userCredential.user;
+      const dadosCategoria = await prepararDadosCategoriaParaProfissional(especialidade);
 
-      const payload = {
+      const nomeExibicao =
+        tipoCadastro === 'empresa' ? nomeNegocio.trim() : nomeCompleto.trim();
+
+      await setDoc(doc(db, "usuarios", user.uid), {
+        uid: user.uid,
+        tipo: 'profissional',
+        perfil: 'profissional',
+        tipoCadastroProfissional: tipoCadastro,
+
         nome: nomeExibicao,
-        nomeResponsavel: nomeResponsavel.trim(),
-        nomeNegocio: tipoRegistro === 'empresa' ? nomeNegocio.trim() : '',
-        email: email.trim().toLowerCase(),
+        nomeCompleto: nomeCompleto.trim(),
+        nomeNegocio: nomeNegocio.trim(),
+        responsavel: nomeCompleto.trim(),
+
         telefone: telefone.trim(),
         whatsapp: telefone.trim(),
-        tipo: 'profissional',
-        perfil: tipoRegistro === 'empresa' ? 'empresa' : 'profissional',
-        tipoRegistro,
-        cpf: tipoRegistro === 'autonomo' ? limparSomenteNumeros(documento) : '',
-        cnpj: tipoRegistro === 'empresa' ? limparSomenteNumeros(documento) : '',
-        documentoFormatado: documento.trim(),
-        especialidade: especialidade.trim(),
+        cpfCnpj: cpfCnpj.trim(),
+
+        email: email.trim().toLowerCase(),
         bio: bio.trim(),
+        fotoPerfil: '',
+        pushToken: '',
+
         endereco: endereco.trim(),
         localizacao: {
           pais: pais.trim(),
@@ -230,334 +236,487 @@ export default function SignUpProEmpresa({ navigation }) {
           cidade: cidade.trim(),
           cep: cep.trim(),
         },
-        ativo: true,
-        pushToken: '',
-        fotoPerfil: '',
-        latitude: null,
-        longitude: null,
-        createdAt: serverTimestamp(),
-        dataCriacao: serverTimestamp(),
-      };
 
-      await setDoc(doc(db, "usuarios", user.uid), payload);
+        avaliacaoMedia: 0,
+        totalAvaliacoes: 0,
+        verificado: false,
+        criadoEm: serverTimestamp(),
+        dataCriacao: serverTimestamp(),
+
+        ...dadosCategoria,
+      });
 
       Alert.alert(
-        "Cadastro realizado!",
-        "Sua conta profissional foi criada com sucesso.",
-        [
-          {
-            text: "OK",
-            onPress: () => navigation.replace("Main"),
-          },
-        ]
+        "Bem-vindo!",
+        tipoCadastro === 'empresa'
+          ? "Conta profissional da empresa criada com sucesso."
+          : "Conta profissional criada com sucesso."
       );
+      // Não navegar manualmente.
+      // O App.js já redireciona automaticamente.
     } catch (e) {
-      let mensagem = "Não foi possível concluir o cadastro.";
+      console.log("Erro ao cadastrar profissional:", e);
+
+      let mensagem = "Não foi possível finalizar o cadastro.";
+
       if (e.code === 'auth/email-already-in-use') {
         mensagem = "Este e-mail já está cadastrado.";
       } else if (e.code === 'auth/invalid-email') {
         mensagem = "O e-mail informado é inválido.";
       } else if (e.code === 'auth/weak-password') {
         mensagem = "A senha é muito fraca. Use pelo menos 6 caracteres.";
+      } else if (
+        e.code === 'permission-denied' ||
+        String(e.message || '').includes('Missing or insufficient permissions')
+      ) {
+        mensagem = "Sem permissão no Firestore. Publique as regras atualizadas antes de cadastrar.";
       } else if (e.message) {
         mensagem = e.message;
       }
 
-      Alert.alert("Erro", mensagem);
+      Alert.alert("Erro ao cadastrar", mensagem);
     } finally {
-      setSalvando(false);
+      setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#F4F7F8' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.screen}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
       >
-        <Text style={styles.headerTitle}>Cadastro Profissional</Text>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>1. Tipo de Conta</Text>
-
-          <View style={styles.switchRow}>
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                tipoRegistro === 'autonomo' && styles.typeButtonActive,
-              ]}
-              onPress={() => setTipoRegistro('autonomo')}
-            >
-              <Text
-                style={[
-                  styles.typeButtonText,
-                  tipoRegistro === 'autonomo' && styles.typeButtonTextActive,
-                ]}
-              >
-                Autônomo
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                tipoRegistro === 'empresa' && styles.typeButtonActive,
-              ]}
-              onPress={() => setTipoRegistro('empresa')}
-            >
-              <Text
-                style={[
-                  styles.typeButtonText,
-                  tipoRegistro === 'empresa' && styles.typeButtonTextActive,
-                ]}
-              >
-                Empresa
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>2. Perfil e Identificação</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nome do Responsável</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: João da Silva"
-              placeholderTextColor="#999"
-              value={nomeResponsavel}
-              onChangeText={setNomeResponsavel}
-            />
-          </View>
-
-          {tipoRegistro === 'empresa' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nome do Negócio / Empresa</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: Barbearia Central"
-                placeholderTextColor="#999"
-                value={nomeNegocio}
-                onChangeText={setNomeNegocio}
-              />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.topBanner}>
+              <Image source={logo} style={styles.logo} />
+              <Text style={styles.headerTitle}>{tituloPrincipal}</Text>
+              <Text style={styles.headerSubtitle}>{subtituloPrincipal}</Text>
             </View>
-          )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{tituloDocumento}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={placeholderDocumento}
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              value={documento}
-              onChangeText={handleDocumentoChange}
-            />
-          </View>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>1. Tipo de Cadastro</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Telefone / WhatsApp</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="(00) 00000-0000"
-              placeholderTextColor="#999"
-              keyboardType="phone-pad"
-              value={telefone}
-              onChangeText={(texto) => setTelefone(formatarTelefone(texto))}
-            />
-          </View>
+              <View style={styles.segmentWrapper}>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    tipoCadastro === 'autonomo' && styles.segmentButtonActive,
+                  ]}
+                  onPress={() => setTipoCadastro('autonomo')}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      tipoCadastro === 'autonomo' && styles.segmentTextActive,
+                    ]}
+                  >
+                    Autônomo
+                  </Text>
+                </TouchableOpacity>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Especialidade Principal</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Barbeiro, Manicure, Fisioterapeuta"
-              placeholderTextColor="#999"
-              value={especialidade}
-              onChangeText={setEspecialidade}
-            />
-          </View>
+                <TouchableOpacity
+                  style={[
+                    styles.segmentButton,
+                    tipoCadastro === 'empresa' && styles.segmentButtonActive,
+                  ]}
+                  onPress={() => setTipoCadastro('empresa')}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      tipoCadastro === 'empresa' && styles.segmentTextActive,
+                    ]}
+                  >
+                    Empresa
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Descrição / Bio</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Fale um pouco sobre seu atendimento, experiência e especialidades."
-              placeholderTextColor="#999"
-              value={bio}
-              onChangeText={setBio}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-        </View>
+              <View style={styles.tipBox}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+                <Text style={styles.tipText}>
+                  {tipoCadastro === 'empresa'
+                    ? 'Ideal para negócios com marca própria, equipe ou estabelecimento.'
+                    : 'Ideal para profissionais que trabalham por conta própria.'}
+                </Text>
+              </View>
+            </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>3. Localização</Text>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>2. Dados Profissionais</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>País</Text>
-            <TextInput
-              style={styles.input}
-              value={pais}
-              onChangeText={setPais}
-              placeholder="Brasil"
-              placeholderTextColor="#999"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  {tipoCadastro === 'empresa' ? 'Nome do Responsável *' : 'Nome Completo *'}
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder={
+                    tipoCadastro === 'empresa'
+                      ? 'Ex: João da Silva'
+                      : 'Ex: Maria Oliveira Santos'
+                  }
+                  placeholderTextColor="#999"
+                  value={nomeCompleto}
+                  onChangeText={setNomeCompleto}
+                  returnKeyType={tipoCadastro === 'empresa' ? 'next' : 'next'}
+                  onSubmitEditing={() => {
+                    if (tipoCadastro === 'empresa') {
+                      nomeNegocioRef.current?.focus();
+                    } else {
+                      telefoneRef.current?.focus();
+                    }
+                  }}
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Estado</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={estado}
-                onValueChange={(itemValue) => setEstado(itemValue)}
-                style={styles.picker}
-              >
-                {estadosBrasil.map((item) => (
-                  <Picker.Item
-                    key={item.value || item.label}
-                    label={item.label}
-                    value={item.value}
+              {tipoCadastro === 'empresa' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Nome da Empresa / Negócio *</Text>
+                  <TextInput
+                    ref={nomeNegocioRef}
+                    style={styles.input}
+                    placeholder="Ex: Tech Soluções Elétricas"
+                    placeholderTextColor="#999"
+                    value={nomeNegocio}
+                    onChangeText={setNomeNegocio}
+                    returnKeyType="next"
+                    onSubmitEditing={() => telefoneRef.current?.focus()}
                   />
-                ))}
-              </Picker>
+                </View>
+              )}
+
+              <View style={styles.row}>
+                <View style={styles.halfInputLeft}>
+                  <Text style={styles.label}>WhatsApp / Celular *</Text>
+                  <TextInput
+                    ref={telefoneRef}
+                    style={styles.input}
+                    placeholder="(11) 99999-9999"
+                    placeholderTextColor="#999"
+                    keyboardType="phone-pad"
+                    value={telefone}
+                    onChangeText={setTelefone}
+                    returnKeyType="next"
+                    onSubmitEditing={() => cpfCnpjRef.current?.focus()}
+                  />
+                </View>
+
+                <View style={styles.halfInputRight}>
+                  <Text style={styles.label}>{tituloDocumento} *</Text>
+                  <TextInput
+                    ref={cpfCnpjRef}
+                    style={styles.input}
+                    placeholder={placeholderDocumento}
+                    placeholderTextColor="#999"
+                    value={cpfCnpj}
+                    onChangeText={setCpfCnpj}
+                    returnKeyType="next"
+                    onSubmitEditing={() => especialidadeRef.current?.focus()}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Especialidade Principal *</Text>
+                <TextInput
+                  ref={especialidadeRef}
+                  style={styles.input}
+                  placeholder="Ex: Eletricista, Cabeleireiro, Pintor..."
+                  placeholderTextColor="#999"
+                  value={especialidade}
+                  onChangeText={setEspecialidade}
+                  returnKeyType="next"
+                  onSubmitEditing={() => bioRef.current?.focus()}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Descrição Profissional</Text>
+                <TextInput
+                  ref={bioRef}
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Descreva seus serviços, experiência ou diferencial..."
+                  placeholderTextColor="#999"
+                  value={bio}
+                  onChangeText={setBio}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  returnKeyType="next"
+                  onSubmitEditing={() => cidadeRef.current?.focus()}
+                />
+              </View>
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Cidade</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Digite sua cidade"
-              placeholderTextColor="#999"
-              value={cidade}
-              onChangeText={setCidade}
-            />
-          </View>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>3. Localização</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Endereço</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Rua, número, bairro"
-              placeholderTextColor="#999"
-              value={endereco}
-              onChangeText={setEndereco}
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>País *</Text>
+                <View style={styles.pickerOuter}>
+                  <Picker
+                    selectedValue={pais}
+                    onValueChange={(v) => {
+                      setPais(v);
+                      setEstado('');
+                    }}
+                    style={styles.picker}
+                    dropdownIconColor={colors.textDark}
+                    itemStyle={styles.pickerItem}
+                  >
+                    {paises.map((item) => (
+                      <Picker.Item
+                        key={item}
+                        label={item}
+                        value={item}
+                        color={Platform.OS === 'android' ? '#222' : undefined}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>CEP</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="00000-000"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              value={cep}
-              onChangeText={(texto) => setCep(formatarCEP(texto))}
-            />
-          </View>
-        </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  {pais === 'Brasil' ? 'Estado (UF) *' : 'Região / Estado *'}
+                </Text>
+                <View style={styles.pickerOuter}>
+                  <Picker
+                    selectedValue={estado}
+                    onValueChange={(v) => setEstado(v)}
+                    style={styles.picker}
+                    dropdownIconColor={colors.textDark}
+                    itemStyle={styles.pickerItem}
+                  >
+                    {estadosParaMostrar.map((item) => (
+                      <Picker.Item
+                        key={`${item.label}-${item.value}`}
+                        label={item.label}
+                        value={item.value}
+                        color={Platform.OS === 'android' ? '#222' : undefined}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>4. Segurança de Acesso</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Cidade *</Text>
+                <TextInput
+                  ref={cidadeRef}
+                  style={styles.input}
+                  placeholder="Digite sua cidade"
+                  placeholderTextColor="#999"
+                  value={cidade}
+                  onChangeText={setCidade}
+                  returnKeyType="next"
+                  onSubmitEditing={() => cepRef.current?.focus()}
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-mail</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="seunegocio@email.com"
-              placeholderTextColor="#999"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>CEP *</Text>
+                <TextInput
+                  ref={cepRef}
+                  style={styles.input}
+                  placeholder="00000-000"
+                  placeholderTextColor="#999"
+                  keyboardType="numeric"
+                  value={cep}
+                  onChangeText={setCep}
+                  returnKeyType="next"
+                  onSubmitEditing={() => enderecoRef.current?.focus()}
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Senha</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Mínimo 6 caracteres"
-              placeholderTextColor="#999"
-              secureTextEntry
-              value={senha}
-              onChangeText={setSenha}
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Endereço / Bairro *</Text>
+                <TextInput
+                  ref={enderecoRef}
+                  style={styles.input}
+                  placeholder="Rua, número, bairro..."
+                  placeholderTextColor="#999"
+                  value={endereco}
+                  onChangeText={setEndereco}
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                />
+              </View>
+            </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirmar Senha</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Digite a senha novamente"
-              placeholderTextColor="#999"
-              secureTextEntry
-              value={confirmarSenha}
-              onChangeText={setConfirmarSenha}
-            />
-          </View>
-        </View>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>4. Dados de Acesso</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>5. Termos e Responsabilidade</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>E-mail *</Text>
+                <TextInput
+                  ref={emailRef}
+                  style={styles.input}
+                  placeholder="seu@email.com"
+                  placeholderTextColor="#999"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
+                  returnKeyType="next"
+                  onSubmitEditing={() => senhaRef.current?.focus()}
+                />
+              </View>
 
-          <View style={styles.termsRow}>
-            <Switch
-              value={aceitaTermos}
-              onValueChange={setAceitaTermos}
-              trackColor={{ false: '#DADADA', true: colors.primary }}
-              thumbColor="#FFF"
-            />
-            <View style={styles.termsTextBox}>
-              <Text style={styles.termsText}>
-                Declaro que li e aceito os Termos de Uso e Privacidade.
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('TermosUso')}>
-                <Text style={styles.linkText}>Ler termos</Text>
+              <View style={styles.row}>
+                <View style={styles.halfInputLeft}>
+                  <Text style={styles.label}>Senha *</Text>
+                  <View style={styles.passwordWrapper}>
+                    <TextInput
+                      ref={senhaRef}
+                      style={styles.passwordInput}
+                      placeholder="6+ dígitos"
+                      placeholderTextColor="#999"
+                      secureTextEntry={!mostrarSenha}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={senha}
+                      onChangeText={setSenha}
+                      returnKeyType="next"
+                      onSubmitEditing={() => confirmarSenhaRef.current?.focus()}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setMostrarSenha((prev) => !prev)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
+                        size={22}
+                        color="#666"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.halfInputRight}>
+                  <Text style={styles.label}>Confirmar Senha *</Text>
+                  <View style={styles.passwordWrapper}>
+                    <TextInput
+                      ref={confirmarSenhaRef}
+                      style={styles.passwordInput}
+                      placeholder="Repita a senha"
+                      placeholderTextColor="#999"
+                      secureTextEntry={!mostrarConfirmarSenha}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={confirmarSenha}
+                      onChangeText={setConfirmarSenha}
+                      returnKeyType="done"
+                      onSubmitEditing={handleCadastro}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setMostrarConfirmarSenha((prev) => !prev)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={mostrarConfirmarSenha ? 'eye-off-outline' : 'eye-outline'}
+                        size={22}
+                        color="#666"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.termsContainer}>
+              <Switch
+                value={aceitaTermos}
+                onValueChange={setAceitaTermos}
+                trackColor={{ false: "#CCC", true: colors.primary }}
+                thumbColor="#FFF"
+              />
+              <TouchableOpacity
+                onPress={() => navigation.navigate("TermosUso")}
+                style={styles.termsTextBox}
+              >
+                <Text style={styles.termsText}>
+                  Li e aceito os <Text style={styles.link}>Termos de Uso</Text> *
+                </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
 
-        <TouchableOpacity
-          style={[styles.btnFinalizar, salvando && styles.btnDisabled]}
-          onPress={handleCadastro}
-          disabled={salvando}
-        >
-          {salvando ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.btnText}>CRIAR CONTA PROFISSIONAL</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <PrimaryButton
+              title={tipoCadastro === 'empresa' ? 'CRIAR CONTA DA EMPRESA' : 'CRIAR PERFIL PROFISSIONAL'}
+              onPress={handleCadastro}
+              loading={loading}
+            />
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F7F8', padding: 15 },
+  flex: { flex: 1 },
+
+  screen: {
+    flex: 1,
+    backgroundColor: '#F4F7F8',
+  },
+
+  container: {
+    flex: 1,
+    backgroundColor: '#F4F7F8',
+  },
+
+  scrollContent: {
+    padding: 15,
+    paddingBottom: 80,
+  },
+
+  topBanner: {
+    marginTop: 30,
+    marginBottom: 20,
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+
+  logo: {
+    width: 150,
+    height: 150,
+    resizeMode: 'contain',
+    marginBottom: 10,
+  },
+
   headerTitle: {
-    fontSize: 26,
+    fontSize: 30,
     fontWeight: 'bold',
     color: '#333',
-    marginTop: 40,
-    marginBottom: 20,
-    textAlign: 'center'
+    textAlign: 'center',
+  },
+
+  headerSubtitle: {
+    fontSize: 15,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
     marginBottom: 20,
     elevation: 4,
@@ -567,119 +726,164 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: '#111',
     marginBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    paddingBottom: 5
+    borderBottomColor: '#EEE',
+    paddingBottom: 6,
   },
 
-  inputGroup: { marginBottom: 15 },
+  inputGroup: {
+    marginBottom: 15,
+  },
 
   label: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#444',
-    marginBottom: 5
+    color: '#555',
+    marginBottom: 5,
   },
 
   input: {
     backgroundColor: '#FBFBFB',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     fontSize: 15,
     borderWidth: 1,
     borderColor: '#E8E8E8',
-    color: '#333'
+    color: '#333',
   },
 
   textArea: {
-    minHeight: 100,
+    minHeight: 95,
   },
 
-  pickerContainer: {
+  pickerOuter: {
     backgroundColor: '#FBFBFB',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8E8E8',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    justifyContent: 'center',
   },
 
   picker: {
-    height: 50,
-    width: '100%'
+    height: Platform.OS === 'ios' ? 180 : 56,
+    width: '100%',
+    color: '#222',
+    backgroundColor: '#FBFBFB',
   },
 
-  switchRow: {
+  pickerItem: {
+    color: '#222',
+    fontSize: 16,
+  },
+
+  row: {
     flexDirection: 'row',
-    gap: 10,
   },
 
-  typeButton: {
+  halfInputLeft: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#D8D8D8',
-    backgroundColor: '#FAFAFA',
+    marginRight: 10,
+  },
+
+  halfInputRight: {
+    flex: 1,
+  },
+
+  segmentWrapper: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F5F7',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 14,
+  },
+
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
 
-  typeButtonActive: {
+  segmentButtonActive: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
   },
 
-  typeButtonText: {
-    color: '#555',
-    fontWeight: '700',
+  segmentText: {
     fontSize: 14,
+    fontWeight: '700',
+    color: '#666',
   },
 
-  typeButtonTextActive: {
+  segmentTextActive: {
     color: '#FFF',
   },
 
-  termsRow: {
+  tipBox: {
+    backgroundColor: '#F0F7FF',
+    borderRadius: 12,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
 
-  termsTextBox: {
+  tipText: {
     flex: 1,
-    marginLeft: 12,
-  },
-
-  termsText: {
-    color: '#555',
+    marginLeft: 8,
     fontSize: 13,
+    color: '#4B5563',
     lineHeight: 19,
   },
 
-  linkText: {
+  passwordWrapper: {
+    minHeight: 50,
+    backgroundColor: '#FBFBFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 6,
+  },
+
+  passwordInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    paddingVertical: 12,
+  },
+
+  eyeButton: {
+    padding: 8,
+  },
+
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+    paddingHorizontal: 6,
+  },
+
+  termsTextBox: {
+    flex: 1,
+    marginLeft: 10,
+  },
+
+  termsText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+
+  link: {
     color: colors.primary,
     fontWeight: 'bold',
-    marginTop: 6,
-    fontSize: 13,
+    textDecorationLine: 'underline',
   },
-
-  btnFinalizar: {
-    backgroundColor: colors.primary,
-    padding: 18,
-    borderRadius: 15,
-    alignItems: 'center',
-    marginBottom: 20
-  },
-
-  btnDisabled: {
-    opacity: 0.7,
-  },
-
-  btnText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16
-  }
 });

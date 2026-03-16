@@ -1,5 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
@@ -10,13 +23,21 @@ function EditarPerfil({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
+  const whatsappRef = useRef(null);
+  const cpfRef = useRef(null);
+  const cnpjRef = useRef(null);
+  const enderecoRef = useRef(null);
+  const bioRef = useRef(null);
+
   useEffect(() => {
     const fetchPerfil = async () => {
       const user = auth.currentUser;
       if (!user) return;
+
       try {
         const perfilRef = doc(db, "usuarios", user.uid);
         const perfilSnap = await getDoc(perfilRef);
+
         if (perfilSnap.exists()) {
           setPerfil(perfilSnap.data());
         }
@@ -26,19 +47,24 @@ function EditarPerfil({ navigation }) {
         setLoading(false);
       }
     };
+
     fetchPerfil();
   }, []);
 
   const handleUpdate = async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user || !perfil) return;
+
+    Keyboard.dismiss();
     setSalvando(true);
+
     try {
       const perfilRef = doc(db, "usuarios", user.uid);
       await updateDoc(perfilRef, {
         ...perfil,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
+
       Alert.alert("Sucesso", "Perfil atualizado com sucesso!");
       navigation.goBack();
     } catch (error) {
@@ -56,94 +82,223 @@ function EditarPerfil({ navigation }) {
     );
   }
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Editar Perfil</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>Nome Completo / Razão Social</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nome"
-          value={perfil.nome}
-          onChangeText={(text) => setPerfil({ ...perfil, nome: text })}
-        />
-
-        <Text style={styles.label}>E-mail</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: '#f0f0f0' }]}
-          placeholder="Email"
-          value={perfil.email}
-          editable={false} // E-mail geralmente não se muda assim por segurança
-        />
-
-        <Text style={styles.label}>WhatsApp (Importante para OS)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Telefone/WhatsApp"
-          value={perfil.telefone || perfil.whatsapp}
-          onChangeText={(text) => setPerfil({ ...perfil, whatsapp: text, telefone: text })}
-          keyboardType="phone-pad"
-        />
-
-        {/* Campos Dinâmicos que você criou */}
-        {perfil.cpf !== undefined && (
-          <>
-            <Text style={styles.label}>CPF</Text>
-            <TextInput style={styles.input} placeholder="CPF" value={perfil.cpf} onChangeText={(text) => setPerfil({ ...perfil, cpf: text })} />
-          </>
-        )}
-
-        {perfil.cnpj !== undefined && (
-          <>
-            <Text style={styles.label}>CNPJ</Text>
-            <TextInput style={styles.input} placeholder="CNPJ" value={perfil.cnpj} onChangeText={(text) => setPerfil({ ...perfil, cnpj: text })} />
-          </>
-        )}
-
-        <Text style={styles.label}>Endereço Completo</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Rua, Número, Bairro, Cidade"
-          value={perfil.endereco}
-          onChangeText={(text) => setPerfil({ ...perfil, endereco: text })}
-        />
-
-        {/* Campo de Bio para o Profissional */}
-        <Text style={styles.label}>Sobre / Descrição</Text>
-        <TextInput
-          style={[styles.input, { height: 80 }]}
-          placeholder="Fale um pouco sobre seus serviços..."
-          value={perfil.bio}
-          onChangeText={(text) => setPerfil({ ...perfil, bio: text })}
-          multiline
-        />
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.success }]}
-          onPress={handleUpdate}
-          disabled={salvando}
-        >
-          {salvando ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <>
-              <Ionicons name="save-outline" size={20} color="#FFF" style={{ marginRight: 10 }} />
-              <Text style={styles.buttonText}>Salvar Alterações</Text>
-            </>
-          )}
-        </TouchableOpacity>
+  if (!perfil) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.emptyText}>Não foi possível carregar os dados do perfil.</Text>
       </View>
-    </ScrollView>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Editar Perfil</Text>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Nome Completo / Razão Social</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nome"
+              value={perfil.nome || ''}
+              onChangeText={(text) => setPerfil({ ...perfil, nome: text })}
+              returnKeyType="next"
+              onSubmitEditing={() => whatsappRef.current?.focus()}
+            />
+
+            <Text style={styles.label}>E-mail</Text>
+            <TextInput
+              style={[styles.input, styles.inputDisabled]}
+              placeholder="Email"
+              value={perfil.email || ''}
+              editable={false}
+            />
+
+            <Text style={styles.label}>WhatsApp (Importante para OS)</Text>
+            <TextInput
+              ref={whatsappRef}
+              style={styles.input}
+              placeholder="Telefone/WhatsApp"
+              value={perfil.telefone || perfil.whatsapp || ''}
+              onChangeText={(text) => setPerfil({ ...perfil, whatsapp: text, telefone: text })}
+              keyboardType="phone-pad"
+              returnKeyType={
+                perfil.cpf !== undefined
+                  ? 'next'
+                  : perfil.cnpj !== undefined
+                    ? 'next'
+                    : 'next'
+              }
+              onSubmitEditing={() => {
+                if (perfil.cpf !== undefined) {
+                  cpfRef.current?.focus();
+                  return;
+                }
+                if (perfil.cnpj !== undefined) {
+                  cnpjRef.current?.focus();
+                  return;
+                }
+                enderecoRef.current?.focus();
+              }}
+            />
+
+            {perfil.cpf !== undefined && (
+              <>
+                <Text style={styles.label}>CPF</Text>
+                <TextInput
+                  ref={cpfRef}
+                  style={styles.input}
+                  placeholder="CPF"
+                  value={perfil.cpf || ''}
+                  onChangeText={(text) => setPerfil({ ...perfil, cpf: text })}
+                  keyboardType="numeric"
+                  returnKeyType={perfil.cnpj !== undefined ? 'next' : 'next'}
+                  onSubmitEditing={() => {
+                    if (perfil.cnpj !== undefined) {
+                      cnpjRef.current?.focus();
+                      return;
+                    }
+                    enderecoRef.current?.focus();
+                  }}
+                />
+              </>
+            )}
+
+            {perfil.cnpj !== undefined && (
+              <>
+                <Text style={styles.label}>CNPJ</Text>
+                <TextInput
+                  ref={cnpjRef}
+                  style={styles.input}
+                  placeholder="CNPJ"
+                  value={perfil.cnpj || ''}
+                  onChangeText={(text) => setPerfil({ ...perfil, cnpj: text })}
+                  keyboardType="numeric"
+                  returnKeyType="next"
+                  onSubmitEditing={() => enderecoRef.current?.focus()}
+                />
+              </>
+            )}
+
+            <Text style={styles.label}>Endereço Completo</Text>
+            <TextInput
+              ref={enderecoRef}
+              style={styles.input}
+              placeholder="Rua, Número, Bairro, Cidade"
+              value={perfil.endereco || ''}
+              onChangeText={(text) => setPerfil({ ...perfil, endereco: text })}
+              returnKeyType="next"
+              onSubmitEditing={() => bioRef.current?.focus()}
+            />
+
+            <Text style={styles.label}>Sobre / Descrição</Text>
+            <TextInput
+              ref={bioRef}
+              style={[styles.input, styles.bioInput]}
+              placeholder="Fale um pouco sobre seus serviços..."
+              value={perfil.bio || ''}
+              onChangeText={(text) => setPerfil({ ...perfil, bio: text })}
+              multiline
+              textAlignVertical="top"
+              returnKeyType="done"
+              onSubmitEditing={handleUpdate}
+            />
+
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: colors.success }]}
+              onPress={handleUpdate}
+              disabled={salvando}
+              activeOpacity={0.88}
+            >
+              {salvando ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="save-outline"
+                    size={20}
+                    color="#FFF"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.buttonText}>Salvar Alterações</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5', padding: 20 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: colors.primary, textAlign: 'center', marginTop: 40 },
-  card: { backgroundColor: '#FFF', padding: 20, borderRadius: 15, elevation: 3, marginBottom: 30 },
-  label: { fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 5 },
+  flex: {
+    flex: 1,
+  },
+
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+  },
+
+  emptyText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: colors.primary,
+    textAlign: 'center',
+    marginTop: 40,
+  },
+
+  card: {
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderRadius: 15,
+    elevation: 3,
+    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  label: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 5,
+  },
+
   input: {
     width: '100%',
     padding: 12,
@@ -152,17 +307,36 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 8,
     fontSize: 16,
-    color: '#333'
+    color: '#333',
+    backgroundColor: '#FFF',
   },
+
+  inputDisabled: {
+    backgroundColor: '#f0f0f0',
+  },
+
+  bioInput: {
+    height: 100,
+  },
+
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
     borderRadius: 10,
-    marginTop: 10
+    marginTop: 10,
   },
-  buttonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' }
+
+  buttonIcon: {
+    marginRight: 10,
+  },
+
+  buttonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default EditarPerfil;

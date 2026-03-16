@@ -1,5 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  Alert,
+} from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import colors from "../../constants/colors";
@@ -37,31 +48,42 @@ function EditarMenor({ route, navigation }) {
   const [rgMenor, setRgMenor] = useState('');
   const [telefoneMenor, setTelefoneMenor] = useState('');
 
+  const idadeRef = useRef(null);
+  const cpfRef = useRef(null);
+  const rgRef = useRef(null);
+  const telefoneRef = useRef(null);
+
   useEffect(() => {
     const fetchMenor = async () => {
       const user = auth.currentUser;
       if (!user) return;
+
       try {
         const menorRef = doc(db, "usuarios", user.uid, "menores", menorId);
         const menorSnap = await getDoc(menorRef);
+
         if (menorSnap.exists()) {
           const data = menorSnap.data();
-          setNomeMenor(data.nomeMenor || '');
-          setIdadeMenor(data.idadeMenor || '');
+          setNomeMenor(data.nomeMenor || data.nome || '');
+          setIdadeMenor(data.idadeMenor || data.idade || '');
           setCpfMenor(data.cpfMenor || '');
           setRgMenor(data.rgMenor || '');
           setTelefoneMenor(data.telefoneMenor || '');
         }
       } catch (error) {
-        alert("Erro ao carregar dados: " + error.message);
+        Alert.alert("Erro", "Erro ao carregar dados: " + error.message);
       }
     };
+
     fetchMenor();
   }, [menorId]);
 
   const handleUpdate = async () => {
+    Keyboard.dismiss();
+
     const user = auth.currentUser;
     if (!user) return;
+
     try {
       const menorRef = doc(db, "usuarios", user.uid, "menores", menorId);
       await updateDoc(menorRef, {
@@ -72,56 +94,131 @@ function EditarMenor({ route, navigation }) {
         telefoneMenor,
         updatedAt: serverTimestamp()
       });
-      alert("Dados atualizados com sucesso!");
+
+      Alert.alert("Sucesso", "Dados atualizados com sucesso!");
       navigation.goBack();
     } catch (error) {
-      alert("Erro ao atualizar: " + error.message);
+      Alert.alert("Erro", "Erro ao atualizar: " + error.message);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Editar Menor</Text>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Editar Menor</Text>
 
-      <TextInput style={styles.input} placeholder="Nome" value={nomeMenor} onChangeText={setNomeMenor} />
-      <TextInput style={styles.input} placeholder="Idade" value={idadeMenor} onChangeText={setIdadeMenor} keyboardType="numeric" />
+          <TextInput
+            style={styles.input}
+            placeholder="Nome"
+            value={nomeMenor}
+            onChangeText={setNomeMenor}
+            returnKeyType="next"
+            onSubmitEditing={() => idadeRef.current?.focus()}
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="CPF"
-        keyboardType="numeric"
-        value={cpfMenor}
-        onChangeText={(t) => setCpfMenor(formatCPF(t))}
-      />
+          <TextInput
+            ref={idadeRef}
+            style={styles.input}
+            placeholder="Idade"
+            value={idadeMenor}
+            onChangeText={setIdadeMenor}
+            keyboardType="numeric"
+            returnKeyType="next"
+            onSubmitEditing={() => cpfRef.current?.focus()}
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="RG"
-        keyboardType="numeric"
-        value={rgMenor}
-        onChangeText={(t) => setRgMenor(formatRG(t))}
-      />
+          <TextInput
+            ref={cpfRef}
+            style={styles.input}
+            placeholder="CPF"
+            keyboardType="numeric"
+            value={cpfMenor}
+            onChangeText={(t) => setCpfMenor(formatCPF(t))}
+            returnKeyType="next"
+            onSubmitEditing={() => rgRef.current?.focus()}
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Telefone"
-        keyboardType="numeric"
-        value={telefoneMenor}
-        onChangeText={(t) => setTelefoneMenor(formatTelefone(t))}
-      />
+          <TextInput
+            ref={rgRef}
+            style={styles.input}
+            placeholder="RG"
+            keyboardType="numeric"
+            value={rgMenor}
+            onChangeText={(t) => setRgMenor(formatRG(t))}
+            returnKeyType="next"
+            onSubmitEditing={() => telefoneRef.current?.focus()}
+          />
 
-      <View style={styles.buttonContainer}>
-        <CustomButton title="Salvar Alterações" icon="save" color={colors.success} onPress={handleUpdate} />
-      </View>
-    </ScrollView>
+          <TextInput
+            ref={telefoneRef}
+            style={styles.input}
+            placeholder="Telefone"
+            keyboardType="numeric"
+            value={telefoneMenor}
+            onChangeText={(t) => setTelefoneMenor(formatTelefone(t))}
+            returnKeyType="done"
+            onSubmitEditing={handleUpdate}
+          />
+
+          <View style={styles.buttonContainer}>
+            <CustomButton
+              title="Salvar Alterações"
+              icon="save"
+              color={colors.success}
+              onPress={handleUpdate}
+            />
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, padding: 20 },
-  title: { fontSize: 22, marginBottom: 20, fontWeight: 'bold', color: colors.textDark },
-  input: { width: '90%', padding: 10, borderWidth: 1, borderColor: '#ccc', marginBottom: 15, borderRadius: 8, backgroundColor: '#fff' },
-  buttonContainer: { width: '90%', marginTop: 20 },
+  flex: {
+    flex: 1,
+  },
+
+  container: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 20,
+    paddingBottom: 40,
+  },
+
+  title: {
+    fontSize: 22,
+    marginBottom: 20,
+    fontWeight: 'bold',
+    color: colors.textDark,
+  },
+
+  input: {
+    width: '90%',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    marginBottom: 15,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+
+  buttonContainer: {
+    width: '90%',
+    marginTop: 20,
+  },
 });
 
 export default EditarMenor;

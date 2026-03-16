@@ -1,31 +1,38 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { onAuthStateChanged } from 'firebase/auth';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc } from 'firebase/firestore';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 
-// Importando Telas de Acesso
+import { auth, db } from './src/services/firebaseConfig';
+import colors from './src/constants/colors';
+import { registrarPushTokenUsuario } from './src/utils/pushTokenUtils';
+
+/* TELAS AUTH */
+
+import LoginScreen from './src/screens/auth/LoginScreen';
 import ChooseProfileScreen from './src/screens/auth/ChooseProfileScreen';
 import SignUpCliente from './src/screens/auth/SignUpCliente';
 import SignUpProEmpresa from './src/screens/auth/SignUpProEmpresa';
-import LoginScreen from './src/screens/auth/LoginScreen';
 import TermosUso from './src/screens/auth/TermosUso';
 
-// Importando Telas Principais
+/* TELAS COMUNS */
+
 import HomeScreen from './src/screens/comum/HomeScreen';
+import PerfilScreen from './src/screens/comum/PerfilScreen';
+import EditarPerfil from './src/screens/comum/EditarPerfil';
+import LoadingScreen from './src/screens/comum/LoadingScreen';
+import NotificacoesScreen from './src/screens/comum/NotificacoesScreen';
+
+/* TELAS CLIENTE */
+
 import BuscaProfissionais from './src/screens/cliente/BuscaProfissionais';
 import PerfilProfissional from './src/screens/cliente/PerfilProfissional';
 import AgendamentoFinal from './src/screens/cliente/AgendamentoFinal';
-
-// Importando Telas do Profissional
-import AgendaProfissional from './src/screens/profissional/AgendaProfissional';
-import ConfigurarServicos from './src/screens/profissional/ConfigurarServicos';
-import ConfigurarPerfil from './src/screens/profissional/ConfigurarPerfil';
-import ConfigurarAgenda from './src/screens/profissional/ConfigurarAgenda';
-import GerenciarColaboradores from './src/screens/profissional/GerenciarColaboradores';
-import RelatoriosPro from './src/screens/profissional/RelatoriosPro';
-import DetalhesAgendamentoPro from './src/screens/profissional/DetalhesAgendamentoPro';
-
-// Importando Telas do Cliente
 import MeusAgendamentosCliente from './src/screens/cliente/MeusAgendamentosCliente';
 import DetalhesAgendamento from './src/screens/cliente/DetalhesAgendamento';
 import AvaliarAtendimento from './src/screens/cliente/AvaliarAtendimento';
@@ -34,115 +41,240 @@ import CadastroMenor from './src/screens/cliente/CadastroMenor';
 import EditarMenor from './src/screens/cliente/EditarMenor';
 import FavoritosCliente from './src/screens/cliente/FavoritosCliente';
 
-// Importando Telas de Perfil Geral
-import PerfilScreen from './src/screens/comum/PerfilScreen';
-import EditarPerfil from './src/screens/comum/EditarPerfil';
+/* TELAS PROFISSIONAL */
+
+import AgendaProfissional from './src/screens/profissional/AgendaProfissional';
+import ConfigurarServicos from './src/screens/profissional/ConfigurarServicos';
+import ConfigurarPerfil from './src/screens/profissional/ConfigurarPerfil';
+import ConfigurarAgenda from './src/screens/profissional/ConfigurarAgenda';
+import GerenciarColaboradores from './src/screens/profissional/GerenciarColaboradores';
+import RelatoriosPro from './src/screens/profissional/RelatoriosPro';
+import DetalhesAgendamentoPro from './src/screens/profissional/DetalhesAgendamentoPro';
 
 const Stack = createStackNavigator();
-const Drawer = createDrawerNavigator();
+const Tab = createBottomTabNavigator();
+export const navigationRef = createNavigationContainerRef();
 
-// 1. Definição das Rotas do Menu Lateral (Drawer)
-function DrawerRoutes() {
+function navegarPorNotificacao(data) {
+  if (!data || !navigationRef.isReady()) return;
+
+  const screen = data?.screen || '';
+  const root = data?.root || '';
+  const params = data?.params || {};
+
+  if (root === 'Main' && screen) {
+    navigationRef.navigate('Main', {
+      screen,
+      params,
+    });
+    return;
+  }
+
+  if (screen) {
+    navigationRef.navigate(screen, params);
+  }
+}
+
+function getTabScreenOptions(route, insets) {
+  return {
+    headerShown: false,
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: '#8E8E93',
+    tabBarHideOnKeyboard: true,
+    tabBarStyle: {
+      height: 60 + insets.bottom,
+      paddingBottom: insets.bottom,
+      backgroundColor: '#fff',
+    },
+    tabBarIcon: ({ color, size }) => {
+      let iconName = 'home-outline';
+
+      if (route.name === 'TelaInicio') iconName = 'home-outline';
+      if (route.name === 'BuscaProfissionais') iconName = 'search-outline';
+      if (route.name === 'MeusAgendamentosCliente') iconName = 'calendar-outline';
+      if (route.name === 'FavoritosCliente') iconName = 'heart-outline';
+      if (route.name === 'Perfil') iconName = 'person-outline';
+
+      if (route.name === 'AgendaProfissional') iconName = 'calendar-outline';
+      if (route.name === 'ConfigurarServicos') iconName = 'construct-outline';
+      if (route.name === 'RelatoriosPro') iconName = 'bar-chart-outline';
+
+      return <Ionicons name={iconName} size={size} color={color} />;
+    },
+  };
+}
+
+/* TABS CLIENTE */
+
+function ClienteTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <Drawer.Navigator initialRouteName="TelaInicio">
-      <Drawer.Screen
-        name="TelaInicio"
-        component={HomeScreen}
-        options={{ title: 'Início' }}
-      />
-
-      {/* SEÇÃO DO CLIENTE */}
-      <Drawer.Screen
-        name="BuscaProfissionais"
-        component={BuscaProfissionais}
-        options={{ title: 'Explorar Profissionais' }}
-      />
-      <Drawer.Screen
-        name="FavoritosCliente"
-        component={FavoritosCliente}
-        options={{ title: 'Profissionais Favoritos' }}
-      />
-      <Drawer.Screen
-        name="MeusAgendamentosCliente"
-        component={MeusAgendamentosCliente}
-        options={{ title: 'Meus Agendamentos' }}
-      />
-      <Drawer.Screen
-        name="ListaMenores"
-        component={ListaMenores}
-        options={{ title: 'Dependentes / Família' }}
-      />
-
-      {/* SEÇÃO DO PROFISSIONAL / EMPRESA */}
-      <Drawer.Screen
-        name="AgendaProfissional"
-        component={AgendaProfissional}
-        options={{ title: 'Minha Agenda de Pedidos' }}
-      />
-      <Drawer.Screen
-        name="RelatoriosPro"
-        component={RelatoriosPro}
-        options={{ title: 'Financeiro / Ganhos' }}
-      />
-      <Drawer.Screen
-        name="ConfigurarServicos"
-        component={ConfigurarServicos}
-        options={{ title: 'Serviços e Preços' }}
-      />
-      <Drawer.Screen
-        name="ConfigurarAgendaGeral"
-        component={ConfigurarAgenda}
-        options={{ title: 'Horários de Atendimento' }}
-      />
-      <Drawer.Screen
-        name="GerenciarColaboradores"
-        component={GerenciarColaboradores}
-        options={{ title: 'Equipe / Colaboradores' }}
-      />
-
-      {/* CONFIGURAÇÕES E PERFIL */}
-      <Drawer.Screen
-        name="Perfil"
-        component={PerfilScreen}
-        options={{ title: 'Meu Painel / Perfil' }}
-      />
-      <Drawer.Screen
-        name="TermosMenu"
-        component={TermosUso}
-        options={{ title: 'Termos e Privacidade' }}
-      />
-    </Drawer.Navigator>
+    <Tab.Navigator screenOptions={({ route }) => getTabScreenOptions(route, insets)}>
+      <Tab.Screen name="TelaInicio" component={HomeScreen} options={{ title: 'Início' }} />
+      <Tab.Screen name="BuscaProfissionais" component={BuscaProfissionais} options={{ title: 'Buscar' }} />
+      <Tab.Screen name="MeusAgendamentosCliente" component={MeusAgendamentosCliente} options={{ title: 'Agenda' }} />
+      <Tab.Screen name="FavoritosCliente" component={FavoritosCliente} options={{ title: 'Favoritos' }} />
+      <Tab.Screen name="Perfil" component={PerfilScreen} options={{ title: 'Perfil' }} />
+    </Tab.Navigator>
   );
 }
 
-// 2. Estrutura Principal de Navegação (Stack)
-export default function App() {
+/* TABS PROFISSIONAL */
+
+function ProfissionalTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="ChooseProfile" component={ChooseProfileScreen} options={{ title: 'Tipo de Conta' }} />
-        <Stack.Screen name="SignUpCliente" component={SignUpCliente} options={{ title: 'Cadastro Cliente' }} />
-        <Stack.Screen name="SignUpProEmpresa" component={SignUpProEmpresa} options={{ title: 'Cadastro Profissional' }} />
-        <Stack.Screen name="TermosUso" component={TermosUso} options={{ headerShown: false }} />
+    <Tab.Navigator screenOptions={({ route }) => getTabScreenOptions(route, insets)}>
+      <Tab.Screen name="TelaInicio" component={HomeScreen} options={{ title: 'Início' }} />
+      <Tab.Screen name="AgendaProfissional" component={AgendaProfissional} options={{ title: 'Agenda' }} />
+      <Tab.Screen name="ConfigurarServicos" component={ConfigurarServicos} options={{ title: 'Serviços' }} />
+      <Tab.Screen name="RelatoriosPro" component={RelatoriosPro} options={{ title: 'Financeiro' }} />
+      <Tab.Screen name="Perfil" component={PerfilScreen} options={{ title: 'Perfil' }} />
+    </Tab.Navigator>
+  );
+}
 
-        <Stack.Screen name="Main" component={DrawerRoutes} options={{ headerShown: false }} />
+/* DEFINE TIPO DE USUARIO */
 
-        <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} options={{ title: 'Perfil do Profissional' }} />
-        <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} options={{ title: 'Confirmar Agendamento' }} />
-        <Stack.Screen name="AvaliarAtendimento" component={AvaliarAtendimento} options={{ title: 'Avaliar Atendimento' }} />
-        <Stack.Screen name="FavoritosCliente" component={FavoritosCliente} options={{ title: 'Profissionais Favoritos' }} />
+function MainTabs() {
+  const [loadingPerfil, setLoadingPerfil] = useState(true);
+  const [isProfissional, setIsProfissional] = useState(false);
 
-        <Stack.Screen name="DetalhesAgendamento" component={DetalhesAgendamento} options={{ title: 'Detalhes' }} />
-        <Stack.Screen name="DetalhesAgendamentoPro" component={DetalhesAgendamentoPro} options={{ title: 'Informações do Pedido' }} />
+  useEffect(() => {
+    async function carregarPerfil() {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
 
-        <Stack.Screen name="ConfigurarPerfil" component={ConfigurarPerfil} options={{ title: 'Editar Perfil Público' }} />
-        <Stack.Screen name="EditarPerfil" component={EditarPerfil} options={{ title: 'Dados Cadastrais' }} />
-        <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} options={{ title: 'Horários de Atendimento' }} />
+        const docRef = doc(db, 'usuarios', user.uid);
+        const docSnap = await getDoc(docRef);
 
-        <Stack.Screen name="CadastroMenor" component={CadastroMenor} options={{ title: 'Cadastrar Dependente' }} />
-        <Stack.Screen name="EditarMenor" component={EditarMenor} options={{ title: 'Editar Dependente' }} />
+        if (docSnap.exists()) {
+          const dados = docSnap.data();
+
+          const profissional =
+            dados?.tipo === 'profissional' ||
+            dados?.perfil === 'profissional';
+
+          setIsProfissional(profissional);
+        }
+      } catch (error) {
+        console.log('Erro ao carregar perfil do usuário:', error);
+      } finally {
+        setLoadingPerfil(false);
+      }
+    }
+
+    carregarPerfil();
+  }, []);
+
+  if (loadingPerfil) return <LoadingScreen />;
+
+  return isProfissional ? <ProfissionalTabs /> : <ClienteTabs />;
+}
+
+/* NAVEGADOR PRINCIPAL */
+
+function AppNavigator() {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const notificationListener = useRef(null);
+  const responseListener = useRef(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (usuario) => {
+      setUser(usuario);
+      setLoading(false);
+
+      if (usuario?.uid) {
+        try {
+          await registrarPushTokenUsuario(usuario.uid);
+        } catch (error) {
+          console.log('Erro ao registrar push token no App:', error);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    notificationListener.current = Notifications.addNotificationReceivedListener(() => { });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response?.notification?.request?.content?.data || {};
+      navegarPorNotificacao(data);
+    });
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response?.notification?.request?.content?.data || {};
+        navegarPorNotificacao(data);
+      }
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, []);
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <NavigationContainer ref={navigationRef}>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!user ? (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="ChooseProfile" component={ChooseProfileScreen} />
+            <Stack.Screen name="SignUpCliente" component={SignUpCliente} />
+            <Stack.Screen name="SignUpProEmpresa" component={SignUpProEmpresa} />
+            <Stack.Screen name="TermosUso" component={TermosUso} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+
+            <Stack.Screen name="PerfilProfissional" component={PerfilProfissional} />
+            <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} />
+
+            <Stack.Screen name="DetalhesAgendamento" component={DetalhesAgendamento} />
+            <Stack.Screen name="AvaliarAtendimento" component={AvaliarAtendimento} />
+
+            <Stack.Screen name="DetalhesAgendamentoPro" component={DetalhesAgendamentoPro} />
+
+            <Stack.Screen name="EditarPerfil" component={EditarPerfil} />
+
+            <Stack.Screen name="ConfigurarPerfil" component={ConfigurarPerfil} />
+            <Stack.Screen name="ConfigurarAgenda" component={ConfigurarAgenda} />
+            <Stack.Screen name="GerenciarColaboradores" component={GerenciarColaboradores} />
+
+            <Stack.Screen name="ListaMenores" component={ListaMenores} />
+            <Stack.Screen name="CadastroMenor" component={CadastroMenor} />
+            <Stack.Screen name="EditarMenor" component={EditarMenor} />
+
+            <Stack.Screen name="Notificacoes" component={NotificacoesScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
+  );
+}
+
+/* APP */
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppNavigator />
+    </SafeAreaProvider>
   );
 }

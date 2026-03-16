@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -9,59 +9,82 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
-import { doc, getDoc } from "firebase/firestore";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
+import {
+    doc,
+    updateDoc,
+    serverTimestamp,
+} from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+import {
+    enviarPushAoCliente,
+    salvarNotificacaoCliente,
+} from "../../utils/notificationUtils";
+
+function getStatusConfig(status) {
+    switch (status) {
+        case 'confirmado':
+            return { cor: '#27AE60', label: 'CONFIRMADO' };
+        case 'cancelado':
+            return { cor: '#6c757d', label: 'CANCELADO' };
+        case 'recusado':
+            return { cor: '#C62828', label: 'RECUSADO' };
+        case 'concluido':
+            return { cor: '#1565C0', label: 'CONCLUÍDO' };
+        default:
+            return { cor: '#E67E22', label: 'PENDENTE' };
+    }
+}
+
+function formatarMoeda(valor) {
+    const numero = Number(valor || 0);
+    return `R$ ${numero.toFixed(2)}`;
+}
+
+function getNomeProfissional(agendamento) {
+    return (
+        agendamento?.colaboradorNome ||
+        agendamento?.clinicaNome ||
+        'Profissional'
+    );
+}
 
 export default function DetalhesAgendamentoPro({ route, navigation }) {
-    const { agendamentoId } = route.params || {};
-    const [agendamento, setAgendamento] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { agendamento } = route.params || {};
 
-    useEffect(() => {
-        carregarAgendamento();
-    }, [agendamentoId]);
+    const [loadingAcao, setLoadingAcao] = useState(false);
 
-    const carregarAgendamento = async () => {
-        if (!agendamentoId) {
-            Alert.alert("Erro", "Agendamento não encontrado.");
-            navigation.goBack();
+    const statusConfig = useMemo(
+        () => getStatusConfig(agendamento?.status),
+        [agendamento?.status]
+    );
+
+    const totalAgendamento = useMemo(() => {
+        return (
+            agendamento?.servicos?.reduce(
+                (acc, s) => acc + parseFloat(s.preco || 0),
+                0
+            ) || parseFloat(agendamento?.preco || 0)
+        );
+    }, [agendamento]);
+
+    const podeConfirmar = agendamento?.status === 'pendente';
+    const podeRecusar = agendamento?.status === 'pendente';
+    const podeConcluir = agendamento?.status === 'confirmado';
+
+    const abrirWhatsAppCliente = async () => {
+        const tel =
+            agendamento?.clienteWhatsapp?.replace(/\D/g, "") ||
+            agendamento?.telefoneCliente?.replace(/\D/g, "") ||
+            "";
+
+        if (!tel) {
+            Alert.alert("Aviso", "Número do cliente não disponível.");
             return;
         }
 
-        try {
-            setLoading(true);
-
-            const ref = doc(db, "agendamentos", agendamentoId);
-            const snap = await getDoc(ref);
-
-            if (!snap.exists()) {
-                Alert.alert("Erro", "Agendamento não encontrado.");
-                navigation.goBack();
-                return;
-            }
-
-            setAgendamento({
-                id: snap.id,
-                ...snap.data(),
-            });
-        } catch (error) {
-            console.log("Erro ao carregar detalhes do agendamento:", error);
-            Alert.alert("Erro", "Não foi possível carregar os detalhes.");
-            navigation.goBack();
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const abrirWhatsapp = async () => {
-        if (!agendamento?.clienteWhatsapp) {
-            Alert.alert("Aviso", "Este cliente não possui WhatsApp cadastrado.");
-            return;
-        }
-
-        const tel = agendamento.clienteWhatsapp.replace(/\D/g, '');
         const url = `https://wa.me/55${tel}`;
 
         try {
@@ -78,314 +101,421 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
         }
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'confirmado':
-                return '#27AE60';
-            case 'cancelado':
-                return '#6c757d';
-            case 'recusado':
-                return '#C62828';
-            case 'concluido':
-                return '#1565C0';
-            default:
-                return '#E67E22';
+    const enviarNotificacaoCompletaParaCliente = async (novoStatus) => {
+        if (!agendamento?.clienteId) return;
+
+        const profissionalNome = getNomeProfissional(agendamento);
+
+        await salvarNotificacaoCliente({
+            clienteId: agendamento.clienteId,
+            status: novoStatus,
+            agendamentoId: agendamento?.id || null,
+            profissionalId: agendamento?.colaboradorId || agendamento?.clinicaId || null,
+            profissionalNome,
+        });
+
+        const pushTokenCliente =
+            agendamento?.clientePushToken ||
+            '';
+
+        if (!pushTokenCliente) {
+            return;
+        }
+
+        if (novoStatus === 'concluido') {
+            await enviarPushAoCliente(pushTokenCliente, novoStatus, {
+                screen: 'AvaliarAtendimento',
+                root: '',
+                params: { agendamento },
+            });
+            return;
+        }
+
+        await enviarPushAoCliente(pushTokenCliente, novoStatus, {
+            screen: 'MeusAgendamentosCliente',
+            root: 'Main',
+            params: {},
+        });
+    };
+
+    const atualizarStatus = async (novoStatus) => {
+        if (!agendamento?.id) {
+            Alert.alert("Erro", "Agendamento inválido.");
+            return;
+        }
+
+        try {
+            setLoadingAcao(true);
+
+            const dadosUpdate = {
+                status: novoStatus,
+                atualizadoEm: serverTimestamp(),
+                atualizadoPor: auth.currentUser?.uid || null,
+            };
+
+            if (novoStatus === 'confirmado') {
+                dadosUpdate.confirmadoEm = serverTimestamp();
+            }
+
+            if (novoStatus === 'recusado') {
+                dadosUpdate.recusadoEm = serverTimestamp();
+            }
+
+            if (novoStatus === 'concluido') {
+                dadosUpdate.concluidoEm = serverTimestamp();
+            }
+
+            await updateDoc(doc(db, "agendamentos", agendamento.id), dadosUpdate);
+
+            await enviarNotificacaoCompletaParaCliente(novoStatus);
+
+            Alert.alert("Sucesso", "Status atualizado com sucesso.");
+            navigation.goBack();
+        } catch (error) {
+            console.log("Erro ao atualizar status:", error);
+            Alert.alert("Erro", "Não foi possível atualizar o status.");
+        } finally {
+            setLoadingAcao(false);
         }
     };
 
-    const valorTotal = agendamento?.servicos
-        ? agendamento.servicos.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0)
-        : parseFloat(agendamento?.preco || 0);
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-            </View>
+    const confirmarAgendamento = () => {
+        Alert.alert(
+            "Confirmar agendamento",
+            "Deseja confirmar este agendamento?",
+            [
+                { text: "Não", style: "cancel" },
+                {
+                    text: "Sim, confirmar",
+                    onPress: () => atualizarStatus('confirmado'),
+                },
+            ]
         );
-    }
+    };
 
-    if (!agendamento) {
-        return (
-            <View style={styles.loadingContainer}>
-                <Text style={styles.emptyText}>Agendamento não encontrado.</Text>
-            </View>
+    const recusarAgendamento = () => {
+        Alert.alert(
+            "Recusar agendamento",
+            "Deseja recusar este agendamento?",
+            [
+                { text: "Não", style: "cancel" },
+                {
+                    text: "Sim, recusar",
+                    style: "destructive",
+                    onPress: () => atualizarStatus('recusado'),
+                },
+            ]
         );
-    }
+    };
+
+    const concluirAgendamento = () => {
+        Alert.alert(
+            "Concluir atendimento",
+            "Deseja marcar este atendimento como concluído?",
+            [
+                { text: "Não", style: "cancel" },
+                {
+                    text: "Sim, concluir",
+                    onPress: () => atualizarStatus('concluido'),
+                },
+            ]
+        );
+    };
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color="#333" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Detalhes do Agendamento</Text>
-            </View>
+        <SafeAreaView style={styles.container}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="arrow-back" size={20} color={colors.textDark} />
+                    </TouchableOpacity>
 
-            <View style={styles.card}>
-                <Text style={styles.label}>CLIENTE</Text>
-                <Text style={styles.clienteNome}>
-                    {agendamento.clienteNome || "Cliente Particular"}
-                </Text>
+                    <View style={styles.headerTextArea}>
+                        <Text style={styles.title}>Detalhes do Agendamento</Text>
+                        <Text style={styles.subtitle}>Painel do profissional</Text>
+                    </View>
+                </View>
 
-                <View style={styles.infoLine}>
-                    <Ionicons name="call-outline" size={18} color={colors.primary} />
-                    <Text style={styles.infoLineText}>
-                        {agendamento.clienteWhatsapp || "WhatsApp não informado"}
+                <View style={styles.statusArea}>
+                    <View style={[styles.statusBadge, { backgroundColor: statusConfig.cor }]}>
+                        <Text style={styles.statusText}>{statusConfig.label}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.label}>CLIENTE</Text>
+                    <Text style={styles.value}>
+                        {agendamento?.clienteNome || "Cliente"}
+                    </Text>
+
+                    <Text style={[styles.label, { marginTop: 16 }]}>DATA E HORÁRIO</Text>
+                    <Text style={styles.value}>
+                        {agendamento?.data} às {agendamento?.horario}
+                    </Text>
+
+                    <Text style={[styles.label, { marginTop: 16 }]}>SERVIÇOS</Text>
+                    {agendamento?.servicos && agendamento.servicos.length > 0 ? (
+                        agendamento.servicos.map((s, index) => (
+                            <View key={index} style={styles.itemServico}>
+                                <Text style={styles.servicoNome}>• {s.nome}</Text>
+                                <Text style={styles.servicoPreco}>{formatarMoeda(s.preco)}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <Text style={styles.value}>Nenhum serviço informado</Text>
+                    )}
+
+                    <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>VALOR TOTAL</Text>
+                        <Text style={styles.totalValue}>{formatarMoeda(totalAgendamento)}</Text>
+                    </View>
+
+                    <Text style={[styles.label, { marginTop: 16 }]}>WHATSAPP DO CLIENTE</Text>
+                    <TouchableOpacity
+                        style={styles.whatsButton}
+                        onPress={abrirWhatsAppCliente}
+                        activeOpacity={0.88}
+                    >
+                        <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                        <Text style={styles.whatsButtonText}>Chamar no WhatsApp</Text>
+                    </TouchableOpacity>
+
+                    <Text style={[styles.label, { marginTop: 16 }]}>STATUS ATUAL</Text>
+                    <Text style={[styles.value, { color: statusConfig.cor, fontWeight: '800' }]}>
+                        {statusConfig.label}
                     </Text>
                 </View>
 
-                <View style={styles.divider} />
-
-                <TouchableOpacity style={styles.whatsappBtn} onPress={abrirWhatsapp}>
-                    <Ionicons name="logo-whatsapp" size={20} color="#FFF" />
-                    <Text style={styles.whatsappBtnText}>Chamar no WhatsApp</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.card}>
-                <Text style={styles.label}>AGENDADO PARA</Text>
-
-                <View style={styles.infoRow}>
-                    <Ionicons name="calendar" size={20} color={colors.primary} />
-                    <Text style={styles.infoText}>{agendamento.data}</Text>
-                </View>
-
-                <View style={[styles.infoRow, { marginTop: 10 }]}>
-                    <Ionicons name="time" size={20} color={colors.primary} />
-                    <Text style={styles.infoText}>{agendamento.horario}</Text>
-                </View>
-
-                <View style={[styles.infoRow, { marginTop: 10 }]}>
-                    <Ionicons name="person-outline" size={20} color={colors.primary} />
-                    <Text style={styles.infoText}>
-                        {agendamento.colaboradorNome || "Profissional"}
-                    </Text>
-                </View>
-            </View>
-
-            <View style={styles.card}>
-                <Text style={styles.label}>SERVIÇOS E VALORES</Text>
-
-                {agendamento.servicos && agendamento.servicos.length > 0 ? (
-                    agendamento.servicos.map((item, index) => (
-                        <View key={index} style={styles.servicoItem}>
-                            <Text style={styles.servicoNome}>{item.nome}</Text>
-                            <Text style={styles.servicoPreco}>
-                                R$ {parseFloat(item.preco || 0).toFixed(2)}
-                            </Text>
-                        </View>
-                    ))
+                {loadingAcao ? (
+                    <View style={styles.loadingBox}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text style={styles.loadingText}>Atualizando status...</Text>
+                    </View>
                 ) : (
-                    <View style={styles.servicoItem}>
-                        <Text style={styles.servicoNome}>
-                            {agendamento.servicoNome || "Serviço"}
-                        </Text>
-                        <Text style={styles.servicoPreco}>
-                            R$ {parseFloat(agendamento.preco || 0).toFixed(2)}
-                        </Text>
+                    <View style={styles.actionsArea}>
+                        {podeConfirmar && (
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.confirmButton]}
+                                onPress={confirmarAgendamento}
+                                activeOpacity={0.9}
+                            >
+                                <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" />
+                                <Text style={styles.actionButtonText}>ACEITAR AGENDAMENTO</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {podeRecusar && (
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.rejectButton]}
+                                onPress={recusarAgendamento}
+                                activeOpacity={0.9}
+                            >
+                                <Ionicons name="close-circle-outline" size={20} color="#FFF" />
+                                <Text style={styles.actionButtonText}>RECUSAR AGENDAMENTO</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {podeConcluir && (
+                            <TouchableOpacity
+                                style={[styles.actionButton, styles.finishButton]}
+                                onPress={concluirAgendamento}
+                                activeOpacity={0.9}
+                            >
+                                <Ionicons name="checkmark-done-outline" size={20} color="#FFF" />
+                                <Text style={styles.actionButtonText}>MARCAR COMO CONCLUÍDO</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
 
-                <View style={styles.totalContainer}>
-                    <Text style={styles.totalLabel}>TOTAL A RECEBER</Text>
-                    <Text style={styles.totalValor}>R$ {valorTotal.toFixed(2)}</Text>
-                </View>
-            </View>
-
-            <View style={styles.card}>
-                <Text style={styles.label}>LOCAL DO ATENDIMENTO</Text>
-                <View style={styles.infoRow}>
-                    <Ionicons name="location" size={20} color="#E74C3C" />
-                    <Text style={styles.enderecoText}>
-                        {agendamento.clienteEndereco ||
-                            agendamento.endereco ||
-                            "Endereço não disponível"}
-                    </Text>
-                </View>
-            </View>
-
-            <View
-                style={[
-                    styles.statusBanner,
-                    { backgroundColor: getStatusColor(agendamento.status) },
-                ]}
-            >
-                <Text style={styles.statusBannerText}>
-                    STATUS: {(agendamento.status || 'pendente').toUpperCase()}
-                </Text>
-            </View>
-
-            <View style={{ height: 40 }} />
-        </ScrollView>
+                <View style={{ height: 20 }} />
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    emptyText: {
-        color: '#666',
-        fontSize: 16,
+        backgroundColor: '#F7F8FA',
     },
 
     header: {
-        padding: 20,
-        paddingTop: 50,
-        backgroundColor: '#FFF',
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 12,
+    },
+
+    backButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 14,
+        backgroundColor: '#FFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
         elevation: 2,
     },
 
-    backBtn: {
-        padding: 5,
+    headerTextArea: {
+        flex: 1,
     },
 
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginLeft: 15,
-        color: '#333',
+    title: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: colors.textDark,
+    },
+
+    subtitle: {
+        fontSize: 14,
+        color: colors.secondary,
+        marginTop: 4,
+    },
+
+    statusArea: {
+        paddingHorizontal: 16,
+        marginBottom: 8,
+    },
+
+    statusBadge: {
+        alignSelf: 'flex-start',
+        borderRadius: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+    },
+
+    statusText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '800',
     },
 
     card: {
         backgroundColor: '#FFF',
-        padding: 20,
-        marginHorizontal: 20,
-        marginTop: 15,
-        borderRadius: 15,
+        marginHorizontal: 16,
+        padding: 18,
+        borderRadius: 18,
         elevation: 2,
     },
 
     label: {
         fontSize: 11,
-        color: '#AAA',
+        color: '#999',
         fontWeight: 'bold',
-        marginBottom: 8,
         letterSpacing: 1,
+        marginBottom: 6,
     },
 
-    clienteNome: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-
-    infoLine: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 12,
-    },
-
-    infoLineText: {
-        fontSize: 14,
-        color: '#444',
-        marginLeft: 8,
-    },
-
-    divider: {
-        height: 1,
-        backgroundColor: '#EEE',
-        marginVertical: 15,
-    },
-
-    whatsappBtn: {
-        backgroundColor: '#25D366',
-        flexDirection: 'row',
-        padding: 12,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    whatsappBtnText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        marginLeft: 10,
-    },
-
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-
-    infoText: {
+    value: {
         fontSize: 16,
-        marginLeft: 10,
-        color: '#444',
-        fontWeight: '500',
+        color: '#333',
+        fontWeight: '600',
     },
 
-    servicoItem: {
+    itemServico: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 6,
     },
 
     servicoNome: {
-        fontSize: 15,
-        color: '#666',
+        fontSize: 14,
+        color: '#444',
         flex: 1,
         paddingRight: 10,
     },
 
     servicoPreco: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: 'bold',
-        color: '#333',
+        color: colors.textDark,
     },
 
-    totalContainer: {
-        marginTop: 15,
-        paddingTop: 15,
+    totalRow: {
         borderTopWidth: 1,
         borderTopColor: '#EEE',
+        marginTop: 12,
+        paddingTop: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
     },
 
     totalLabel: {
         fontWeight: 'bold',
         color: '#333',
-        fontSize: 12,
     },
 
-    totalValor: {
-        fontSize: 20,
+    totalValue: {
         fontWeight: 'bold',
         color: colors.primary,
+        fontSize: 18,
     },
 
-    enderecoText: {
-        fontSize: 14,
-        color: '#666',
-        marginLeft: 10,
-        flex: 1,
-        lineHeight: 20,
-    },
-
-    statusBanner: {
-        margin: 20,
-        padding: 15,
+    whatsButton: {
+        backgroundColor: '#F0FFF4',
         borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
         alignItems: 'center',
+        alignSelf: 'flex-start',
     },
 
-    statusBannerText: {
+    whatsButtonText: {
+        marginLeft: 8,
+        color: '#25D366',
+        fontWeight: '800',
+    },
+
+    actionsArea: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+    },
+
+    actionButton: {
+        borderRadius: 14,
+        paddingVertical: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+
+    confirmButton: {
+        backgroundColor: '#27AE60',
+    },
+
+    rejectButton: {
+        backgroundColor: '#E74C3C',
+    },
+
+    finishButton: {
+        backgroundColor: '#1565C0',
+    },
+
+    actionButtonText: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontWeight: '800',
+        marginLeft: 8,
         fontSize: 14,
-        letterSpacing: 1,
+    },
+
+    loadingBox: {
+        paddingTop: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    loadingText: {
+        marginTop: 10,
+        color: colors.secondary,
+        fontSize: 14,
     },
 });

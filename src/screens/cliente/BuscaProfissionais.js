@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { auth, db } from "../../services/firebaseConfig";
@@ -26,31 +28,118 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 
-export default function BuscaProfissionais({ navigation }) {
+const REGIAO_PADRAO = {
+  latitude: -23.5505,
+  longitude: -46.6333,
+  latitudeDelta: 0.2,
+  longitudeDelta: 0.2,
+};
+
+function parseCoord(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+
+  const numero =
+    typeof valor === 'string'
+      ? parseFloat(valor.replace(',', '.'))
+      : Number(valor);
+
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function getNomeProfissional(profissional) {
+  return (
+    profissional.nome ||
+    profissional.nomeCompleto ||
+    profissional.nomeNegocio ||
+    "Profissional"
+  );
+}
+
+function temCoordenadasValidas(item) {
+  return (
+    item.latitudeParsed !== null &&
+    item.longitudeParsed !== null &&
+    item.latitudeParsed !== 0 &&
+    item.longitudeParsed !== 0
+  );
+}
+
+function ordenarProfissionais(lista) {
+  return [...lista].sort((a, b) => {
+    if (Number(b.favorito) !== Number(a.favorito)) {
+      return Number(b.favorito) - Number(a.favorito);
+    }
+
+    if (b.mediaAvaliacao !== a.mediaAvaliacao) {
+      return b.mediaAvaliacao - a.mediaAvaliacao;
+    }
+
+    if (b.quantidadeAvaliacoes !== a.quantidadeAvaliacoes) {
+      return b.quantidadeAvaliacoes - a.quantidadeAvaliacoes;
+    }
+
+    const nomeA = getNomeProfissional(a).toLowerCase();
+    const nomeB = getNomeProfissional(b).toLowerCase();
+
+    return nomeA.localeCompare(nomeB);
+  });
+}
+
+export default function BuscaProfissionais({ navigation, route }) {
   const [profissionais, setProfissionais] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [busca, setBusca] = useState('');
+  const [busca, setBusca] = useState(route?.params?.buscaInicial || '');
   const [region, setRegion] = useState(null);
   const [selectedPro, setSelectedPro] = useState(null);
   const [favoritosMap, setFavoritosMap] = useState({});
   const [salvandoFavoritoId, setSalvandoFavoritoId] = useState(null);
 
-  useEffect(() => {
-    carregarDados();
+  const categoriaSelecionada = route?.params?.categoria || '';
+  const categoriaSlugSelecionada = route?.params?.categoriaSlug || '';
+  const categoriaIdSelecionada = route?.params?.categoriaId || '';
+  const verTodasCategorias = !!route?.params?.verTodasCategorias;
+
+  const carregarProfissionaisBase = useCallback(async () => {
+    try {
+      const profissionaisPorTipoQuery = query(
+        collection(db, "usuarios"),
+        where("tipo", "==", "profissional")
+      );
+
+      const profissionaisPorTipoSnap = await getDocs(profissionaisPorTipoQuery);
+
+      if (!profissionaisPorTipoSnap.empty) {
+        return profissionaisPorTipoSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+      }
+    } catch (error) {
+      console.log("Erro ao carregar profissionais por tipo:", error);
+    }
+
+    try {
+      const profissionaisPorPerfilQuery = query(
+        collection(db, "usuarios"),
+        where("perfil", "==", "profissional")
+      );
+
+      const profissionaisPorPerfilSnap = await getDocs(profissionaisPorPerfilQuery);
+
+      if (!profissionaisPorPerfilSnap.empty) {
+        return profissionaisPorPerfilSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+      }
+    } catch (error) {
+      console.log("Erro ao carregar profissionais por perfil:", error);
+    }
+
+    return [];
   }, []);
 
-  const parseCoord = (valor) => {
-    if (valor === null || valor === undefined || valor === '') return null;
-
-    const numero =
-      typeof valor === 'string'
-        ? parseFloat(valor.replace(',', '.'))
-        : Number(valor);
-
-    return Number.isFinite(numero) ? numero : null;
-  };
-
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setLoading(true);
 
     try {
@@ -67,21 +156,11 @@ export default function BuscaProfissionais({ navigation }) {
           longitudeDelta: 0.05,
         });
       } else {
-        setRegion({
-          latitude: -23.5505,
-          longitude: -46.6333,
-          latitudeDelta: 0.2,
-          longitudeDelta: 0.2,
-        });
+        setRegion(REGIAO_PADRAO);
       }
 
-      const profissionaisQuery = query(
-        collection(db, "usuarios"),
-        where("tipo", "==", "profissional")
-      );
-
-      const [profissionaisSnap, avaliacoesSnap, favoritosSnap] = await Promise.all([
-        getDocs(profissionaisQuery),
+      const [profissionaisBase, avaliacoesSnap, favoritosSnap] = await Promise.all([
+        carregarProfissionaisBase(),
         getDocs(collection(db, "avaliacoes")),
         user ? getDocs(collection(db, "usuarios", user.uid, "favoritos")) : Promise.resolve(null),
       ]);
@@ -111,52 +190,39 @@ export default function BuscaProfissionais({ navigation }) {
           favoritosObj[docSnap.id] = true;
         });
       }
+
       setFavoritosMap(favoritosObj);
 
-      const lista = profissionaisSnap.docs.map((d) => {
-        const dados = d.data();
-        const resumo = avaliacoesAgrupadas[d.id] || { soma: 0, quantidade: 0 };
+      const lista = profissionaisBase.map((dados) => {
+        const resumo = avaliacoesAgrupadas[dados.id] || { soma: 0, quantidade: 0 };
         const media = resumo.quantidade > 0 ? resumo.soma / resumo.quantidade : 0;
 
         return {
-          id: d.id,
           ...dados,
           latitudeParsed: parseCoord(dados.latitude),
           longitudeParsed: parseCoord(dados.longitude),
           mediaAvaliacao: media,
           quantidadeAvaliacoes: resumo.quantidade,
-          favorito: !!favoritosObj[d.id],
+          favorito: !!favoritosObj[dados.id],
         };
       });
 
-      const ordenada = lista.sort((a, b) => {
-        if (Number(b.favorito) !== Number(a.favorito)) {
-          return Number(b.favorito) - Number(a.favorito);
-        }
-
-        if (b.mediaAvaliacao !== a.mediaAvaliacao) {
-          return b.mediaAvaliacao - a.mediaAvaliacao;
-        }
-
-        if (b.quantidadeAvaliacoes !== a.quantidadeAvaliacoes) {
-          return b.quantidadeAvaliacoes - a.quantidadeAvaliacoes;
-        }
-
-        const nomeA = (a.nome || a.nomeCompleto || a.nomeNegocio || '').toLowerCase();
-        const nomeB = (b.nome || b.nomeCompleto || b.nomeNegocio || '').toLowerCase();
-        return nomeA.localeCompare(nomeB);
-      });
-
+      const ordenada = ordenarProfissionais(lista);
       setProfissionais(ordenada);
     } catch (e) {
       console.log("Erro ao carregar profissionais:", e);
       Alert.alert("Erro", "Não foi possível carregar os profissionais.");
+      setRegion(REGIAO_PADRAO);
     } finally {
       setLoading(false);
     }
-  };
+  }, [carregarProfissionaisBase]);
 
-  const atualizarFavoritoNaLista = (proId, ehFavorito) => {
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
+
+  const atualizarFavoritoNaLista = useCallback((proId, ehFavorito) => {
     setFavoritosMap((prev) => ({
       ...prev,
       [proId]: ehFavorito,
@@ -167,32 +233,18 @@ export default function BuscaProfissionais({ navigation }) {
         p.id === proId ? { ...p, favorito: ehFavorito } : p
       );
 
-      return atualizada.sort((a, b) => {
-        if (Number(b.favorito) !== Number(a.favorito)) {
-          return Number(b.favorito) - Number(a.favorito);
-        }
-
-        if (b.mediaAvaliacao !== a.mediaAvaliacao) {
-          return b.mediaAvaliacao - a.mediaAvaliacao;
-        }
-
-        if (b.quantidadeAvaliacoes !== a.quantidadeAvaliacoes) {
-          return b.quantidadeAvaliacoes - a.quantidadeAvaliacoes;
-        }
-
-        const nomeA = (a.nome || a.nomeCompleto || a.nomeNegocio || '').toLowerCase();
-        const nomeB = (b.nome || b.nomeCompleto || b.nomeNegocio || '').toLowerCase();
-        return nomeA.localeCompare(nomeB);
-      });
+      return ordenarProfissionais(atualizada);
     });
 
     setSelectedPro((prev) => {
       if (!prev || prev.id !== proId) return prev;
       return { ...prev, favorito: ehFavorito };
     });
-  };
+  }, []);
 
-  const toggleFavorito = async (profissional) => {
+  const toggleFavorito = useCallback(async (profissional) => {
+    Keyboard.dismiss();
+
     const user = auth.currentUser;
 
     if (!user) {
@@ -212,9 +264,11 @@ export default function BuscaProfissionais({ navigation }) {
       } else {
         await setDoc(favoritoRef, {
           profissionalId: profissional.id,
-          nome: profissional.nome || profissional.nomeCompleto || profissional.nomeNegocio || "Profissional",
+          nome: getNomeProfissional(profissional),
           especialidade: profissional.especialidade || "",
-          cidade: profissional.localizacao?.cidade || "",
+          cidade: profissional.localizacao?.cidade || profissional.cidade || "",
+          categoriaSlug: profissional.categoriaSlug || "",
+          categoriaId: profissional.categoriaId || "",
           createdAt: serverTimestamp(),
         });
         atualizarFavoritoNaLista(profissional.id, true);
@@ -225,81 +279,143 @@ export default function BuscaProfissionais({ navigation }) {
     } finally {
       setSalvandoFavoritoId(null);
     }
-  };
+  }, [atualizarFavoritoNaLista]);
 
   const profissionaisFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
 
-    const base = !termo
-      ? profissionais
-      : profissionais.filter((p) => {
-        const nome = (p.nome || p.nomeCompleto || p.nomeNegocio || '').toLowerCase();
-        const especialidade = (p.especialidade || '').toLowerCase();
-        const nomeNegocio = (p.nomeNegocio || '').toLowerCase();
-
-        return (
-          nome.includes(termo) ||
-          especialidade.includes(termo) ||
-          nomeNegocio.includes(termo)
-        );
-      });
-
-    return [...base].sort((a, b) => {
-      if (Number(b.favorito) !== Number(a.favorito)) {
-        return Number(b.favorito) - Number(a.favorito);
+    const listaFiltradaPorCategoria = profissionais.filter((p) => {
+      if (verTodasCategorias) {
+        return true;
       }
 
-      if (b.mediaAvaliacao !== a.mediaAvaliacao) {
-        return b.mediaAvaliacao - a.mediaAvaliacao;
+      if (categoriaIdSelecionada && p.categoriaId === categoriaIdSelecionada) {
+        return true;
       }
 
-      if (b.quantidadeAvaliacoes !== a.quantidadeAvaliacoes) {
-        return b.quantidadeAvaliacoes - a.quantidadeAvaliacoes;
+      if (
+        categoriaSlugSelecionada &&
+        String(p.categoriaSlug || '').toLowerCase() ===
+        String(categoriaSlugSelecionada).toLowerCase()
+      ) {
+        return true;
       }
 
-      return 0;
+      if (
+        categoriaSelecionada &&
+        String(p.especialidade || '').toLowerCase() ===
+        String(categoriaSelecionada).toLowerCase()
+      ) {
+        return true;
+      }
+
+      if (
+        categoriaSelecionada &&
+        String(p.categoriaNome || '').toLowerCase() ===
+        String(categoriaSelecionada).toLowerCase()
+      ) {
+        return true;
+      }
+
+      if (
+        !categoriaIdSelecionada &&
+        !categoriaSlugSelecionada &&
+        !categoriaSelecionada
+      ) {
+        return true;
+      }
+
+      return false;
     });
-  }, [profissionais, busca]);
 
-  const profissionaisComMapa = useMemo(() => {
-    return profissionaisFiltrados.filter((p) => {
+    if (!termo) {
+      return ordenarProfissionais(listaFiltradaPorCategoria);
+    }
+
+    const filtrados = listaFiltradaPorCategoria.filter((p) => {
+      const nome = getNomeProfissional(p).toLowerCase();
+      const especialidade = String(p.especialidade || '').toLowerCase();
+      const nomeNegocio = String(p.nomeNegocio || '').toLowerCase();
+      const categoriaNome = String(p.categoriaNome || '').toLowerCase();
+      const categoriaSlug = String(p.categoriaSlug || '').toLowerCase();
+      const cidade = String(p.localizacao?.cidade || p.cidade || '').toLowerCase();
+
       return (
-        p.latitudeParsed !== null &&
-        p.longitudeParsed !== null &&
-        p.latitudeParsed !== 0 &&
-        p.longitudeParsed !== 0
+        nome.includes(termo) ||
+        especialidade.includes(termo) ||
+        nomeNegocio.includes(termo) ||
+        categoriaNome.includes(termo) ||
+        categoriaSlug.includes(termo) ||
+        cidade.includes(termo)
       );
     });
+
+    return ordenarProfissionais(filtrados);
+  }, [
+    profissionais,
+    busca,
+    categoriaSelecionada,
+    categoriaSlugSelecionada,
+    categoriaIdSelecionada,
+    verTodasCategorias,
+  ]);
+
+  const profissionaisComMapa = useMemo(() => {
+    return profissionaisFiltrados.filter(temCoordenadasValidas);
   }, [profissionaisFiltrados]);
 
-  const abrirPerfil = (pro) => {
-    navigation.navigate("PerfilProfissional", { proId: pro.id });
-  };
+  const abrirPerfil = useCallback((pro) => {
+    Keyboard.dismiss();
+    navigation.navigate("PerfilProfissional", {
+      proId: pro.id,
+      profissionalId: pro.id,
+    });
+  }, [navigation]);
 
-  const textoAvaliacao = (item) => {
+  const textoAvaliacao = useCallback((item) => {
     if (!item.quantidadeAvaliacoes) return "Sem avaliações";
     return `${item.mediaAvaliacao.toFixed(1)} (${item.quantidadeAvaliacoes})`;
-  };
+  }, []);
 
-  const renderResultado = ({ item }) => {
-    const temLocalizacao =
-      item.latitudeParsed !== null &&
-      item.longitudeParsed !== null &&
-      item.latitudeParsed !== 0 &&
-      item.longitudeParsed !== 0;
+  const tituloResultados = useMemo(() => {
+    if (verTodasCategorias) {
+      return `Categorias e profissionais (${profissionaisFiltrados.length})`;
+    }
+
+    if (categoriaSelecionada) {
+      return `${categoriaSelecionada} (${profissionaisFiltrados.length})`;
+    }
+
+    return `Resultados (${profissionaisFiltrados.length})`;
+  }, [categoriaSelecionada, profissionaisFiltrados.length, verTodasCategorias]);
+
+  const subtituloBusca = useMemo(() => {
+    if (verTodasCategorias) {
+      return 'Explore os profissionais disponíveis';
+    }
+
+    if (categoriaSelecionada) {
+      return `Profissionais da categoria ${categoriaSelecionada}`;
+    }
+
+    return 'Buscar por nome, serviço ou cidade';
+  }, [categoriaSelecionada, verTodasCategorias]);
+
+  const renderResultado = useCallback(({ item }) => {
+    const temLocalizacao = temCoordenadasValidas(item);
 
     return (
       <TouchableOpacity style={styles.resultCard} onPress={() => abrirPerfil(item)}>
         <View style={styles.resultAvatar}>
           <Text style={styles.resultAvatarText}>
-            {(item.nome || item.nomeCompleto || item.nomeNegocio || "P").charAt(0)}
+            {getNomeProfissional(item).charAt(0)}
           </Text>
         </View>
 
-        <View style={{ flex: 1, marginLeft: 12 }}>
+        <View style={styles.resultContent}>
           <View style={styles.resultTopRow}>
             <Text style={styles.resultName}>
-              {item.nome || item.nomeCompleto || item.nomeNegocio || "Profissional"}
+              {getNomeProfissional(item)}
             </Text>
 
             <TouchableOpacity
@@ -319,7 +435,7 @@ export default function BuscaProfissionais({ navigation }) {
           </View>
 
           <Text style={styles.resultSub}>
-            {item.especialidade || "Especialidade não informada"}
+            {item.especialidade || item.categoriaNome || "Especialidade não informada"}
           </Text>
 
           <View style={styles.resultMetaRow}>
@@ -329,7 +445,7 @@ export default function BuscaProfissionais({ navigation }) {
             </View>
 
             <Text style={styles.resultCity}>
-              {item.localizacao?.cidade || "Cidade não informada"}
+              {item.localizacao?.cidade || item.cidade || "Cidade não informada"}
             </Text>
           </View>
 
@@ -341,78 +457,116 @@ export default function BuscaProfissionais({ navigation }) {
         <Ionicons name="chevron-forward" size={20} color="#999" />
       </TouchableOpacity>
     );
-  };
+  }, [abrirPerfil, toggleFavorito, salvandoFavoritoId, textoAvaliacao]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.topArea}>
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.85}
+            onPress={() => {
+              Keyboard.dismiss();
+              navigation.goBack();
+            }}
+          >
+            <Ionicons name="arrow-back" size={20} color={colors.textDark} />
+          </TouchableOpacity>
+
+          <View style={styles.titleArea}>
+            <Text style={styles.pageTitle}>Explorar profissionais</Text>
+            <Text style={styles.pageSubtitle}>{subtituloBusca}</Text>
+          </View>
+        </View>
+
         <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color={colors.secondary} />
+          <Ionicons name="search-outline" size={20} color={colors.secondary} />
 
           <TextInput
             style={styles.input}
-            placeholder="Buscar por nome ou serviço..."
+            placeholder="Buscar por nome, serviço ou cidade..."
             placeholderTextColor="#999"
             value={busca}
             onChangeText={setBusca}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={Keyboard.dismiss}
           />
 
-          <TouchableOpacity style={styles.filterBtn}>
-            <Ionicons name="options-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
+          {busca?.length > 0 ? (
+            <TouchableOpacity
+              style={styles.filterBtn}
+              onPress={() => {
+                Keyboard.dismiss();
+                setBusca('');
+              }}
+            >
+              <Ionicons name="close-circle-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
-      {region && (
-        <MapView
-          style={styles.map}
-          provider={PROVIDER_GOOGLE}
-          region={region}
-          showsUserLocation
-          onPress={() => setSelectedPro(null)}
-        >
-          {profissionaisComMapa.map((pro) => (
-            <Marker
-              key={pro.id}
-              coordinate={{
-                latitude: pro.latitudeParsed,
-                longitude: pro.longitudeParsed,
-              }}
-              onPress={() => setSelectedPro(pro)}
-            >
-              <View style={[styles.customMarker, pro.favorito && styles.customMarkerFavorite]}>
-                <Ionicons
-                  name={pro.favorito ? "heart" : "star"}
-                  size={12}
-                  color="#FFF"
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.markerText}>
-                  {pro.quantidadeAvaliacoes > 0 ? pro.mediaAvaliacao.toFixed(1) : "Novo"}
-                </Text>
-              </View>
-            </Marker>
-          ))}
-        </MapView>
-      )}
+      <View style={styles.mapWrapper}>
+        {region && (
+          <MapView
+            style={styles.map}
+            provider={PROVIDER_GOOGLE}
+            region={region}
+            showsUserLocation
+            onPress={() => {
+              Keyboard.dismiss();
+              setSelectedPro(null);
+            }}
+          >
+            {profissionaisComMapa.map((pro) => (
+              <Marker
+                key={pro.id}
+                coordinate={{
+                  latitude: pro.latitudeParsed,
+                  longitude: pro.longitudeParsed,
+                }}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setSelectedPro(pro);
+                }}
+              >
+                <View style={[styles.customMarker, pro.favorito && styles.customMarkerFavorite]}>
+                  <Ionicons
+                    name={pro.favorito ? "heart" : "star"}
+                    size={12}
+                    color="#FFF"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.markerText}>
+                    {pro.quantidadeAvaliacoes > 0 ? pro.mediaAvaliacao.toFixed(1) : "Novo"}
+                  </Text>
+                </View>
+              </Marker>
+            ))}
+          </MapView>
+        )}
+      </View>
 
       {selectedPro && (
         <TouchableOpacity
-          activeOpacity={0.9}
+          activeOpacity={0.92}
           style={styles.proCard}
           onPress={() => abrirPerfil(selectedPro)}
         >
           <View style={styles.proInfo}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {(selectedPro.nome || selectedPro.nomeCompleto || selectedPro.nomeNegocio || "P").charAt(0)}
+                {getNomeProfissional(selectedPro).charAt(0)}
               </Text>
             </View>
 
             <View style={styles.details}>
               <View style={styles.selectedTopRow}>
                 <Text style={styles.proName}>
-                  {selectedPro.nome || selectedPro.nomeCompleto || selectedPro.nomeNegocio || "Profissional"}
+                  {getNomeProfissional(selectedPro)}
                 </Text>
 
                 <TouchableOpacity
@@ -432,7 +586,7 @@ export default function BuscaProfissionais({ navigation }) {
               </View>
 
               <Text style={styles.proSpec}>
-                {selectedPro.especialidade || "Especialidade não informada"}
+                {selectedPro.especialidade || selectedPro.categoriaNome || "Especialidade não informada"}
               </Text>
 
               <View style={styles.ratingBox}>
@@ -450,19 +604,34 @@ export default function BuscaProfissionais({ navigation }) {
       )}
 
       <View style={styles.resultsPanel}>
-        <Text style={styles.resultsTitle}>
-          Resultados ({profissionaisFiltrados.length})
-        </Text>
+        <View style={styles.resultsHeader}>
+          <Text style={styles.resultsTitle}>{tituloResultados}</Text>
+          <View style={styles.resultsBadge}>
+            <Text style={styles.resultsBadgeText}>{profissionaisFiltrados.length}</Text>
+          </View>
+        </View>
 
         {profissionaisFiltrados.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhum profissional encontrado.</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search-outline" size={26} color="#A0A0A0" />
+            <Text style={styles.emptyText}>Nenhum profissional encontrado.</Text>
+            <Text style={styles.emptySubtext}>
+              Tente buscar por outro nome, cidade ou categoria.
+            </Text>
+          </View>
         ) : (
           <FlatList
             data={profissionaisFiltrados}
             keyExtractor={(item) => item.id}
             renderItem={renderResultado}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={6}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           />
         )}
       </View>
@@ -472,53 +641,99 @@ export default function BuscaProfissionais({ navigation }) {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
-
-  map: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+  },
 
   loader: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(247,248,250,0.75)',
   },
 
-  searchContainer: {
-    position: "absolute",
-    top: 50,
-    left: 20,
-    right: 20,
-    zIndex: 20,
+  topArea: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+    backgroundColor: '#F7F8FA',
+  },
+
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  titleArea: {
+    flex: 1,
+  },
+
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.textDark,
+  },
+
+  pageSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: colors.secondary,
   },
 
   searchBox: {
     backgroundColor: "#fff",
-    borderRadius: 30,
-    paddingHorizontal: 20,
-    height: 55,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 56,
     flexDirection: "row",
     alignItems: "center",
-    elevation: 8,
+    elevation: 3,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
 
   input: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textDark,
   },
 
   filterBtn: {
-    padding: 5,
+    padding: 4,
+  },
+
+  mapWrapper: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+
+  map: {
+    flex: 1,
   },
 
   customMarker: {
@@ -545,23 +760,24 @@ const styles = StyleSheet.create({
 
   proCard: {
     position: 'absolute',
-    bottom: 220,
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
+    bottom: 255,
     backgroundColor: '#FFF',
     borderRadius: 20,
     padding: 15,
-    elevation: 10,
+    elevation: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    zIndex: 10,
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    zIndex: 20,
   },
 
   proInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 14,
   },
 
   avatar: {
@@ -580,7 +796,7 @@ const styles = StyleSheet.create({
   },
 
   details: {
-    marginLeft: 15,
+    marginLeft: 14,
     flex: 1,
   },
 
@@ -618,7 +834,7 @@ const styles = StyleSheet.create({
   viewBtn: {
     backgroundColor: colors.primary,
     borderRadius: 15,
-    height: 45,
+    height: 46,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -635,26 +851,57 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 240,
+    height: 270,
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 16,
-    elevation: 12,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    elevation: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -2 },
+  },
+
+  resultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
 
   resultsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '800',
     color: colors.textDark,
-    marginBottom: 12,
+  },
+
+  resultsBadge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: `${colors.primary}18`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+
+  resultsBadgeText: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+
+  listContent: {
+    paddingBottom: 32,
   },
 
   resultCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FAFAFA',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
     marginBottom: 10,
     borderWidth: 1,
@@ -662,9 +909,9 @@ const styles = StyleSheet.create({
   },
 
   resultAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: colors.inputFill,
     justifyContent: 'center',
     alignItems: 'center',
@@ -674,6 +921,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: 'bold',
     fontSize: 18,
+  },
+
+  resultContent: {
+    flex: 1,
+    marginLeft: 12,
   },
 
   resultTopRow: {
@@ -730,9 +982,27 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+
   emptyText: {
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  emptySubtext: {
     color: '#999',
     textAlign: 'center',
-    marginTop: 30,
+    marginTop: 6,
+    fontSize: 13,
+    paddingHorizontal: 24,
+    lineHeight: 18,
   },
 });

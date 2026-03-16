@@ -10,74 +10,89 @@ service cloud.firestore {
       return estaLogado() && request.auth.uid == userId;
     }
 
-    // =========================
-    // USUÁRIOS
-    // =========================
+    function ehProfissional(resourceData) {
+      return resourceData.tipo == "profissional" || resourceData.perfil == "profissional";
+    }
+
+    function podeLerPerfilProfissional() {
+      return estaLogado() && ehProfissional(resource.data);
+    }
 
     match /usuarios/{userId} {
-      allow read: if estaLogado();
-      allow create: if ehDono(userId);
-      allow update: if ehDono(userId);
-      allow delete: if false;
+
+      // Dono pode ler e editar seu próprio documento
+      allow read, write: if ehDono(userId);
+
+      // Outros usuários autenticados podem ler perfis profissionais
+      allow read: if podeLerPerfilProfissional();
+
+      match /notificacoes/{notificacaoId} {
+        allow read: if ehDono(userId);
+        allow create: if estaLogado();
+        allow update, delete: if ehDono(userId);
+      }
+
+      match /favoritos/{favoritoId} {
+        allow read, write: if ehDono(userId);
+      }
 
       match /servicos/{servicoId} {
         allow read: if estaLogado();
         allow write: if ehDono(userId);
       }
 
-      match /colaboradores/{colaboradorId} {
-        allow read: if estaLogado();
-        allow write: if ehDono(userId);
+      match /configuracoes/{configId} {
+        // Dono tem acesso total
+        allow read, write: if ehDono(userId);
+
+        // Usuários autenticados podem ler agenda pública do profissional
+        allow read: if estaLogado() && configId == "agenda";
       }
 
-      match /configuracoes/{configId} {
+      match /colaboradores/{colabId} {
         allow read: if estaLogado();
         allow write: if ehDono(userId);
+
+        match /configuracoes/{configId} {
+          // Dono pode tudo
+          allow read, write: if ehDono(userId);
+
+          // Usuários autenticados podem ler agenda do colaborador
+          allow read: if estaLogado() && configId == "agenda";
+        }
       }
 
       match /menores/{menorId} {
         allow read, write: if ehDono(userId);
       }
-
-      match /favoritos/{favoritoId} {
-        allow read, write: if ehDono(userId);
-      }
     }
 
-    // =========================
-    // AGENDAMENTOS
-    // =========================
+    match /categorias/{categoriaId} {
+      allow read: if true;
+      allow write: if estaLogado();
+    }
 
-    match /agendamentos/{docId} {
-      allow read: if estaLogado();
+    match /agendamentos/{agendamentoId} {
       allow create: if estaLogado();
-      allow update: if estaLogado() && (
-        request.auth.uid == resource.data.clienteId ||
-        request.auth.uid == resource.data.colaboradorId ||
-        request.auth.uid == resource.data.clinicaId
-      );
-      allow delete: if estaLogado() && (
-        request.auth.uid == resource.data.colaboradorId ||
-        request.auth.uid == resource.data.clinicaId
-      );
-    }
 
-    // =========================
-    // AVALIAÇÕES
-    // =========================
+      // TEMPORÁRIO / funcional para o fluxo de disponibilidade:
+      // usuários autenticados podem ler agendamentos
+      allow read: if estaLogado();
+
+      allow update: if estaLogado() && (
+        resource.data.clienteId == request.auth.uid ||
+        resource.data.clinicaId == request.auth.uid ||
+        resource.data.colaboradorId == request.auth.uid
+      );
+
+      allow delete: if false;
+    }
 
     match /avaliacoes/{avaliacaoId} {
       allow read: if true;
       allow create: if estaLogado();
-      allow update, delete: if false;
-    }
-
-    // =========================
-    // BLOQUEIO GERAL
-    // =========================
-
-    match /{document=**} {
-      allow read, write: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

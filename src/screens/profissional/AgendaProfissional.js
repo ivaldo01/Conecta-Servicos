@@ -1,49 +1,72 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     FlatList,
     TouchableOpacity,
-    Alert,
     ActivityIndicator,
-    Vibration,
-    ScrollView,
+    RefreshControl,
 } from 'react-native';
-import { db } from "../../services/firebaseConfig";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { auth, db } from "../../services/firebaseConfig";
 import {
-    doc,
-    updateDoc,
-    getDoc,
+    collection,
+    query,
+    where,
+    onSnapshot,
 } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 
-import { useAuth } from '../../hooks/useAuth';
-import { useUsuario } from '../../hooks/useUsuario';
-import { useAgendamentos } from '../../hooks/useAgendamentos';
+function getStatusConfig(status) {
+    switch (status) {
+        case 'confirmado':
+            return { color: '#27AE60', label: 'Confirmado' };
+        case 'cancelado':
+            return { color: '#6c757d', label: 'Cancelado' };
+        case 'recusado':
+            return { color: '#C62828', label: 'Recusado' };
+        case 'concluido':
+            return { color: '#1565C0', label: 'Concluído' };
+        default:
+            return { color: '#E67E22', label: 'Pendente' };
+    }
+}
 
-import { enviarPushAoCliente } from '../../utils/notificationUtils';
-import { getStatusColor, getMensagemStatus } from '../../utils/statusUtils';
-import {
-    getHojeStr,
-    calcularTotalAgendamento,
-    getResumoServicos,
-    filtrarAgendamentosPorStatus,
-    contarAgendamentosPorStatus,
-    montarDashboardHoje,
-} from '../../utils/agendamentoUtils';
-import { imprimirOrdemServico } from '../../utils/pdfUtils';
+function formatarValorTotal(servicos = [], preco = 0) {
+    const total =
+        servicos?.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0) ||
+        parseFloat(preco || 0);
+
+    return `R$ ${Number(total || 0).toFixed(2)}`;
+}
+
+function getResumoServicos(item) {
+    if (item?.servicos && item.servicos.length > 0) {
+        if (item.servicos.length === 1) {
+            return item.servicos[0].nome || 'Serviço';
+        }
+
+        return `${item.servicos[0].nome || 'Serviço'} +${item.servicos.length - 1}`;
+    }
+
+    return 'Serviço';
+}
+
+function getDataOrdenacao(item) {
+    if (item?.dataCriacao?.seconds) {
+        return item.dataCriacao.seconds;
+    }
+
+    return 0;
+}
 
 export default function AgendaProfissional({ navigation }) {
+    const [agendamentos, setAgendamentos] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [filtroStatus, setFiltroStatus] = useState('todos');
-
-    const { usuario, loadingAuth } = useAuth();
-    const { dadosUsuario, loadingUsuario } = useUsuario(usuario?.uid);
-    const { agendamentos, loadingAgendamentos } = useAgendamentos(
-        usuario?.uid,
-        dadosUsuario?.perfil
-    );
+    const [refreshing, setRefreshing] = useState(false);
 
     const filtros = [
         { key: 'todos', label: 'Todos' },
@@ -55,238 +78,67 @@ export default function AgendaProfissional({ navigation }) {
     ];
 
     useEffect(() => {
-        if (agendamentos.some((item) => item.vistoPeloPro === false)) {
-            Vibration.vibrate(500);
-        }
-    }, [agendamentos]);
+        const user = auth.currentUser;
 
-    const hojeStr = useMemo(() => getHojeStr(), []);
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+
+        const q = query(
+            collection(db, "agendamentos"),
+            where("clinicaId", "==", user.uid)
+        );
+
+        const unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                const lista = snapshot.docs.map((d) => ({
+                    id: d.id,
+                    ...d.data(),
+                }));
+
+                const ordenada = lista.sort((a, b) => getDataOrdenacao(b) - getDataOrdenacao(a));
+
+                setAgendamentos(ordenada);
+                setLoading(false);
+                setRefreshing(false);
+            },
+            (error) => {
+                console.log("Erro ao carregar agenda profissional:", error);
+                setLoading(false);
+                setRefreshing(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, []);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        setTimeout(() => setRefreshing(false), 800);
+    };
 
     const agendamentosFiltrados = useMemo(() => {
-        return filtrarAgendamentosPorStatus(agendamentos, filtroStatus);
+        if (filtroStatus === 'todos') return agendamentos;
+        return agendamentos.filter((item) => (item.status || 'pendente') === filtroStatus);
     }, [agendamentos, filtroStatus]);
 
     const contagemPorStatus = useMemo(() => {
-        return contarAgendamentosPorStatus(agendamentos);
+        return {
+            todos: agendamentos.length,
+            pendente: agendamentos.filter((a) => (a.status || 'pendente') === 'pendente').length,
+            confirmado: agendamentos.filter((a) => a.status === 'confirmado').length,
+            concluido: agendamentos.filter((a) => a.status === 'concluido').length,
+            cancelado: agendamentos.filter((a) => a.status === 'cancelado').length,
+            recusado: agendamentos.filter((a) => a.status === 'recusado').length,
+        };
     }, [agendamentos]);
 
-    const dashboardHoje = useMemo(() => {
-        return montarDashboardHoje(agendamentos, hojeStr);
-    }, [agendamentos, hojeStr]);
-
-    const alterarStatus = async (item, novoStatus) => {
-        try {
-            await updateDoc(doc(db, "agendamentos", item.id), {
-                status: novoStatus,
-                vistoPeloPro: true,
-            });
-
-            const clienteSnap = await getDoc(doc(db, "usuarios", item.clienteId));
-
-            if (clienteSnap.exists() && clienteSnap.data().pushToken) {
-                await enviarPushAoCliente(clienteSnap.data().pushToken, novoStatus);
-            }
-
-            Alert.alert("Sucesso", getMensagemStatus(novoStatus));
-        } catch (e) {
-            console.log("Erro ao atualizar status:", e);
-            Alert.alert("Erro", "Falha ao atualizar status.");
-        }
-    };
-
-    const confirmarCancelamento = (item) => {
-        Alert.alert(
-            "Cancelar agendamento",
-            "Tem certeza que deseja cancelar este agendamento?",
-            [
-                { text: "Não", style: "cancel" },
-                {
-                    text: "Sim, cancelar",
-                    style: "destructive",
-                    onPress: () => alterarStatus(item, 'cancelado'),
-                },
-            ]
-        );
-    };
-
-    const confirmarRecusa = (item) => {
-        Alert.alert(
-            "Recusar agendamento",
-            "Tem certeza que deseja recusar este agendamento?",
-            [
-                { text: "Não", style: "cancel" },
-                {
-                    text: "Sim, recusar",
-                    style: "destructive",
-                    onPress: () => alterarStatus(item, 'recusado'),
-                },
-            ]
-        );
-    };
-
-    const confirmarConclusao = (item) => {
-        Alert.alert(
-            "Concluir atendimento",
-            "Tem certeza que deseja marcar este atendimento como concluído?",
-            [
-                { text: "Não", style: "cancel" },
-                {
-                    text: "Sim, concluir",
-                    onPress: () => alterarStatus(item, 'concluido'),
-                },
-            ]
-        );
-    };
-
-    const imprimirOS = async (item) => {
-        try {
-            await imprimirOrdemServico(item);
-        } catch (error) {
-            console.log("Erro ao gerar PDF:", error);
-            Alert.alert("Erro", "Falha ao gerar PDF.");
-        }
-    };
-
-    const abrirDetalhes = async (item) => {
-        try {
-            if (item.vistoPeloPro === false) {
-                await updateDoc(doc(db, "agendamentos", item.id), {
-                    vistoPeloPro: true,
-                });
-            }
-
-            navigation.navigate("DetalhesAgendamentoPro", {
-                agendamentoId: item.id,
-            });
-        } catch (error) {
-            console.log("Erro ao abrir detalhes:", error);
-            Alert.alert("Erro", "Não foi possível abrir os detalhes.");
-        }
-    };
-
-    const renderAcoes = (item) => {
-        const status = item.status || 'pendente';
-
-        if (status === 'pendente') {
-            return (
-                <View style={styles.footerActions}>
-                    <TouchableOpacity
-                        style={styles.actionBtnOutline}
-                        onPress={() => confirmarRecusa(item)}
-                    >
-                        <Ionicons name="close-circle-outline" size={18} color={colors.danger} />
-                        <Text style={[styles.actionBtnText, { color: colors.danger }]}>Recusar</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionBtnSolid}
-                        onPress={() => alterarStatus(item, 'confirmado')}
-                    >
-                        <Ionicons name="checkmark-circle-outline" size={18} color="#FFF" />
-                        <Text style={styles.actionBtnTextSolid}>Aceitar</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionBtnCancel}
-                        onPress={() => confirmarCancelamento(item)}
-                    >
-                        <Ionicons name="trash-outline" size={18} color="#FFF" />
-                        <Text style={styles.actionBtnTextSolid}>Cancelar</Text>
-                    </TouchableOpacity>
-                </View>
-            );
-        }
-
-        if (status === 'confirmado') {
-            return (
-                <>
-                    <View style={styles.footerActions}>
-                        <TouchableOpacity
-                            style={styles.actionBtnConcluir}
-                            onPress={() => confirmarConclusao(item)}
-                        >
-                            <Ionicons name="checkmark-done-outline" size={18} color="#FFF" />
-                            <Text style={styles.actionBtnTextSolid}>Concluir</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.actionBtnCancel}
-                            onPress={() => confirmarCancelamento(item)}
-                        >
-                            <Ionicons name="trash-outline" size={18} color="#FFF" />
-                            <Text style={styles.actionBtnTextSolid}>Cancelar</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity style={styles.btnFullWidth} onPress={() => imprimirOS(item)}>
-                        <Ionicons name="print-outline" size={20} color={colors.primary} />
-                        <Text style={styles.btnFullWidthText}>Gerar Ordem de Serviço (PDF)</Text>
-                    </TouchableOpacity>
-                </>
-            );
-        }
-
-        return (
-            <TouchableOpacity style={styles.btnFullWidth} onPress={() => abrirDetalhes(item)}>
-                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-                <Text style={styles.btnFullWidthText}>Ver detalhes</Text>
-            </TouchableOpacity>
-        );
-    };
-
-    const renderCard = ({ item }) => {
-        const totalCard = calcularTotalAgendamento(item);
-        const statusColor = getStatusColor(item.status);
-        const ehNovo = item.vistoPeloPro === false;
-
-        return (
-            <TouchableOpacity
-                activeOpacity={0.9}
-                style={[styles.card, ehNovo && styles.cardNovo]}
-                onPress={() => abrirDetalhes(item)}
-            >
-                <View style={styles.cardHeader}>
-                    <View style={styles.clientInfo}>
-                        <Text style={styles.clienteNome}>{item.clienteNome || "Cliente"}</Text>
-                        <Text style={styles.servicoResumo}>
-                            {getResumoServicos(item)}
-                        </Text>
-                    </View>
-
-                    <View style={[styles.badge, { backgroundColor: `${statusColor}20` }]}>
-                        <Text style={[styles.badgeText, { color: statusColor }]}>
-                            {(item.status || 'pendente').toUpperCase()}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.detailsRow}>
-                    <View style={styles.detailItem}>
-                        <Ionicons name="calendar-outline" size={16} color={colors.secondary} />
-                        <Text style={styles.detailText}>{item.data}</Text>
-                    </View>
-
-                    <View style={styles.detailItem}>
-                        <Ionicons name="time-outline" size={16} color={colors.secondary} />
-                        <Text style={styles.detailText}>{item.horario}</Text>
-                    </View>
-
-                    <View style={styles.detailItem}>
-                        <Ionicons name="cash-outline" size={16} color={colors.success} />
-                        <Text style={[styles.detailText, { fontWeight: 'bold' }]}>
-                            R$ {totalCard.toFixed(2)}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.tapHint}>
-                    <Ionicons name="information-circle-outline" size={16} color={colors.secondary} />
-                    <Text style={styles.tapHintText}>Toque para ver os dados do cliente</Text>
-                </View>
-
-                {renderAcoes(item)}
-            </TouchableOpacity>
-        );
+    const abrirDetalhes = (item) => {
+        navigation.navigate("DetalhesAgendamentoPro", {
+            agendamento: item,
+        });
     };
 
     const renderFiltro = (filtro) => {
@@ -297,6 +149,7 @@ export default function AgendaProfissional({ navigation }) {
                 key={filtro.key}
                 style={[styles.filtroChip, ativo && styles.filtroChipAtivo]}
                 onPress={() => setFiltroStatus(filtro.key)}
+                activeOpacity={0.88}
             >
                 <Text style={[styles.filtroChipText, ativo && styles.filtroChipTextAtivo]}>
                     {filtro.label} ({contagemPorStatus[filtro.key] || 0})
@@ -305,100 +158,153 @@ export default function AgendaProfissional({ navigation }) {
         );
     };
 
-    const renderDashboardCard = (titulo, valor, icone, corFundo) => (
-        <View style={[styles.dashboardCard, { backgroundColor: corFundo }]}>
-            <Ionicons name={icone} size={22} color="#FFF" />
-            <Text style={styles.dashboardValor}>{valor}</Text>
-            <Text style={styles.dashboardTitulo}>{titulo}</Text>
-        </View>
-    );
+    const renderItem = ({ item }) => {
+        const status = getStatusConfig(item.status);
+        const valorTotal = formatarValorTotal(item.servicos, item.preco);
+        const resumoServicos = getResumoServicos(item);
 
-    if (loadingAuth || loadingUsuario || loadingAgendamentos) {
         return (
-            <View style={styles.loadingContainer}>
+            <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.92}
+                onPress={() => abrirDetalhes(item)}
+            >
+                <View style={styles.cardTop}>
+                    <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>
+                            {(item?.clienteNome || "C").charAt(0).toUpperCase()}
+                        </Text>
+                    </View>
+
+                    <View style={styles.topInfo}>
+                        <View style={styles.nomeStatusRow}>
+                            <Text style={styles.nomeCliente} numberOfLines={1}>
+                                {item?.clienteNome || "Cliente"}
+                            </Text>
+
+                            <View style={[styles.statusBadge, { backgroundColor: `${status.color}18` }]}>
+                                <Text style={[styles.statusBadgeText, { color: status.color }]}>
+                                    {status.label}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <Text style={styles.resumoServico} numberOfLines={1}>
+                            {resumoServicos}
+                        </Text>
+
+                        <View style={styles.infoRow}>
+                            <Ionicons name="calendar-outline" size={14} color={colors.secondary} />
+                            <Text style={styles.infoText}>
+                                {item?.data || 'Data não informada'} às {item?.horario || '--:--'}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.cardBottom}>
+                    <View style={styles.pill}>
+                        <Ionicons name="cash-outline" size={14} color={colors.primary} />
+                        <Text style={styles.pillText}>{valorTotal}</Text>
+                    </View>
+
+                    <View style={styles.pill}>
+                        <Ionicons name="call-outline" size={14} color={colors.secondary} />
+                        <Text style={styles.pillText} numberOfLines={1}>
+                            {item?.clienteWhatsapp || 'Sem telefone'}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.tapHint}>
+                    <Ionicons name="create-outline" size={15} color={colors.secondary} />
+                    <Text style={styles.tapHintText}>
+                        Toque para gerenciar este agendamento
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Carregando agenda...</Text>
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.title}>Minha Agenda</Text>
+                <Text style={styles.subtitle}>
+                    {agendamentosFiltrados.length} agendamento(s) neste filtro
+                </Text>
+            </View>
+
+            <View style={styles.filtrosWrapper}>
+                <FlatList
+                    data={filtros}
+                    keyExtractor={(item) => item.key}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    renderItem={({ item }) => renderFiltro(item)}
+                    contentContainerStyle={styles.filtrosContainer}
+                />
+            </View>
+
             <FlatList
                 data={agendamentosFiltrados}
                 keyExtractor={(item) => item.id}
-                renderItem={renderCard}
-                contentContainerStyle={{ paddingBottom: 30 }}
-                ListHeaderComponent={
-                    <>
-                        <View style={styles.header}>
-                            <Text style={styles.title}>Minha Agenda</Text>
-                            <Text style={styles.subtitle}>
-                                {agendamentosFiltrados.length} agendamento(s) em {filtros.find(f => f.key === filtroStatus)?.label.toLowerCase()}
-                            </Text>
-                        </View>
-
-                        <View style={styles.dashboardWrapper}>
-                            <Text style={styles.dashboardSectionTitle}>Resumo de Hoje</Text>
-
-                            <View style={styles.dashboardGrid}>
-                                {renderDashboardCard("Hoje", dashboardHoje.totalHoje, "calendar-outline", "#5E60CE")}
-                                {renderDashboardCard("Pendentes", dashboardHoje.pendentesHoje, "time-outline", "#F4A261")}
-                                {renderDashboardCard("Confirmados", dashboardHoje.confirmadosHoje, "checkmark-circle-outline", "#2A9D8F")}
-                                {renderDashboardCard("Concluídos", dashboardHoje.concluidosHoje, "checkmark-done-outline", "#1565C0")}
-                            </View>
-
-                            <View style={styles.dashboardExtraBox}>
-                                <Ionicons name="close-circle-outline" size={18} color="#6c757d" />
-                                <Text style={styles.dashboardExtraText}>
-                                    Cancelados hoje: {dashboardHoje.canceladosHoje}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.filtrosWrapper}>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.filtrosContainer}
-                            >
-                                {filtros.map(renderFiltro)}
-                            </ScrollView>
-                        </View>
-                    </>
+                renderItem={renderItem}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
+                contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    <View style={styles.empty}>
+                    <View style={styles.emptyBox}>
+                        <Ionicons name="calendar-clear-outline" size={42} color="#A0A0A0" />
+                        <Text style={styles.emptyTitle}>Nenhum agendamento encontrado</Text>
                         <Text style={styles.emptyText}>
-                            Nenhum agendamento encontrado neste filtro.
+                            Não há pedidos neste filtro no momento.
                         </Text>
                     </View>
                 }
             />
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background || '#F8F9FA',
+        backgroundColor: '#F7F8FA',
     },
 
-    loadingContainer: {
+    centered: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
 
+    loadingText: {
+        marginTop: 10,
+        color: colors.secondary,
+        fontSize: 14,
+    },
+
     header: {
-        padding: 25,
-        paddingTop: 60,
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 12,
         backgroundColor: '#FFF',
     },
 
     title: {
-        fontSize: 26,
-        fontWeight: 'bold',
+        fontSize: 24,
+        fontWeight: '800',
         color: colors.textDark,
     },
 
@@ -408,78 +314,17 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    dashboardWrapper: {
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 8,
-        backgroundColor: '#F8F9FA',
-    },
-
-    dashboardSectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.textDark,
-        marginBottom: 12,
-    },
-
-    dashboardGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-
-    dashboardCard: {
-        width: '48%',
-        borderRadius: 18,
-        paddingVertical: 18,
-        paddingHorizontal: 14,
-        marginBottom: 12,
-    },
-
-    dashboardValor: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#FFF',
-        marginTop: 10,
-    },
-
-    dashboardTitulo: {
-        fontSize: 13,
-        color: '#FFF',
-        marginTop: 4,
-        fontWeight: '600',
-    },
-
-    dashboardExtraBox: {
-        backgroundColor: '#FFF',
-        borderRadius: 14,
-        padding: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 6,
-    },
-
-    dashboardExtraText: {
-        marginLeft: 8,
-        color: '#6c757d',
-        fontWeight: '600',
-    },
-
     filtrosWrapper: {
-        backgroundColor: '#FFF',
-        paddingBottom: 10,
-        paddingTop: 6,
+        paddingTop: 12,
+        paddingBottom: 6,
     },
 
     filtrosContainer: {
-        paddingHorizontal: 20,
-        paddingTop: 5,
-        paddingBottom: 5,
+        paddingHorizontal: 16,
     },
 
     filtroChip: {
-        backgroundColor: '#F1F3F5',
+        backgroundColor: '#EEF1F4',
         paddingHorizontal: 14,
         paddingVertical: 10,
         borderRadius: 20,
@@ -492,7 +337,7 @@ const styles = StyleSheet.create({
 
     filtroChipText: {
         color: '#555',
-        fontWeight: '600',
+        fontWeight: '700',
         fontSize: 13,
     },
 
@@ -500,83 +345,118 @@ const styles = StyleSheet.create({
         color: '#FFF',
     },
 
+    listContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 24,
+        flexGrow: 1,
+    },
+
     card: {
         backgroundColor: '#FFF',
-        marginHorizontal: 20,
-        marginTop: 15,
-        borderRadius: 20,
-        padding: 20,
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-    },
-
-    cardNovo: {
-        borderLeftWidth: 6,
-        borderLeftColor: colors.primary,
-    },
-
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 15,
-    },
-
-    clientInfo: {
-        flex: 1,
-        paddingRight: 10,
-    },
-
-    clienteNome: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.textDark,
-    },
-
-    servicoResumo: {
-        fontSize: 13,
-        color: colors.secondary,
-        marginTop: 2,
-    },
-
-    badge: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 10,
-    },
-
-    badgeText: {
-        fontSize: 10,
-        fontWeight: 'bold',
-    },
-
-    detailsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 15,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 12,
+        elevation: 2,
+        borderWidth: 1,
         borderColor: '#F0F0F0',
     },
 
-    detailItem: {
+    cardTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+
+    avatar: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: colors.inputFill,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+
+    avatarText: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+
+    topInfo: {
+        flex: 1,
+    },
+
+    nomeStatusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+
+    nomeCliente: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '800',
+        color: colors.textDark,
+        paddingRight: 8,
+    },
+
+    statusBadge: {
+        borderRadius: 14,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+
+    statusBadgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+    },
+
+    resumoServico: {
+        fontSize: 13,
+        color: colors.secondary,
+        marginBottom: 8,
+    },
+
+    infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
 
-    detailText: {
+    infoText: {
+        marginLeft: 6,
         fontSize: 13,
+        color: '#666',
+    },
+
+    cardBottom: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 14,
+    },
+
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F7F8FA',
+        borderRadius: 16,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        marginRight: 8,
+        marginBottom: 8,
+    },
+
+    pillText: {
         marginLeft: 5,
-        color: colors.textDark,
+        fontSize: 12,
+        color: colors.secondary,
+        fontWeight: '600',
+        maxWidth: 150,
     },
 
     tapHint: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 12,
-        marginBottom: 10,
+        marginTop: 6,
     },
 
     tapHintText: {
@@ -585,91 +465,27 @@ const styles = StyleSheet.create({
         color: colors.secondary,
     },
 
-    footerActions: {
-        flexDirection: 'row',
-        marginTop: 8,
-        justifyContent: 'space-between',
-    },
-
-    actionBtnOutline: {
+    emptyBox: {
         flex: 1,
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.danger,
-        marginRight: 8,
+        paddingTop: 80,
+        paddingHorizontal: 24,
     },
 
-    actionBtnSolid: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: colors.success,
-        marginRight: 8,
-    },
-
-    actionBtnConcluir: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: '#1565C0',
-        marginRight: 8,
-    },
-
-    actionBtnCancel: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        borderRadius: 12,
-        backgroundColor: colors.danger,
-    },
-
-    actionBtnText: {
-        fontWeight: 'bold',
-        marginLeft: 5,
-    },
-
-    actionBtnTextSolid: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        marginLeft: 5,
-    },
-
-    btnFullWidth: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        backgroundColor: `${colors.primary}10`,
-        borderRadius: 12,
+    emptyTitle: {
         marginTop: 12,
-    },
-
-    btnFullWidthText: {
-        color: colors.primary,
-        fontWeight: 'bold',
-        marginLeft: 8,
-    },
-
-    empty: {
-        alignItems: 'center',
-        marginTop: 50,
-        paddingHorizontal: 20,
+        fontSize: 17,
+        fontWeight: '800',
+        color: colors.textDark,
+        textAlign: 'center',
     },
 
     emptyText: {
-        color: colors.secondary,
+        marginTop: 8,
+        fontSize: 14,
+        color: '#999',
         textAlign: 'center',
+        lineHeight: 20,
     },
 });

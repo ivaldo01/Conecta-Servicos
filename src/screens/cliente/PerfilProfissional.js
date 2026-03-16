@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ImageBackground,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
 import {
   collection,
@@ -24,8 +25,56 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 
+function getNomeProfissional(perfil) {
+  return (
+    perfil?.nome ||
+    perfil?.nomeCompleto ||
+    perfil?.nomeNegocio ||
+    "Profissional"
+  );
+}
+
+function getEspecialidadeProfissional(perfil) {
+  return (
+    perfil?.especialidade ||
+    perfil?.categoriaNome ||
+    "Especialidade não informada"
+  );
+}
+
+function getCidadeProfissional(perfil) {
+  return (
+    perfil?.cidade ||
+    perfil?.localizacao?.cidade ||
+    "Cidade não informada"
+  );
+}
+
+function getBairroProfissional(perfil) {
+  return (
+    perfil?.bairro ||
+    perfil?.localizacao?.bairro ||
+    ""
+  );
+}
+
+function getTextoLocalizacao(perfil) {
+  const bairro = getBairroProfissional(perfil);
+  const cidade = getCidadeProfissional(perfil);
+
+  if (bairro && cidade && cidade !== "Cidade não informada") {
+    return `${bairro} - ${cidade}`;
+  }
+
+  return cidade;
+}
+
+function getInitial(nome = '') {
+  return String(nome).trim().charAt(0).toUpperCase() || 'P';
+}
+
 export default function PerfilProfissional({ route, navigation }) {
-  const { proId } = route.params || {};
+  const proId = route?.params?.proId || route?.params?.profissionalId || null;
 
   const [perfil, setPerfil] = useState(null);
   const [servicos, setServicos] = useState([]);
@@ -35,13 +84,13 @@ export default function PerfilProfissional({ route, navigation }) {
   const [favorito, setFavorito] = useState(false);
   const [salvandoFavorito, setSalvandoFavorito] = useState(false);
 
-  useEffect(() => {
-    if (proId) {
-      carregarDados();
+  const carregarDados = useCallback(async () => {
+    if (!proId) {
+      Alert.alert("Erro", "Profissional não informado.");
+      navigation.goBack();
+      return;
     }
-  }, [proId]);
 
-  const carregarDados = async () => {
     try {
       setLoading(true);
 
@@ -89,6 +138,8 @@ export default function PerfilProfissional({ route, navigation }) {
         const favoritoRef = doc(db, "usuarios", user.uid, "favoritos", proId);
         const favoritoSnap = await getDoc(favoritoRef);
         setFavorito(favoritoSnap.exists());
+      } else {
+        setFavorito(false);
       }
     } catch (error) {
       console.log("Erro ao carregar perfil profissional:", error);
@@ -96,7 +147,11 @@ export default function PerfilProfissional({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigation, proId]);
+
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   const toggleFavorito = async () => {
     const user = auth.currentUser;
@@ -106,7 +161,7 @@ export default function PerfilProfissional({ route, navigation }) {
       return;
     }
 
-    if (!perfil) return;
+    if (!perfil || !proId) return;
 
     try {
       setSalvandoFavorito(true);
@@ -120,11 +175,14 @@ export default function PerfilProfissional({ route, navigation }) {
       } else {
         await setDoc(favoritoRef, {
           profissionalId: proId,
-          nome: perfil?.nome || perfil?.nomeCompleto || perfil?.nomeNegocio || "Profissional",
+          nome: getNomeProfissional(perfil),
           especialidade: perfil?.especialidade || "",
-          cidade: perfil?.localizacao?.cidade || "",
+          cidade: perfil?.localizacao?.cidade || perfil?.cidade || "",
+          categoriaSlug: perfil?.categoriaSlug || "",
+          categoriaId: perfil?.categoriaId || "",
           createdAt: serverTimestamp(),
         });
+
         setFavorito(true);
         Alert.alert("Pronto", "Profissional adicionado aos favoritos.");
       }
@@ -154,6 +212,7 @@ export default function PerfilProfissional({ route, navigation }) {
 
     navigation.push("AgendamentoFinal", {
       clinicaId: proId,
+      profissionalId: proId,
       servicos: servicosSelecionados,
     });
   };
@@ -164,6 +223,13 @@ export default function PerfilProfissional({ route, navigation }) {
   );
 
   const resumoAvaliacoes = useMemo(() => {
+    if (perfil?.avaliacaoMedia !== undefined && perfil?.totalAvaliacoes !== undefined) {
+      return {
+        media: Number(perfil.avaliacaoMedia || 0),
+        quantidade: Number(perfil.totalAvaliacoes || 0),
+      };
+    }
+
     if (!avaliacoes.length) {
       return {
         media: 0,
@@ -178,7 +244,7 @@ export default function PerfilProfissional({ route, navigation }) {
       media,
       quantidade: avaliacoes.length,
     };
-  }, [avaliacoes]);
+  }, [avaliacoes, perfil]);
 
   const textoAvaliacao = useMemo(() => {
     if (resumoAvaliacoes.quantidade === 0) {
@@ -220,37 +286,69 @@ export default function PerfilProfissional({ route, navigation }) {
   }
 
   return (
-    <View style={styles.mainContainer}>
-      <ScrollView>
+    <SafeAreaView style={styles.mainContainer}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <ImageBackground
           source={{
             uri: 'https://images.unsplash.com/photo-1625834317364-b32c140fd360?q=80&w=1000&auto=format&fit=crop',
           }}
           style={styles.cover}
         >
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
+          <View style={styles.coverOverlay}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={22} color="#FFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.topFavoriteBtn}
+              onPress={toggleFavorito}
+              disabled={salvandoFavorito}
+            >
+              {salvandoFavorito ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <Ionicons
+                  name={favorito ? "heart" : "heart-outline"}
+                  size={22}
+                  color="#FFF"
+                />
+              )}
+            </TouchableOpacity>
+          </View>
         </ImageBackground>
 
         <View style={styles.profileInfoArea}>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatarText}>
-              {(perfil?.nome || perfil?.nomeCompleto || perfil?.nomeNegocio || "P").charAt(0)}
+              {getInitial(getNomeProfissional(perfil))}
             </Text>
           </View>
 
           <Text style={styles.nomeClinica}>
-            {perfil?.nome || perfil?.nomeCompleto || perfil?.nomeNegocio || "Profissional"}
+            {getNomeProfissional(perfil)}
           </Text>
 
           <Text style={styles.especialidade}>
-            {perfil?.especialidade || "Especialidade não informada"}
+            {getEspecialidadeProfissional(perfil)}
           </Text>
 
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={16} color={colors.warning || "#FFC107"} />
             <Text style={styles.ratingText}> {textoAvaliacao}</Text>
+          </View>
+
+          <View style={styles.chipRow}>
+            <View style={styles.infoChip}>
+              <Ionicons name="location-outline" size={15} color={colors.primary} />
+              <Text style={styles.infoChipText}>
+                {getTextoLocalizacao(perfil)}
+              </Text>
+            </View>
+
+            <View style={styles.infoChip}>
+              <Ionicons name="shield-checkmark-outline" size={15} color={colors.primary} />
+              <Text style={styles.infoChipText}>Perfil profissional</Text>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -287,7 +385,7 @@ export default function PerfilProfissional({ route, navigation }) {
             <View style={styles.statBox}>
               <Ionicons name="location-outline" size={20} color={colors.primary} />
               <Text style={styles.statText}>
-                {perfil?.localizacao?.cidade || "Localização"}
+                {getTextoLocalizacao(perfil)}
               </Text>
             </View>
 
@@ -299,20 +397,26 @@ export default function PerfilProfissional({ route, navigation }) {
             </View>
 
             <View style={styles.statBox}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
-              <Text style={styles.statText}>Verificado</Text>
+              <Ionicons name="star-outline" size={20} color={colors.primary} />
+              <Text style={styles.statText}>
+                {resumoAvaliacoes.quantidade > 0 ? resumoAvaliacoes.media.toFixed(1) : "Novo"}
+              </Text>
             </View>
           </View>
 
           {!!perfil?.bio && (
             <View style={styles.bioBox}>
+              <Text style={styles.bioTitle}>Sobre</Text>
               <Text style={styles.bioText}>{perfil.bio}</Text>
             </View>
           )}
         </View>
 
         <View style={styles.servicesSection}>
-          <Text style={styles.sectionTitle}>Serviços</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Serviços</Text>
+            <Text style={styles.sectionCount}>{servicos.length}</Text>
+          </View>
 
           {servicos.length === 0 ? (
             <Text style={styles.emptyText}>Nenhum serviço cadastrado.</Text>
@@ -325,9 +429,15 @@ export default function PerfilProfissional({ route, navigation }) {
                   key={servico.id}
                   style={[styles.serviceCard, selecionado && styles.selectedCard]}
                   onPress={() => toggleServico(servico)}
+                  activeOpacity={0.9}
                 >
                   <View style={styles.serviceInfo}>
                     <Text style={styles.serviceName}>{servico.nome}</Text>
+                    {!!servico.descricao && (
+                      <Text style={styles.serviceDescription} numberOfLines={2}>
+                        {servico.descricao}
+                      </Text>
+                    )}
                     <Text style={styles.servicePrice}>
                       R$ {Number(servico.preco || 0).toFixed(2)}
                     </Text>
@@ -335,7 +445,7 @@ export default function PerfilProfissional({ route, navigation }) {
 
                   <Ionicons
                     name={selecionado ? "checkmark-circle" : "add-circle-outline"}
-                    size={28}
+                    size={30}
                     color={selecionado ? colors.success : colors.primary}
                   />
                 </TouchableOpacity>
@@ -345,7 +455,10 @@ export default function PerfilProfissional({ route, navigation }) {
         </View>
 
         <View style={styles.avaliacoesSection}>
-          <Text style={styles.sectionTitle}>Avaliações</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Avaliações</Text>
+            <Text style={styles.sectionCount}>{avaliacoes.length}</Text>
+          </View>
 
           {avaliacoes.length === 0 ? (
             <Text style={styles.emptyText}>Este profissional ainda não recebeu avaliações.</Text>
@@ -353,7 +466,7 @@ export default function PerfilProfissional({ route, navigation }) {
             avaliacoes.map((item) => (
               <View key={item.id} style={styles.avaliacaoCard}>
                 <View style={styles.avaliacaoHeader}>
-                  <View style={{ flex: 1 }}>
+                  <View style={styles.avaliacaoNameArea}>
                     <Text style={styles.avaliacaoNome}>
                       {item.clienteNome || "Cliente"}
                     </Text>
@@ -377,7 +490,7 @@ export default function PerfilProfissional({ route, navigation }) {
           )}
         </View>
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: servicosSelecionados.length > 0 ? 120 : 30 }} />
       </ScrollView>
 
       {servicosSelecionados.length > 0 && (
@@ -393,78 +506,105 @@ export default function PerfilProfissional({ route, navigation }) {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F7F8FA',
   },
 
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F7F8FA',
   },
 
   cover: {
-    height: 180,
+    height: 220,
     width: '100%',
     backgroundColor: colors.primary,
   },
 
+  coverOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingTop: 18,
+    paddingHorizontal: 16,
+  },
+
   backBtn: {
-    marginTop: 45,
-    marginLeft: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.26)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  topFavoriteBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.26)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   profileInfoArea: {
     backgroundColor: '#FFF',
-    marginTop: -30,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    marginTop: -34,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     alignItems: 'center',
-    paddingBottom: 20,
+    paddingBottom: 22,
+    paddingHorizontal: 16,
   },
 
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: colors.inputFill,
     borderWidth: 4,
     borderColor: '#FFF',
-    marginTop: -40,
+    marginTop: -44,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
 
   avatarText: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
     color: colors.primary,
   },
 
   nomeClinica: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginTop: 10,
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 12,
     color: colors.textDark,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
 
   especialidade: {
     fontSize: 14,
     color: colors.secondary,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 10,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
 
   ratingRow: {
@@ -475,8 +615,32 @@ const styles = StyleSheet.create({
 
   ratingText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.textDark,
+  },
+
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 14,
+    gap: 8,
+  },
+
+  infoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F4F7FB',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  infoChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textDark,
+    marginLeft: 6,
   },
 
   favoriteButton: {
@@ -484,7 +648,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: colors.primary,
@@ -508,73 +672,104 @@ const styles = StyleSheet.create({
 
   statsRow: {
     flexDirection: 'row',
-    width: '90%',
+    width: '100%',
     backgroundColor: '#F8F9FA',
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
   },
 
   statBox: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
 
   statMiddle: {
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: '#EEE',
+    borderColor: '#E8E8E8',
   },
 
   statText: {
     fontSize: 12,
     fontWeight: '600',
     color: colors.secondary,
-    marginTop: 4,
+    marginTop: 5,
     textAlign: 'center',
+    lineHeight: 16,
   },
 
   bioBox: {
-    width: '90%',
+    width: '100%',
     marginTop: 16,
     backgroundColor: '#F8F9FA',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
+  },
+
+  bioTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textDark,
+    marginBottom: 8,
   },
 
   bioText: {
     fontSize: 14,
     color: colors.textDark,
-    lineHeight: 20,
-    textAlign: 'center',
+    lineHeight: 21,
   },
 
   servicesSection: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
 
   avaliacoesSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 10,
   },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 15,
+  },
+
+  sectionTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.textDark,
+  },
+
+  sectionCount: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: `${colors.primary}18`,
+    textAlign: 'center',
+    lineHeight: 28,
+    color: colors.primary,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    overflow: 'hidden',
   },
 
   emptyText: {
     color: '#999',
     textAlign: 'center',
-    marginTop: 15,
+    marginTop: 8,
+    marginBottom: 18,
   },
 
   serviceCard: {
     backgroundColor: '#FFF',
     padding: 18,
-    borderRadius: 15,
+    borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -582,6 +777,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0F0F0',
     elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
 
   selectedCard: {
@@ -591,29 +790,41 @@ const styles = StyleSheet.create({
 
   serviceInfo: {
     flex: 1,
+    paddingRight: 12,
   },
 
   serviceName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textDark,
   },
 
-  servicePrice: {
-    fontSize: 15,
-    color: colors.primary,
-    fontWeight: 'bold',
+  serviceDescription: {
+    fontSize: 13,
+    color: '#666',
     marginTop: 4,
+    lineHeight: 18,
+  },
+
+  servicePrice: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '800',
+    marginTop: 8,
   },
 
   avaliacaoCard: {
     backgroundColor: '#FFF',
-    borderRadius: 15,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
     elevation: 2,
     borderWidth: 1,
     borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
 
   avaliacaoHeader: {
@@ -621,6 +832,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 10,
+  },
+
+  avaliacaoNameArea: {
+    flex: 1,
+    paddingRight: 10,
   },
 
   avaliacaoNome: {
@@ -638,7 +854,6 @@ const styles = StyleSheet.create({
   estrelasRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 10,
   },
 
   avaliacaoComentario: {
@@ -659,14 +874,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFF',
-    padding: 20,
-    paddingBottom: 35,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 26,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
     borderColor: '#EEE',
     elevation: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -2 },
   },
 
   footerLabel: {
@@ -675,16 +895,17 @@ const styles = StyleSheet.create({
   },
 
   footerPrice: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 21,
+    fontWeight: '800',
     color: colors.textDark,
+    marginTop: 2,
   },
 
   btnFinal: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 25,
+    paddingHorizontal: 24,
     paddingVertical: 15,
-    borderRadius: 15,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },

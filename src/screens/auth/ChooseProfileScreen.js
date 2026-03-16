@@ -1,40 +1,60 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import colors from "../../constants/colors";
-import CustomButton from '../../components/CustomButton';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+} from 'react-native';
+import colors from '../../constants/colors';
 
-function ChooseProfileScreen({ navigation }) {
+import logo from '../../../assets/logo.png';
+
+export default function ChooseProfileScreen({ navigation }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bem-vindo ao App de Agendamentos</Text>
-      <Text style={styles.subtitle}>Escolha seu perfil para continuar:</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.logoArea}>
+          <Image source={logo} style={styles.logo} />
+          <Text style={styles.title}>Bem-vindo ao Conecta Serviços</Text>
+          <Text style={styles.subtitle}>
+            Escolha como deseja usar o aplicativo
+          </Text>
+        </View>
 
-      <View style={styles.buttonContainer}>
-        <CustomButton
-          title="Sou Cliente"
-          icon="person"
-          color={colors.primary}
-          onPress={() => navigation.navigate('SignUpCliente')}
-        />
-      </View>
+        <View style={styles.buttonsArea}>
+          <TouchableOpacity
+            style={styles.buttonCliente}
+            activeOpacity={0.88}
+            onPress={() => navigation.navigate('SignUpCliente')}
+          >
+            <Text style={styles.buttonTitleDark}>Sou Cliente</Text>
+            <Text style={styles.buttonSubtitleDark}>
+              Quero contratar profissionais e agendar serviços
+            </Text>
+          </TouchableOpacity>
 
-      <View style={styles.buttonContainer}>
-        <CustomButton
-          title="Sou Profissional / Empresa"
-          icon="business"
-          color={colors.success}
-          onPress={() => navigation.navigate('SignUpProEmpresa')}
-        />
-      </View>
+          <TouchableOpacity
+            style={styles.buttonProfissional}
+            activeOpacity={0.88}
+            onPress={() => navigation.navigate('SignUpProEmpresa')}
+          >
+            <Text style={styles.buttonTitleLight}>Sou Profissional</Text>
+            <Text style={styles.buttonSubtitleLight}>
+              Quero oferecer meus serviços e atender clientes
+            </Text>
+          </TouchableOpacity>
 
-      <View style={styles.buttonContainer}>
-        <CustomButton
-          title="Ir para Login"
-          icon="log-in"
-          color={colors.info}
-          onPress={() => navigation.navigate('Login')}
-        />
-      </View>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.85}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Voltar</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -42,41 +62,106 @@ function ChooseProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    padding: 20,
+    backgroundColor: '#F4F7F8',
   },
+
+  content: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+    paddingBottom: 40,
+  },
+
+  logoArea: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+
+  logo: {
+    width: 180,
+    height: 180,
+    resizeMode: 'contain',
+    marginBottom: 18,
+  },
+
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#333',
     textAlign: 'center',
-    color: colors.textDark,
   },
+
   subtitle: {
-    fontSize: 16,
-    marginBottom: 30,
+    fontSize: 15,
+    color: '#666',
+    marginTop: 8,
     textAlign: 'center',
-    color: '#555',
+    lineHeight: 22,
+    paddingHorizontal: 10,
   },
-  buttonContainer: {
-    width: '80%',
-    marginTop: 15,
+
+  buttonsArea: {
+    marginTop: 8,
   },
-  button: {
-    flexDirection: 'row',
+
+  buttonCliente: {
+    backgroundColor: '#FFFFFF',
+    padding: 22,
+    borderRadius: 18,
+    marginBottom: 18,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+
+  buttonProfissional: {
+    backgroundColor: colors.primary,
+    padding: 22,
+    borderRadius: 18,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+
+  buttonTitleDark: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#222',
+  },
+
+  buttonSubtitleDark: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 6,
+    lineHeight: 20,
+  },
+
+  buttonTitleLight: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+
+  buttonSubtitleLight: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.92)',
+    marginTop: 6,
+    lineHeight: 20,
+  },
+
+  backButton: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginVertical: 8,
+    marginTop: 6,
   },
-  buttonText: {
-    color: colors.textLight,
-    fontSize: 18,
-    fontWeight: 'bold',
+
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
 });
-
-export default ChooseProfileScreen;

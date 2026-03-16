@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ConectaServiços",
+    "name": "Conecta Serviços",
     "slug": "conecta-servicos",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,37 +8,27 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "cover",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "plugins": [
-      "expo-font",
-      "expo-location",
-      "expo-notifications",
-      "@react-native-community/datetimepicker"
+    "assetBundlePatterns": [
+      "**/*"
     ],
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.conecta.servicos",
-      "googleServicesFile": "./google-services.json",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDYm16LhWcle_6_oox7ILw-jYpmw6ZHqQc"
-        }
-      },
-      "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.POST_NOTIFICATIONS"
-      ]
+      "edgeToEdgeEnabled": true
     },
-    "extra": {
-      "eas": {
-        "projectId": "92748d97-fa35-4a53-9d5b-efb7c5d0059f"
-      }
-    }
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

@@ -13,7 +13,6 @@ import {
     doc,
     getDoc,
     getDocs,
-    setDoc,
     collection,
     serverTimestamp,
     query,
@@ -23,29 +22,19 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+import {
+    enviarPushAoProfissional,
+    salvarNotificacaoProfissional,
+} from "../../utils/notificationUtils";
 
 async function enviarPushNotificacao(expoPushToken, clienteNome, data, horario) {
-    const message = {
-        to: expoPushToken,
-        sound: 'default',
-        title: '🚀 Novo Agendamento!',
-        body: `${clienteNome} agendou para o dia ${data} às ${horario}`,
-        data: { screen: 'AgendaProfissional' },
-    };
-
-    try {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Accept-encoding': 'gzip, deflate',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(message),
-        });
-    } catch (error) {
-        console.log("Erro ao enviar push:", error);
-    }
+    await enviarPushAoProfissional(expoPushToken, {
+        titulo: '🚀 Novo Agendamento!',
+        mensagem: `${clienteNome} agendou para o dia ${data} às ${horario}`,
+        screen: 'AgendaProfissional',
+        root: 'Main',
+        params: {},
+    });
 }
 
 export default function AgendamentoFinal({ route, navigation }) {
@@ -58,6 +47,8 @@ export default function AgendamentoFinal({ route, navigation }) {
     const [horarioSelecionado, setHorarioSelecionado] = useState(null);
     const [colaboradorEscolhido, setColaboradorEscolhido] = useState(null);
     const [perfilCliente, setPerfilCliente] = useState(null);
+    const [clinicaData, setClinicaData] = useState(null);
+
     const [equipe, setEquipe] = useState([]);
     const [agendaClinica, setAgendaClinica] = useState({
         horarios: [],
@@ -103,6 +94,15 @@ export default function AgendamentoFinal({ route, navigation }) {
         return dataObj.toLocaleDateString('pt-BR');
     };
 
+    const getNomeClinica = (dados) => {
+        return (
+            dados?.nome ||
+            dados?.nomeCompleto ||
+            dados?.nomeNegocio ||
+            "Profissional"
+        );
+    };
+
     const carregarPerfilCliente = async () => {
         try {
             const user = auth.currentUser;
@@ -121,7 +121,9 @@ export default function AgendamentoFinal({ route, navigation }) {
         try {
             const clinicaUserRef = doc(db, "usuarios", clinicaId);
             const clinicaUserSnap = await getDoc(clinicaUserRef);
-            const clinicaData = clinicaUserSnap.exists() ? clinicaUserSnap.data() : {};
+            const dadosClinica = clinicaUserSnap.exists() ? clinicaUserSnap.data() : {};
+
+            setClinicaData(dadosClinica);
 
             const clinicaAgendaRef = doc(db, "usuarios", clinicaId, "configuracoes", "agenda");
             const clinicaAgendaSnap = await getDoc(clinicaAgendaRef);
@@ -145,14 +147,12 @@ export default function AgendamentoFinal({ route, navigation }) {
 
             const donoComoProfissional = {
                 id: clinicaId,
-                nome:
-                    clinicaData.nome ||
-                    clinicaData.nomeCompleto ||
-                    clinicaData.nomeNegocio ||
-                    "Profissional",
-                email: clinicaData.email || "",
-                perfil: clinicaData.perfil || "profissional",
-                tipo: clinicaData.tipo || "profissional",
+                nome: getNomeClinica(dadosClinica),
+                email: dadosClinica.email || "",
+                telefone: dadosClinica.telefone || "",
+                whatsapp: dadosClinica.whatsapp || dadosClinica.telefone || "",
+                perfil: dadosClinica.perfil || "profissional",
+                tipo: dadosClinica.tipo || "profissional",
                 servicosHabilitados: servicosDoDonoIds,
                 agenda: agendaDono,
                 ehDono: true,
@@ -178,6 +178,9 @@ export default function AgendamentoFinal({ route, navigation }) {
                 listaColabs.push({
                     id: d.id,
                     ...dados,
+                    nome: dados.nome || dados.nomeCompleto || "Profissional",
+                    telefone: dados.telefone || "",
+                    whatsapp: dados.whatsapp || dados.telefone || "",
                     agenda: aSnap.exists()
                         ? {
                             horarios: aSnap.data().horarios || [],
@@ -308,9 +311,65 @@ export default function AgendamentoFinal({ route, navigation }) {
         return minutosHorario <= minutosAgora;
     };
 
+    const salvarNotificacaoInternaProfissional = async ({
+        profissionalId,
+        clienteId,
+        clienteNome,
+        dataExibicao,
+        horarioSelecionadoAtual,
+        agendamentoId,
+    }) => {
+        await salvarNotificacaoProfissional({
+            profissionalId,
+            tipo: 'novo_agendamento',
+            titulo: '🚀 Novo agendamento recebido',
+            mensagem: `${clienteNome} agendou para o dia ${dataExibicao} às ${horarioSelecionadoAtual}.`,
+            agendamentoId,
+            clienteId,
+            clienteNome,
+            screen: 'AgendaProfissional',
+            root: 'Main',
+            params: {},
+        });
+    };
+
+    const enviarPushProfissionalSeTiverToken = async ({
+        profissionalId,
+        clienteNome,
+        dataExibicao,
+        horarioSelecionadoAtual,
+    }) => {
+        try {
+            const profissionalSnap = await getDoc(doc(db, "usuarios", profissionalId));
+
+            if (!profissionalSnap.exists()) return;
+
+            const dadosProfissional = profissionalSnap.data();
+            const token =
+                dadosProfissional?.expoPushToken ||
+                dadosProfissional?.pushToken ||
+                '';
+
+            if (!token) return;
+
+            await enviarPushNotificacao(
+                token,
+                clienteNome,
+                dataExibicao,
+                horarioSelecionadoAtual
+            );
+        } catch (error) {
+            console.log("Erro ao enviar push para profissional:", error);
+        }
+    };
+
     const finalizar = async () => {
         if (!colaboradorEscolhido || !horarioSelecionado) {
             return Alert.alert("Atenção", "Selecione data, hora e profissional.");
+        }
+
+        if (!auth.currentUser) {
+            return Alert.alert("Erro", "Usuário não autenticado.");
         }
 
         setLoading(true);
@@ -323,6 +382,11 @@ export default function AgendamentoFinal({ route, navigation }) {
                 perfilCliente?.nome ||
                 perfilCliente?.nomeCompleto ||
                 "Cliente";
+
+            const clientePushToken =
+                perfilCliente?.expoPushToken ||
+                perfilCliente?.pushToken ||
+                '';
 
             const novoAgendamentoRef = doc(collection(db, "agendamentos"));
 
@@ -346,16 +410,38 @@ export default function AgendamentoFinal({ route, navigation }) {
 
                 transaction.set(novoAgendamentoRef, {
                     clinicaId,
+                    clinicaNome: getNomeClinica(clinicaData),
+
+                    clinicaWhatsapp: clinicaData?.whatsapp || clinicaData?.telefone || "",
+                    profissionalWhatsapp:
+                        colaboradorEscolhido?.whatsapp ||
+                        colaboradorEscolhido?.telefone ||
+                        clinicaData?.whatsapp ||
+                        clinicaData?.telefone ||
+                        "",
+
+                    colaboradorWhatsapp:
+                        colaboradorEscolhido?.whatsapp ||
+                        colaboradorEscolhido?.telefone ||
+                        "",
+
                     servicos: servicos.map((s) => ({
                         id: s.id,
                         nome: s.nome,
                         preco: s.preco,
                     })),
+
                     colaboradorId: colaboradorEscolhido.id,
-                    colaboradorNome: colaboradorEscolhido.nome,
+                    colaboradorNome: colaboradorEscolhido.nome || "Profissional",
+
                     clienteId: auth.currentUser.uid,
                     clienteNome: nomeCliente,
-                    clienteWhatsapp: perfilCliente?.whatsapp || perfilCliente?.telefone || "Não informado",
+                    clienteWhatsapp:
+                        perfilCliente?.whatsapp ||
+                        perfilCliente?.telefone ||
+                        "Não informado",
+                    clientePushToken,
+
                     data: dataExibicao,
                     dataFiltro,
                     horario: horarioSelecionado,
@@ -364,32 +450,44 @@ export default function AgendamentoFinal({ route, navigation }) {
                 });
             });
 
-            const colabUserRef = doc(db, "usuarios", colaboradorEscolhido.id);
-            const colabUserSnap = await getDoc(colabUserRef);
+            await salvarNotificacaoInternaProfissional({
+                profissionalId: colaboradorEscolhido.id,
+                clienteId: auth.currentUser.uid,
+                clienteNome: nomeCliente,
+                dataExibicao,
+                horarioSelecionadoAtual: horarioSelecionado,
+                agendamentoId: novoAgendamentoRef.id,
+            });
 
-            if (colabUserSnap.exists() && colabUserSnap.data().pushToken) {
-                await enviarPushNotificacao(
-                    colabUserSnap.data().pushToken,
-                    nomeCliente,
-                    dataExibicao,
-                    horarioSelecionado
-                );
-            }
+            await enviarPushProfissionalSeTiverToken({
+                profissionalId: colaboradorEscolhido.id,
+                clienteNome: nomeCliente,
+                dataExibicao,
+                horarioSelecionadoAtual: horarioSelecionado,
+            });
 
             if (clinicaId !== colaboradorEscolhido.id) {
-                const proSnap = await getDoc(doc(db, "usuarios", clinicaId));
-                if (proSnap.exists() && proSnap.data().pushToken) {
-                    await enviarPushNotificacao(
-                        proSnap.data().pushToken,
-                        nomeCliente,
-                        dataExibicao,
-                        horarioSelecionado
-                    );
-                }
+                await salvarNotificacaoInternaProfissional({
+                    profissionalId: clinicaId,
+                    clienteId: auth.currentUser.uid,
+                    clienteNome: nomeCliente,
+                    dataExibicao,
+                    horarioSelecionadoAtual: horarioSelecionado,
+                    agendamentoId: novoAgendamentoRef.id,
+                });
+
+                await enviarPushProfissionalSeTiverToken({
+                    profissionalId: clinicaId,
+                    clienteNome: nomeCliente,
+                    dataExibicao,
+                    horarioSelecionadoAtual: horarioSelecionado,
+                });
             }
 
             Alert.alert("Sucesso!", "Agendamento realizado com sucesso!");
-            navigation.navigate("Main");
+            navigation.navigate("Main", {
+                screen: "MeusAgendamentosCliente",
+            });
         } catch (e) {
             console.log("Erro ao finalizar agendamento:", e);
 
@@ -604,16 +702,57 @@ export default function AgendamentoFinal({ route, navigation }) {
 const styles = StyleSheet.create({
     mainContainer: { flex: 1, backgroundColor: colors.background },
     container: { flex: 1, padding: 20 },
-    centerLoading: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+    centerLoading: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.background
+    },
     loadingText: { marginTop: 12, color: colors.secondary, fontSize: 14 },
     headerInfo: { marginBottom: 25, marginTop: 20 },
     title: { fontSize: 24, fontWeight: 'bold', color: colors.textDark },
     subtitle: { fontSize: 14, color: colors.secondary },
-    sectionLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: colors.textDark, marginTop: 10 },
-    dateSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 18, borderRadius: 15, elevation: 2, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
-    dateSelectorText: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: '600', color: colors.textDark, textTransform: 'capitalize' },
-    horariosGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
-    horaChip: { paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, marginRight: 10, marginBottom: 10, borderWidth: 1.5, alignItems: 'center', minWidth: 80 },
+    sectionLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        color: colors.textDark,
+        marginTop: 10
+    },
+    dateSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        padding: 18,
+        borderRadius: 15,
+        elevation: 2,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: colors.border
+    },
+    dateSelectorText: {
+        flex: 1,
+        marginLeft: 12,
+        fontSize: 16,
+        fontWeight: '600',
+        color: colors.textDark,
+        textTransform: 'capitalize'
+    },
+    horariosGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-start'
+    },
+    horaChip: {
+        paddingVertical: 12,
+        paddingHorizontal: 18,
+        borderRadius: 12,
+        marginRight: 10,
+        marginBottom: 10,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        minWidth: 80
+    },
     horaChipLivre: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
     horaChipTextLivre: { color: '#2E7D32', fontWeight: 'bold' },
     horaChipIndisponivel: { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2', opacity: 0.6 },
@@ -621,17 +760,55 @@ const styles = StyleSheet.create({
     horaChipSelected: { backgroundColor: '#918a8a', borderColor: '#212121', elevation: 4 },
     horaChipTextSelected: { color: '#FFF', fontWeight: 'bold' },
     colabSection: { marginTop: 10 },
-    colabCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 15, borderRadius: 15, marginBottom: 12, elevation: 2, borderWidth: 1, borderColor: colors.border },
+    colabCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        padding: 15,
+        borderRadius: 15,
+        marginBottom: 12,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: colors.border
+    },
     colabSelected: { borderColor: colors.primary, backgroundColor: '#F0F7FF' },
     colabDisabled: { opacity: 0.5, backgroundColor: '#F8F8F8' },
-    colabAvatar: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: colors.inputFill, justifyContent: 'center', alignItems: 'center' },
+    colabAvatar: {
+        width: 45,
+        height: 45,
+        borderRadius: 22.5,
+        backgroundColor: colors.inputFill,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
     colabAvatarText: { fontWeight: 'bold', color: colors.primary },
     nomeColab: { fontWeight: 'bold', fontSize: 16, color: colors.textDark },
     txtErro: { fontSize: 12, color: colors.danger, fontWeight: '500' },
-    emptyBox: { width: '100%', backgroundColor: '#FFF4E5', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FFE0B2', marginBottom: 12 },
+    emptyBox: {
+        width: '100%',
+        backgroundColor: '#FFF4E5',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#FFE0B2',
+        marginBottom: 12
+    },
     emptyBoxText: { color: '#8A6D3B', fontSize: 14, textAlign: 'center' },
-    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: 'transparent' },
-    btnFinal: { backgroundColor: colors.success, padding: 18, borderRadius: 15, alignItems: 'center', elevation: 5 },
+    footer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 20,
+        backgroundColor: 'transparent'
+    },
+    btnFinal: {
+        backgroundColor: colors.success,
+        padding: 18,
+        borderRadius: 15,
+        alignItems: 'center',
+        elevation: 5
+    },
     btnDisabled: { backgroundColor: '#CCC', elevation: 0 },
     btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
 });

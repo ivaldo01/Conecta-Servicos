@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import {
     View,
     Text,
@@ -7,165 +7,25 @@ import {
     ActivityIndicator,
     TouchableOpacity,
 } from 'react-native';
-import { auth, db } from "../../services/firebaseConfig";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import { formatCurrency } from "../../utils/formatCurrency";
-import { calcTotalServicos } from "../../utils/calcTotalServicos";
+import { useAuth } from "../../hooks/useAuth";
+import { useRelatoriosPro } from "../../hooks/useRelatoriosPro";
+import EmptyState from "../../components/EmptyState";
 
 export default function RelatoriosPro() {
-    const [loading, setLoading] = useState(true);
-    const [agendamentosConcluidos, setAgendamentosConcluidos] = useState([]);
-    const [avaliacoes, setAvaliacoes] = useState([]);
+    const { usuario, loadingAuth } = useAuth();
 
-    useEffect(() => {
-        carregarDadosFinanceiros();
-    }, []);
+    const {
+        loading,
+        resumo,
+        dadosGrafico,
+        ultimosAtendimentos,
+        carregarDadosFinanceiros,
+    } = useRelatoriosPro(usuario?.uid);
 
-    const valorDoAgendamento = (data) => {
-        return calcTotalServicos(data?.servicos, data?.preco);
-    };
-
-    const carregarDadosFinanceiros = async () => {
-        setLoading(true);
-
-        try {
-            const user = auth.currentUser;
-            if (!user) {
-                setLoading(false);
-                return;
-            }
-
-            const qAgendamentos = query(
-                collection(db, "agendamentos"),
-                where("clinicaId", "==", user.uid),
-                where("status", "==", "concluido")
-            );
-
-            const qAvaliacoes = query(
-                collection(db, "avaliacoes"),
-                where("profissionalId", "==", user.uid)
-            );
-
-            const [agendamentosSnap, avaliacoesSnap] = await Promise.all([
-                getDocs(qAgendamentos),
-                getDocs(qAvaliacoes),
-            ]);
-
-            const listaAgendamentos = agendamentosSnap.docs.map((docSnap) => ({
-                id: docSnap.id,
-                ...docSnap.data(),
-            }));
-
-            const listaAvaliacoes = avaliacoesSnap.docs.map((docSnap) => ({
-                id: docSnap.id,
-                ...docSnap.data(),
-            }));
-
-            const ordenados = listaAgendamentos.sort((a, b) => {
-                const dataA = a.dataCriacao?.seconds || 0;
-                const dataB = b.dataCriacao?.seconds || 0;
-                return dataB - dataA;
-            });
-
-            setAgendamentosConcluidos(ordenados);
-            setAvaliacoes(listaAvaliacoes);
-        } catch (error) {
-            console.error("Erro ao carregar relatório:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const resumo = useMemo(() => {
-        const hoje = new Date();
-        const anoAtual = hoje.getFullYear();
-        const mesAtual = hoje.getMonth();
-        const diaAtual = hoje.getDate();
-
-        let faturamentoTotal = 0;
-        let faturamentoHoje = 0;
-        let faturamentoMes = 0;
-        let totalAtendimentos = 0;
-        let atendimentosHoje = 0;
-        let atendimentosMes = 0;
-
-        agendamentosConcluidos.forEach((item) => {
-            const valor = valorDoAgendamento(item);
-            faturamentoTotal += valor;
-            totalAtendimentos += 1;
-
-            let dataItem = null;
-
-            if (item.dataFiltro) {
-                const [ano, mes, dia] = item.dataFiltro.split('-').map(Number);
-                dataItem = new Date(ano, mes - 1, dia);
-            } else if (item.dataCriacao?.seconds) {
-                dataItem = new Date(item.dataCriacao.seconds * 1000);
-            }
-
-            if (dataItem) {
-                const mesmoAno = dataItem.getFullYear() === anoAtual;
-                const mesmoMes = dataItem.getMonth() === mesAtual;
-                const mesmoDia = dataItem.getDate() === diaAtual;
-
-                if (mesmoAno && mesmoMes) {
-                    faturamentoMes += valor;
-                    atendimentosMes += 1;
-                }
-
-                if (mesmoAno && mesmoMes && mesmoDia) {
-                    faturamentoHoje += valor;
-                    atendimentosHoje += 1;
-                }
-            }
-        });
-
-        const ticketMedio =
-            totalAtendimentos > 0 ? faturamentoTotal / totalAtendimentos : 0;
-
-        const mediaAvaliacoes =
-            avaliacoes.length > 0
-                ? avaliacoes.reduce((acc, item) => acc + Number(item.nota || 0), 0) / avaliacoes.length
-                : 0;
-
-        return {
-            faturamentoTotal,
-            faturamentoHoje,
-            faturamentoMes,
-            totalAtendimentos,
-            atendimentosHoje,
-            atendimentosMes,
-            ticketMedio,
-            mediaAvaliacoes,
-            totalAvaliacoes: avaliacoes.length,
-        };
-    }, [agendamentosConcluidos, avaliacoes]);
-
-    const dadosGrafico = useMemo(() => {
-        const itens = [
-            { label: 'Hoje', valor: resumo.faturamentoHoje },
-            { label: 'Mês', valor: resumo.faturamentoMes },
-            { label: 'Total', valor: resumo.faturamentoTotal },
-        ];
-
-        const maiorValor = Math.max(...itens.map((i) => i.valor), 1);
-
-        return itens.map((item) => ({
-            ...item,
-            percentual: (item.valor / maiorValor) * 100,
-        }));
-    }, [resumo]);
-
-    const ultimosAtendimentos = useMemo(() => {
-        return agendamentosConcluidos.slice(0, 5).map((item) => ({
-            ...item,
-            valorTotal: valorDoAgendamento(item),
-        }));
-    }, [agendamentosConcluidos]);
-
-    if (loading) {
+    if (loadingAuth || loading) {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
@@ -175,18 +35,32 @@ export default function RelatoriosPro() {
     }
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Relatório Financeiro</Text>
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+        >
+            <View style={styles.topBanner}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.title}>Relatório Financeiro</Text>
+                    <Text style={styles.subtitle}>
+                        Acompanhe seu faturamento e desempenho
+                    </Text>
+                </View>
 
-                <TouchableOpacity onPress={carregarDadosFinanceiros}>
-                    <Ionicons name="refresh-circle" size={32} color={colors.primary} />
+                <TouchableOpacity
+                    onPress={carregarDadosFinanceiros}
+                    style={styles.refreshButton}
+                >
+                    <Ionicons name="refresh-outline" size={20} color={colors.primary} />
                 </TouchableOpacity>
             </View>
 
             <View style={styles.mainCard}>
                 <Text style={styles.cardLabel}>Faturamento Total</Text>
-                <Text style={styles.totalValue}>{formatCurrency(resumo.faturamentoTotal)}</Text>
+                <Text style={styles.totalValue}>
+                    {formatCurrency(resumo.faturamentoTotal)}
+                </Text>
 
                 <View style={styles.divider} />
 
@@ -200,34 +74,59 @@ export default function RelatoriosPro() {
 
             <View style={styles.infoGrid}>
                 <View style={styles.infoCard}>
-                    <Ionicons name="today-outline" size={22} color={colors.primary} />
+                    <View style={styles.infoIconBox}>
+                        <Ionicons name="today-outline" size={20} color={colors.primary} />
+                    </View>
                     <Text style={styles.smallLabel}>Hoje</Text>
-                    <Text style={styles.smallValue}>{formatCurrency(resumo.faturamentoHoje)}</Text>
-                    <Text style={styles.smallSub}>{resumo.atendimentosHoje} atendimento(s)</Text>
+                    <Text style={styles.smallValue}>
+                        {formatCurrency(resumo.faturamentoHoje)}
+                    </Text>
+                    <Text style={styles.smallSub}>
+                        {resumo.atendimentosHoje} atendimento(s)
+                    </Text>
                 </View>
 
                 <View style={styles.infoCard}>
-                    <Ionicons name="calendar-outline" size={22} color={colors.primary} />
+                    <View style={styles.infoIconBox}>
+                        <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                    </View>
                     <Text style={styles.smallLabel}>Este mês</Text>
-                    <Text style={styles.smallValue}>{formatCurrency(resumo.faturamentoMes)}</Text>
-                    <Text style={styles.smallSub}>{resumo.atendimentosMes} atendimento(s)</Text>
+                    <Text style={styles.smallValue}>
+                        {formatCurrency(resumo.faturamentoMes)}
+                    </Text>
+                    <Text style={styles.smallSub}>
+                        {resumo.atendimentosMes} atendimento(s)
+                    </Text>
                 </View>
 
                 <View style={styles.infoCard}>
-                    <Ionicons name="trending-up-outline" size={22} color={colors.primary} />
+                    <View style={styles.infoIconBox}>
+                        <Ionicons name="trending-up-outline" size={20} color={colors.primary} />
+                    </View>
                     <Text style={styles.smallLabel}>Ticket médio</Text>
-                    <Text style={styles.smallValue}>{formatCurrency(resumo.ticketMedio)}</Text>
+                    <Text style={styles.smallValue}>
+                        {formatCurrency(resumo.ticketMedio)}
+                    </Text>
                     <Text style={styles.smallSub}>por atendimento</Text>
                 </View>
 
                 <View style={styles.infoCard}>
-                    <Ionicons name="star-outline" size={22} color={colors.warning || "#FFC107"} />
+                    <View style={styles.infoIconBox}>
+                        <Ionicons
+                            name="star-outline"
+                            size={20}
+                            color={colors.warning || "#FFC107"}
+                        />
+                    </View>
                     <Text style={styles.smallLabel}>Avaliação média</Text>
                     <Text style={styles.smallValue}>
-                        {resumo.totalAvaliacoes > 0 ? resumo.mediaAvaliacoes.toFixed(1) : "—"}
+                        {resumo.totalAvaliacoes > 0
+                            ? resumo.mediaAvaliacoes.toFixed(1)
+                            : "—"}
                     </Text>
                     <Text style={styles.smallSub}>
-                        {resumo.totalAvaliacoes} avaliação{resumo.totalAvaliacoes === 1 ? "" : "ões"}
+                        {resumo.totalAvaliacoes} avaliação
+                        {resumo.totalAvaliacoes === 1 ? "" : "ões"}
                     </Text>
                 </View>
             </View>
@@ -239,11 +138,18 @@ export default function RelatoriosPro() {
                     <View key={item.label} style={styles.barItem}>
                         <View style={styles.barHeader}>
                             <Text style={styles.barLabel}>{item.label}</Text>
-                            <Text style={styles.barValue}>{formatCurrency(item.valor)}</Text>
+                            <Text style={styles.barValue}>
+                                {formatCurrency(item.valor)}
+                            </Text>
                         </View>
 
                         <View style={styles.barTrack}>
-                            <View style={[styles.barFill, { width: `${item.percentual}%` }]} />
+                            <View
+                                style={[
+                                    styles.barFill,
+                                    { width: `${item.percentual}%` },
+                                ]}
+                            />
                         </View>
                     </View>
                 ))}
@@ -253,11 +159,19 @@ export default function RelatoriosPro() {
                 <Text style={styles.sectionTitle}>Últimos atendimentos concluídos</Text>
 
                 {ultimosAtendimentos.length === 0 ? (
-                    <Text style={styles.emptyText}>Nenhum atendimento concluído ainda.</Text>
+                    <EmptyState
+                        icon="receipt-outline"
+                        title="Nenhum atendimento concluído"
+                        subtitle="Quando você concluir atendimentos, eles aparecerão aqui."
+                    />
                 ) : (
                     ultimosAtendimentos.map((item) => (
                         <View key={item.id} style={styles.atendimentoCard}>
-                            <View style={{ flex: 1 }}>
+                            <View style={styles.atendimentoAvatar}>
+                                <Ionicons name="person-outline" size={18} color={colors.primary} />
+                            </View>
+
+                            <View style={styles.atendimentoContent}>
                                 <Text style={styles.atendimentoCliente}>
                                     {item.clienteNome || "Cliente"}
                                 </Text>
@@ -275,10 +189,10 @@ export default function RelatoriosPro() {
             </View>
 
             <View style={styles.tipCard}>
-                <Ionicons name="bulb-outline" size={24} color="#856404" />
+                <Ionicons name="bulb-outline" size={22} color="#856404" />
                 <Text style={styles.tipText}>
                     Este relatório considera apenas agendamentos com status{" "}
-                    <Text style={{ fontWeight: 'bold' }}>concluído</Text> como faturamento realizado.
+                    <Text style={styles.tipBold}>concluído</Text> como faturamento realizado.
                 </Text>
             </View>
         </ScrollView>
@@ -289,61 +203,84 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F8F9FA',
+    },
+
+    scrollContent: {
         padding: 20,
+        paddingBottom: 30,
     },
 
     centered: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#F8F9FA',
     },
 
     loadingText: {
         marginTop: 10,
         color: '#666',
+        fontSize: 14,
     },
 
-    header: {
+    topBanner: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         marginTop: 40,
         marginBottom: 20,
     },
 
     title: {
-        fontSize: 22,
+        fontSize: 26,
         fontWeight: 'bold',
-        color: '#333',
+        color: '#222',
+    },
+
+    subtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginTop: 4,
+    },
+
+    refreshButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#FFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#EEE',
     },
 
     mainCard: {
         backgroundColor: colors.primary,
         padding: 25,
-        borderRadius: 20,
+        borderRadius: 22,
         elevation: 8,
         shadowColor: colors.primary,
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.25,
         shadowRadius: 10,
+        marginBottom: 6,
     },
 
     cardLabel: {
         color: 'rgba(255,255,255,0.85)',
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 13,
+        fontWeight: '700',
         textTransform: 'uppercase',
     },
 
     totalValue: {
         color: '#FFF',
-        fontSize: 32,
+        fontSize: 34,
         fontWeight: 'bold',
         marginVertical: 10,
     },
 
     divider: {
         height: 1,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(255,255,255,0.22)',
         marginVertical: 15,
     },
 
@@ -355,7 +292,8 @@ const styles = StyleSheet.create({
     subText: {
         color: '#FFF',
         marginLeft: 10,
-        fontSize: 16,
+        fontSize: 15,
+        fontWeight: '500',
     },
 
     infoGrid: {
@@ -369,18 +307,27 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFF',
         width: '48%',
         padding: 18,
-        borderRadius: 15,
+        borderRadius: 16,
         elevation: 3,
-        borderLeftWidth: 4,
-        borderLeftColor: colors.primary,
+        borderWidth: 1,
+        borderColor: '#F0F0F0',
         marginBottom: 14,
+    },
+
+    infoIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: `${colors.primary}12`,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 
     smallLabel: {
         fontSize: 12,
         color: '#999',
         fontWeight: 'bold',
-        marginTop: 8,
+        marginTop: 10,
     },
 
     smallValue: {
@@ -398,7 +345,7 @@ const styles = StyleSheet.create({
 
     sectionCard: {
         backgroundColor: '#FFF',
-        borderRadius: 16,
+        borderRadius: 18,
         padding: 16,
         marginTop: 18,
         elevation: 2,
@@ -452,11 +399,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FAFAFA',
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 12,
         marginBottom: 10,
         borderWidth: 1,
         borderColor: '#EEE',
+    },
+
+    atendimentoAvatar: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: `${colors.primary}12`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    atendimentoContent: {
+        flex: 1,
+        marginLeft: 12,
     },
 
     atendimentoCliente: {
@@ -478,16 +439,10 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
 
-    emptyText: {
-        color: '#999',
-        textAlign: 'center',
-        paddingVertical: 10,
-    },
-
     tipCard: {
         backgroundColor: '#FFF3CD',
         padding: 15,
-        borderRadius: 12,
+        borderRadius: 14,
         marginTop: 18,
         flexDirection: 'row',
         alignItems: 'center',
@@ -500,6 +455,10 @@ const styles = StyleSheet.create({
         marginLeft: 10,
         fontSize: 13,
         flex: 1,
-        lineHeight: 18,
+        lineHeight: 19,
+    },
+
+    tipBold: {
+        fontWeight: 'bold',
     },
 });
