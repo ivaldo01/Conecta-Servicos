@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, onSnapshot } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 
@@ -20,10 +20,31 @@ export default function DetalhesAgendamento({ route, navigation }) {
     const [loadingAcao, setLoadingAcao] = useState(false);
     const [loadingAvaliacao, setLoadingAvaliacao] = useState(true);
     const [jaAvaliado, setJaAvaliado] = useState(false);
+    const [statusPagamentoAtual, setStatusPagamentoAtual] = useState(agendamento?.statusPagamento || 'aguardando_cobranca');
 
     useEffect(() => {
         verificarAvaliacao();
     }, [agendamento?.id]);
+
+    useEffect(() => {
+        if (!agendamento?.id) return;
+
+        const unsubscribePagamento = onSnapshot(
+            doc(db, 'pagamentos', agendamento.id),
+            (snap) => {
+                if (snap.exists()) {
+                    setStatusPagamentoAtual(snap.data()?.status || 'gerada');
+                } else {
+                    setStatusPagamentoAtual(agendamento?.statusPagamento || 'aguardando_cobranca');
+                }
+            },
+            (error) => {
+                console.log('Erro ao ouvir pagamento do cliente:', error);
+            }
+        );
+
+        return () => unsubscribePagamento?.();
+    }, [agendamento?.id, agendamento?.statusPagamento]);
 
     const verificarAvaliacao = async () => {
         if (!agendamento?.id) {
@@ -141,6 +162,48 @@ export default function DetalhesAgendamento({ route, navigation }) {
 
     const statusConfig = getStatusConfig(agendamento?.status);
 
+    function getStatusPagamentoLabel(status) {
+        switch (status) {
+            case 'gerada':
+                return 'Cobrança gerada';
+            case 'pago':
+                return 'Pagamento confirmado';
+            case 'cancelado':
+                return 'Cobrança cancelada';
+            case 'vencido':
+                return 'Cobrança vencida';
+            case 'aguardando_cobranca':
+            default:
+                return 'Aguardando cobrança';
+        }
+    }
+
+    function getStatusPagamentoCor(status) {
+        switch (status) {
+            case 'pago':
+                return '#1E8E3E';
+            case 'cancelado':
+                return '#6C757D';
+            case 'vencido':
+                return '#E67E22';
+            case 'gerada':
+                return colors.primary;
+            case 'aguardando_cobranca':
+            default:
+                return '#7F8C8D';
+        }
+    }
+
+    const pagamentoLabel = getStatusPagamentoLabel(statusPagamentoAtual);
+    const pagamentoCor = getStatusPagamentoCor(statusPagamentoAtual);
+
+    const abrirTelaPagamento = () => {
+        navigation.navigate('PagamentoAgendamento', {
+            agendamento,
+            agendamentoId: agendamento?.id,
+        });
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -185,6 +248,27 @@ export default function DetalhesAgendamento({ route, navigation }) {
                         </Text>
                     </View>
 
+                    <Text style={[styles.label, { marginTop: 16 }]}>PAGAMENTO</Text>
+
+                    <View style={styles.pagamentoResumoBox}>
+                        <View>
+                            <Text style={styles.pagamentoFormaText}>
+                                {agendamento?.formaPagamentoLabel || 'Pix'}
+                            </Text>
+                            <Text style={[styles.pagamentoStatusText, { color: pagamentoCor }]}>
+                                {pagamentoLabel}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.pagamentoButtonInline}
+                            onPress={abrirTelaPagamento}
+                        >
+                            <Ionicons name="wallet-outline" size={18} color="#FFF" />
+                            <Text style={styles.pagamentoButtonInlineText}>Ver cobrança</Text>
+                        </TouchableOpacity>
+                    </View>
+
                     <Text style={[styles.label, { marginTop: 16 }]}>
                         DATA E HORÁRIO
                     </Text>
@@ -205,6 +289,14 @@ export default function DetalhesAgendamento({ route, navigation }) {
                         <Text style={styles.whatsText}>
                             Chamar no WhatsApp com mensagem pronta
                         </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.paymentBtn}
+                        onPress={abrirTelaPagamento}
+                    >
+                        <Ionicons name="wallet-outline" size={20} color="#FFF" />
+                        <Text style={styles.btnText}>VER COBRANÇA / PAGAMENTO</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -385,6 +477,55 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#25D366',
         flex: 1,
+    },
+
+    pagamentoResumoBox: {
+        marginTop: 8,
+        backgroundColor: '#F7F9FC',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E4EAF1',
+    },
+
+    pagamentoFormaText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: colors.textDark,
+    },
+
+    pagamentoStatusText: {
+        marginTop: 4,
+        fontSize: 14,
+        fontWeight: '600',
+    },
+
+    pagamentoButtonInline: {
+        marginTop: 12,
+        backgroundColor: colors.primary,
+        borderRadius: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-start',
+    },
+
+    pagamentoButtonInlineText: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
+
+    paymentBtn: {
+        marginTop: 14,
+        backgroundColor: colors.primary,
+        padding: 16,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     actionArea: {

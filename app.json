@@ -22,13 +22,20 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ivaldo_silva.conectaservicos"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "92748d97-fa35-4a53-9d5b-efb7c5d0059f"
+      }
+    },
+    "owner": "ivaldo_silva"
   }
 }

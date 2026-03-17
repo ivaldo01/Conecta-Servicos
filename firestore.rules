@@ -10,20 +10,28 @@ service cloud.firestore {
       return estaLogado() && request.auth.uid == userId;
     }
 
-    function ehProfissional(resourceData) {
-      return resourceData.tipo == "profissional" || resourceData.perfil == "profissional";
+    function ehProfissional(data) {
+      return data != null && (
+        data.tipo == "profissional" ||
+        data.perfil == "profissional"
+      );
     }
 
     function podeLerPerfilProfissional() {
-      return estaLogado() && ehProfissional(resource.data);
+      return estaLogado() && resource.data != null && ehProfissional(resource.data);
+    }
+
+    function participaDoAgendamento() {
+      return estaLogado() && resource.data != null && (
+        resource.data.clienteId == request.auth.uid ||
+        resource.data.clinicaId == request.auth.uid ||
+        resource.data.colaboradorId == request.auth.uid ||
+        resource.data.profissionalId == request.auth.uid
+      );
     }
 
     match /usuarios/{userId} {
-
-      // Dono pode ler e editar seu próprio documento
       allow read, write: if ehDono(userId);
-
-      // Outros usuários autenticados podem ler perfis profissionais
       allow read: if podeLerPerfilProfissional();
 
       match /notificacoes/{notificacaoId} {
@@ -42,10 +50,7 @@ service cloud.firestore {
       }
 
       match /configuracoes/{configId} {
-        // Dono tem acesso total
         allow read, write: if ehDono(userId);
-
-        // Usuários autenticados podem ler agenda pública do profissional
         allow read: if estaLogado() && configId == "agenda";
       }
 
@@ -54,10 +59,7 @@ service cloud.firestore {
         allow write: if ehDono(userId);
 
         match /configuracoes/{configId} {
-          // Dono pode tudo
           allow read, write: if ehDono(userId);
-
-          // Usuários autenticados podem ler agenda do colaborador
           allow read: if estaLogado() && configId == "agenda";
         }
       }
@@ -74,17 +76,44 @@ service cloud.firestore {
 
     match /agendamentos/{agendamentoId} {
       allow create: if estaLogado();
+      allow read: if estaLogado();
+      allow update: if participaDoAgendamento();
+      allow delete: if false;
+    }
 
-      // TEMPORÁRIO / funcional para o fluxo de disponibilidade:
-      // usuários autenticados podem ler agendamentos
+    match /pagamentos/{pagamentoId} {
       allow read: if estaLogado();
 
-      allow update: if estaLogado() && (
-        resource.data.clienteId == request.auth.uid ||
+      allow create: if estaLogado() && (
+        request.resource.data.profissionalId == request.auth.uid ||
+        request.resource.data.clinicaId == request.auth.uid ||
+        request.resource.data.colaboradorId == request.auth.uid
+      );
+
+      allow update: if estaLogado() && resource.data != null && (
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clinicaId == request.auth.uid ||
+        resource.data.colaboradorId == request.auth.uid ||
+        resource.data.clienteId == request.auth.uid
+      );
+
+      allow delete: if false;
+    }
+
+    match /saques/{saqueId} {
+      allow read: if estaLogado() && resource.data != null && (
+        resource.data.profissionalId == request.auth.uid ||
         resource.data.clinicaId == request.auth.uid ||
         resource.data.colaboradorId == request.auth.uid
       );
 
+      allow create: if estaLogado() && request.resource.data != null && (
+        request.resource.data.profissionalId == request.auth.uid ||
+        request.resource.data.clinicaId == request.auth.uid ||
+        request.resource.data.colaboradorId == request.auth.uid
+      );
+
+      allow update: if false;
       allow delete: if false;
     }
 

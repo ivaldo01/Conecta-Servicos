@@ -40,6 +40,7 @@ import ListaMenores from './src/screens/cliente/ListaMenores';
 import CadastroMenor from './src/screens/cliente/CadastroMenor';
 import EditarMenor from './src/screens/cliente/EditarMenor';
 import FavoritosCliente from './src/screens/cliente/FavoritosCliente';
+import PagamentoAgendamento from './src/screens/cliente/PagamentoAgendamento';
 
 /* TELAS PROFISSIONAL */
 
@@ -48,7 +49,7 @@ import ConfigurarServicos from './src/screens/profissional/ConfigurarServicos';
 import ConfigurarPerfil from './src/screens/profissional/ConfigurarPerfil';
 import ConfigurarAgenda from './src/screens/profissional/ConfigurarAgenda';
 import GerenciarColaboradores from './src/screens/profissional/GerenciarColaboradores';
-import RelatoriosPro from './src/screens/profissional/RelatoriosPro';
+import FinanceiroPro from './src/screens/profissional/FinanceiroPro';
 import DetalhesAgendamentoPro from './src/screens/profissional/DetalhesAgendamentoPro';
 
 const Stack = createStackNavigator();
@@ -97,7 +98,7 @@ function getTabScreenOptions(route, insets) {
 
       if (route.name === 'AgendaProfissional') iconName = 'calendar-outline';
       if (route.name === 'ConfigurarServicos') iconName = 'construct-outline';
-      if (route.name === 'RelatoriosPro') iconName = 'bar-chart-outline';
+      if (route.name === 'FinanceiroPro') iconName = 'wallet-outline';
 
       return <Ionicons name={iconName} size={size} color={color} />;
     },
@@ -130,7 +131,7 @@ function ProfissionalTabs() {
       <Tab.Screen name="TelaInicio" component={HomeScreen} options={{ title: 'Início' }} />
       <Tab.Screen name="AgendaProfissional" component={AgendaProfissional} options={{ title: 'Agenda' }} />
       <Tab.Screen name="ConfigurarServicos" component={ConfigurarServicos} options={{ title: 'Serviços' }} />
-      <Tab.Screen name="RelatoriosPro" component={RelatoriosPro} options={{ title: 'Financeiro' }} />
+      <Tab.Screen name="FinanceiroPro" component={FinanceiroPro} options={{ title: 'Financeiro' }} />
       <Tab.Screen name="Perfil" component={PerfilScreen} options={{ title: 'Perfil' }} />
     </Tab.Navigator>
   );
@@ -216,12 +217,12 @@ function AppNavigator() {
     });
 
     return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+      if (notificationListener.current?.remove) {
+        notificationListener.current.remove();
       }
 
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+      if (responseListener.current?.remove) {
+        responseListener.current.remove();
       }
     };
   }, []);
@@ -247,6 +248,7 @@ function AppNavigator() {
             <Stack.Screen name="AgendamentoFinal" component={AgendamentoFinal} />
 
             <Stack.Screen name="DetalhesAgendamento" component={DetalhesAgendamento} />
+            <Stack.Screen name="PagamentoAgendamento" component={PagamentoAgendamento} />
             <Stack.Screen name="AvaliarAtendimento" component={AvaliarAtendimento} />
 
             <Stack.Screen name="DetalhesAgendamentoPro" component={DetalhesAgendamentoPro} />

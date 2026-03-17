@@ -66,6 +66,48 @@ function podeCancelar(status) {
     return status === 'pendente' || status === 'confirmado';
 }
 
+function getStatusPagamentoStyle(status) {
+    switch (status) {
+        case 'pago':
+            return {
+                color: '#1E8E3E',
+                bg: '#EAF7ED',
+                label: 'Pagamento confirmado',
+                icon: 'checkmark-done-circle-outline',
+            };
+        case 'cancelado':
+            return {
+                color: '#6C757D',
+                bg: '#F1F3F5',
+                label: 'Cobrança cancelada',
+                icon: 'close-circle-outline',
+            };
+        case 'vencido':
+            return {
+                color: '#E67E22',
+                bg: '#FFF4E5',
+                label: 'Cobrança vencida',
+                icon: 'alert-circle-outline',
+            };
+        case 'gerada':
+            return {
+                color: colors.primary,
+                bg: '#EEF3FF',
+                label: 'Cobrança gerada',
+                icon: 'wallet-outline',
+            };
+        case 'aguardando_cobranca':
+        default:
+            return {
+                color: '#7F8C8D',
+                bg: '#F5F6F8',
+                label: 'Aguardando cobrança',
+                icon: 'time-outline',
+            };
+    }
+}
+
+
 export default function MeusAgendamentosCliente({ navigation }) {
     const [agendamentos, setAgendamentos] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -165,9 +207,18 @@ export default function MeusAgendamentosCliente({ navigation }) {
         );
     };
 
+    const abrirTelaPagamento = (item) => {
+        navigation.navigate('PagamentoAgendamento', {
+            agendamento: item,
+            agendamentoId: item?.id,
+        });
+    };
+
     const renderItem = ({ item }) => {
         const statusStyle = getStatusStyle(item.status);
+        const statusPagamentoStyle = getStatusPagamentoStyle(item.statusPagamento);
         const total =
+            Number(item.valorTotal) ||
             item.servicos?.reduce((acc, s) => acc + parseFloat(s.preco || 0), 0) || 0;
 
         return (
@@ -213,6 +264,34 @@ export default function MeusAgendamentosCliente({ navigation }) {
                     <Text style={styles.infoText} numberOfLines={1}>
                         {item.servicos?.map((s) => s.nome).join(", ") || "Serviço"}
                     </Text>
+                </View>
+
+                <View style={styles.pagamentoBox}>
+                    <View style={styles.pagamentoHeaderRow}>
+                        <Text style={styles.pagamentoTitle}>Pagamento</Text>
+                        <View style={[styles.pagamentoBadge, { backgroundColor: statusPagamentoStyle.bg }]}>
+                            <Ionicons
+                                name={statusPagamentoStyle.icon}
+                                size={14}
+                                color={statusPagamentoStyle.color}
+                            />
+                            <Text style={[styles.pagamentoBadgeText, { color: statusPagamentoStyle.color }]}>
+                                {statusPagamentoStyle.label}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Text style={styles.pagamentoForma}>
+                        {item.formaPagamentoLabel || 'Pix'}
+                    </Text>
+
+                    <TouchableOpacity
+                        style={styles.pagamentoButton}
+                        onPress={() => abrirTelaPagamento(item)}
+                    >
+                        <Ionicons name="wallet-outline" size={18} color="#FFF" />
+                        <Text style={styles.pagamentoButtonText}>Ver cobrança</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.footerCard}>

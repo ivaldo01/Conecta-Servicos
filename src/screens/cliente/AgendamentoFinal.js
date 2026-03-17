@@ -37,6 +37,35 @@ async function enviarPushNotificacao(expoPushToken, clienteNome, data, horario) 
     });
 }
 
+const FORMAS_PAGAMENTO = [
+    {
+        id: 'pix',
+        titulo: 'Pix',
+        descricao: 'Pagamento instantâneo',
+        icon: 'qr-code-outline',
+    },
+    {
+        id: 'boleto',
+        titulo: 'Boleto',
+        descricao: 'Cobrança bancária',
+        icon: 'document-text-outline',
+    },
+    {
+        id: 'cartao_credito',
+        titulo: 'Cartão de crédito',
+        descricao: 'Cobrança no crédito',
+        icon: 'card-outline',
+    },
+    {
+        id: 'cartao_debito',
+        titulo: 'Cartão de débito',
+        descricao: 'Cobrança no débito',
+        icon: 'card-outline',
+    },
+];
+
+const STATUS_PAGAMENTO_INICIAL = 'aguardando_cobranca';
+
 export default function AgendamentoFinal({ route, navigation }) {
     const { clinicaId, servicos } = route.params || {};
 
@@ -48,6 +77,7 @@ export default function AgendamentoFinal({ route, navigation }) {
     const [colaboradorEscolhido, setColaboradorEscolhido] = useState(null);
     const [perfilCliente, setPerfilCliente] = useState(null);
     const [clinicaData, setClinicaData] = useState(null);
+    const [formaPagamento, setFormaPagamento] = useState('pix');
 
     const [equipe, setEquipe] = useState([]);
     const [agendaClinica, setAgendaClinica] = useState({
@@ -68,6 +98,16 @@ export default function AgendamentoFinal({ route, navigation }) {
             setColaboradorEscolhido(null);
         }
     }, [date, loadingInicial]);
+
+    const valorTotalAgendamento = useMemo(() => {
+        return servicos.reduce((acc, servico) => {
+            return acc + parseFloat(servico?.preco || 0);
+        }, 0);
+    }, [servicos]);
+
+    const formaPagamentoSelecionada = useMemo(() => {
+        return FORMAS_PAGAMENTO.find((item) => item.id === formaPagamento) || FORMAS_PAGAMENTO[0];
+    }, [formaPagamento]);
 
     const inicializarTela = async () => {
         setLoadingInicial(true);
@@ -92,6 +132,13 @@ export default function AgendamentoFinal({ route, navigation }) {
 
     const formatarDataExibicao = (dataObj) => {
         return dataObj.toLocaleDateString('pt-BR');
+    };
+
+    const formatarMoeda = (valor) => {
+        return Number(valor || 0).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        });
     };
 
     const getNomeClinica = (dados) => {
@@ -368,6 +415,10 @@ export default function AgendamentoFinal({ route, navigation }) {
             return Alert.alert("Atenção", "Selecione data, hora e profissional.");
         }
 
+        if (!formaPagamento) {
+            return Alert.alert("Atenção", "Selecione a forma de pagamento.");
+        }
+
         if (!auth.currentUser) {
             return Alert.alert("Erro", "Usuário não autenticado.");
         }
@@ -446,6 +497,14 @@ export default function AgendamentoFinal({ route, navigation }) {
                     dataFiltro,
                     horario: horarioSelecionado,
                     status: "pendente",
+
+                    valorTotal: valorTotalAgendamento,
+                    formaPagamento,
+                    formaPagamentoLabel: formaPagamentoSelecionada?.titulo || 'Pix',
+                    statusPagamento: STATUS_PAGAMENTO_INICIAL,
+                    cobrancaGerada: false,
+                    pagamentoConfirmado: false,
+
                     dataCriacao: serverTimestamp(),
                 });
             });
@@ -521,6 +580,11 @@ export default function AgendamentoFinal({ route, navigation }) {
                     </Text>
                 </View>
 
+                <View style={styles.resumeCard}>
+                    <Text style={styles.resumeLabel}>VALOR TOTAL</Text>
+                    <Text style={styles.resumeValue}>{formatarMoeda(valorTotalAgendamento)}</Text>
+                </View>
+
                 <Text style={styles.sectionLabel}>Selecione a Data</Text>
                 <TouchableOpacity
                     style={styles.dateSelector}
@@ -550,6 +614,65 @@ export default function AgendamentoFinal({ route, navigation }) {
                         }}
                     />
                 )}
+
+                <Text style={styles.sectionLabel}>Forma de Pagamento</Text>
+                <View style={styles.paymentList}>
+                    {FORMAS_PAGAMENTO.map((item) => {
+                        const selecionado = formaPagamento === item.id;
+
+                        return (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[
+                                    styles.paymentCard,
+                                    selecionado && styles.paymentCardSelected,
+                                ]}
+                                onPress={() => setFormaPagamento(item.id)}
+                                activeOpacity={0.88}
+                            >
+                                <View style={styles.paymentIconArea}>
+                                    <Ionicons
+                                        name={item.icon}
+                                        size={22}
+                                        color={selecionado ? '#FFF' : colors.primary}
+                                    />
+                                </View>
+
+                                <View style={styles.paymentTextArea}>
+                                    <Text
+                                        style={[
+                                            styles.paymentTitle,
+                                            selecionado && styles.paymentTitleSelected,
+                                        ]}
+                                    >
+                                        {item.titulo}
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.paymentDescription,
+                                            selecionado && styles.paymentDescriptionSelected,
+                                        ]}
+                                    >
+                                        {item.descricao}
+                                    </Text>
+                                </View>
+
+                                <Ionicons
+                                    name={selecionado ? 'radio-button-on' : 'radio-button-off'}
+                                    size={22}
+                                    color={selecionado ? colors.primary : colors.border}
+                                />
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                <View style={styles.paymentInfoBox}>
+                    <Ionicons name="information-circle-outline" size={18} color="#8A6D3B" />
+                    <Text style={styles.paymentInfoText}>
+                        O profissional vai gerar a cobrança depois, com base no valor deste agendamento e na forma de pagamento escolhida por você.
+                    </Text>
+                </View>
 
                 <Text style={styles.sectionLabel}>Horários Disponíveis</Text>
 
@@ -676,7 +799,15 @@ export default function AgendamentoFinal({ route, navigation }) {
                     </View>
                 )}
 
-                <View style={{ height: 100 }} />
+                <View style={styles.bottomSummaryCard}>
+                    <Text style={styles.bottomSummaryLabel}>Pagamento escolhido</Text>
+                    <Text style={styles.bottomSummaryValue}>{formaPagamentoSelecionada?.titulo}</Text>
+                    <Text style={styles.bottomSummarySubtext}>
+                        Status inicial: aguardando cobrança do profissional
+                    </Text>
+                </View>
+
+                <View style={{ height: 120 }} />
             </ScrollView>
 
             <View style={styles.footer}>
@@ -706,18 +837,39 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: colors.background
+        backgroundColor: colors.background,
     },
     loadingText: { marginTop: 12, color: colors.secondary, fontSize: 14 },
-    headerInfo: { marginBottom: 25, marginTop: 20 },
+    headerInfo: { marginBottom: 20, marginTop: 20 },
     title: { fontSize: 24, fontWeight: 'bold', color: colors.textDark },
     subtitle: { fontSize: 14, color: colors.secondary },
+    resumeCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: colors.border,
+        elevation: 2,
+    },
+    resumeLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.secondary,
+        marginBottom: 6,
+        letterSpacing: 0.8,
+    },
+    resumeValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: colors.primary,
+    },
     sectionLabel: {
         fontSize: 16,
         fontWeight: 'bold',
         marginBottom: 15,
         color: colors.textDark,
-        marginTop: 10
+        marginTop: 10,
     },
     dateSelector: {
         flexDirection: 'row',
@@ -728,7 +880,7 @@ const styles = StyleSheet.create({
         elevation: 2,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: colors.border
+        borderColor: colors.border,
     },
     dateSelectorText: {
         flex: 1,
@@ -736,12 +888,75 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: colors.textDark,
-        textTransform: 'capitalize'
+        textTransform: 'capitalize',
+    },
+    paymentList: {
+        marginBottom: 12,
+    },
+    paymentCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 15,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: colors.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        elevation: 2,
+    },
+    paymentCardSelected: {
+        borderColor: colors.primary,
+        backgroundColor: '#F0F7FF',
+    },
+    paymentIconArea: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: colors.inputFill,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+    },
+    paymentTextArea: {
+        flex: 1,
+    },
+    paymentTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: colors.textDark,
+    },
+    paymentTitleSelected: {
+        color: colors.primary,
+    },
+    paymentDescription: {
+        fontSize: 13,
+        color: colors.secondary,
+        marginTop: 4,
+    },
+    paymentDescriptionSelected: {
+        color: colors.primary,
+    },
+    paymentInfoBox: {
+        backgroundColor: '#FFF4E5',
+        borderWidth: 1,
+        borderColor: '#FFE0B2',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 18,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    paymentInfoText: {
+        flex: 1,
+        color: '#8A6D3B',
+        fontSize: 13,
+        marginLeft: 8,
+        lineHeight: 18,
     },
     horariosGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'flex-start'
+        justifyContent: 'flex-start',
     },
     horaChip: {
         paddingVertical: 12,
@@ -751,7 +966,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         borderWidth: 1.5,
         alignItems: 'center',
-        minWidth: 80
+        minWidth: 80,
     },
     horaChipLivre: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
     horaChipTextLivre: { color: '#2E7D32', fontWeight: 'bold' },
@@ -769,7 +984,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         elevation: 2,
         borderWidth: 1,
-        borderColor: colors.border
+        borderColor: colors.border,
     },
     colabSelected: { borderColor: colors.primary, backgroundColor: '#F0F7FF' },
     colabDisabled: { opacity: 0.5, backgroundColor: '#F8F8F8' },
@@ -779,7 +994,7 @@ const styles = StyleSheet.create({
         borderRadius: 22.5,
         backgroundColor: colors.inputFill,
         justifyContent: 'center',
-        alignItems: 'center'
+        alignItems: 'center',
     },
     colabAvatarText: { fontWeight: 'bold', color: colors.primary },
     nomeColab: { fontWeight: 'bold', fontSize: 16, color: colors.textDark },
@@ -791,23 +1006,49 @@ const styles = StyleSheet.create({
         padding: 14,
         borderWidth: 1,
         borderColor: '#FFE0B2',
-        marginBottom: 12
+        marginBottom: 12,
     },
     emptyBoxText: { color: '#8A6D3B', fontSize: 14, textAlign: 'center' },
+    bottomSummaryCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        marginTop: 8,
+        elevation: 2,
+    },
+    bottomSummaryLabel: {
+        fontSize: 12,
+        color: colors.secondary,
+        fontWeight: '700',
+        marginBottom: 6,
+        letterSpacing: 0.8,
+    },
+    bottomSummaryValue: {
+        fontSize: 18,
+        color: colors.textDark,
+        fontWeight: 'bold',
+    },
+    bottomSummarySubtext: {
+        marginTop: 6,
+        fontSize: 13,
+        color: colors.secondary,
+    },
     footer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
         padding: 20,
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
     },
     btnFinal: {
         backgroundColor: colors.success,
         padding: 18,
         borderRadius: 15,
         alignItems: 'center',
-        elevation: 5
+        elevation: 5,
     },
     btnDisabled: { backgroundColor: '#CCC', elevation: 0 },
     btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 },
