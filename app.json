@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Conecta Solutions",
+    "slug": "conecta-solutions",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.conecta.servicos",
+      "supportsTablet": true,
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "Este app envia notificações sobre seus agendamentos."
+      }
+    },
+    "android": {
+      "package": "com.conecta.servicos",
+      "versionCode": 1,
+      "permissions": [
+        "NOTIFICATIONS",
+        "INTERNET"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-1699847314322523~2751920567",
+          "iosAppId": "ca-app-pub-1699847314322523~5827042986",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "Este identificador será usado para fornecer anúncios mais relevantes para você."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "082bf5fa-3281-4520-abf8-e85d25df2eb8"
+      }
+    },
+    "owner": "ivaldo_silva"
+  },
+  "owner": "ivaldo_silva"
+}

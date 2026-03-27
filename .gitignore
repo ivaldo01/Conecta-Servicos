@@ -1,0 +1,45 @@
+# --- DEPENDÊNCIAS ---
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# --- FIREBASE & SEGURANÇA (Importante) ---
+# O arquivo abaixo contém chaves privadas do seu projeto
+.eas/
+eas-build-pre-install.sh
+
+# --- ARQUIVOS NATIVOS GERADOS ---
+# Como você usa o EAS Build, estas pastas são geradas no servidor
+/ios
+/android
+
+# --- CHAVES E ASSINATURAS (Segurança Máxima) ---
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.orig.*
+
+# --- AMBIENTE E CONFIGURAÇÃO ---
+.env
+.env*.local
+.metro-health-check*
+
+# --- DEBUG E LOGS ---
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+logs/
+*.log
+
+# --- SISTEMA OPERACIONAL ---
+.DS_Store
+Thumbs.db
+
+# --- TYPESCRIPT ---
+*.tsbuildinfo
+firebase-auth.json.json

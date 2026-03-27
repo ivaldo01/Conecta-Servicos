@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaLogado() {
+      return request.auth != null;
+    }
+
+    function ehDono(userId) {
+      return estaLogado() && request.auth.uid == userId;
+    }
+
+    function ehProfissional(data) {
+      return data != null && (
+        data.tipo == "profissional" ||
+        data.perfil == "profissional" ||
+        data.tipoCadastroProfissional == "empresa" ||
+        data.tipoCadastroProfissional == "autonomo" ||
+        (data.cpfCnpj is string && data.cpfCnpj != "") ||
+        (data.cnpj is string && data.cnpj != "")
+      );
+    }
+
+    function podeLerPerfilProfissional() {
+      return estaLogado() && resource.data != null && ehProfissional(resource.data);
+    }
+
+    function participaDoAgendamento() {
+      return estaLogado() && resource.data != null && (
+        resource.data.clienteId == request.auth.uid ||
+        resource.data.clinicaId == request.auth.uid ||
+        resource.data.colaboradorId == request.auth.uid ||
+        resource.data.profissionalId == request.auth.uid
+      );
+    }
+
+    match /usuarios/{userId} {
+      allow read, write: if ehDono(userId);
+      allow read: if podeLerPerfilProfissional();
+
+      match /notificacoes/{notificacaoId} {
+        allow read: if ehDono(userId);
+        allow create: if estaLogado();
+        allow update, delete: if ehDono(userId);
+      }
+
+      match /favoritos/{favoritoId} {
+        allow read, write: if ehDono(userId);
+      }
+
+      match /servicos/{servicoId} {
+        allow read: if estaLogado();
+        allow write: if ehDono(userId);
+      }
+
+      match /configuracoes/{configId} {
+        allow read, write: if ehDono(userId);
+        allow read: if estaLogado() && configId == "agenda";
+      }
+
+      match /colaboradores/{colabId} {
+        allow read: if estaLogado();
+        allow write: if ehDono(userId);
+
+        match /configuracoes/{configId} {
+          allow read, write: if ehDono(userId);
+          allow read: if estaLogado() && configId == "agenda";
+        }
+      }
+
+      match /menores/{menorId} {
+        allow read, write: if ehDono(userId);
+      }
+    }
+
+    match /categorias/{categoriaId} {
+      allow read: if true;
+      allow write: if estaLogado();
+    }
+
+    match /agendamentos/{agendamentoId} {
+      allow create: if estaLogado();
+      allow read: if estaLogado();
+      allow update: if participaDoAgendamento();
+      allow delete: if false;
+    }
+
+    match /pagamentos/{pagamentoId} {
+      allow read: if estaLogado();
+
+      allow create: if estaLogado() && (
+        request.resource.data.profissionalId == request.auth.uid ||
+        request.resource.data.clinicaId == request.auth.uid ||
+        request.resource.data.colaboradorId == request.auth.uid
+      );
+
+      allow update: if estaLogado() && resource.data != null && (
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clinicaId == request.auth.uid ||
+        resource.data.colaboradorId == request.auth.uid ||
+        resource.data.clienteId == request.auth.uid
+      );
+
+      allow delete: if false;
+    }
+
+    match /saques/{saqueId} {
+      allow read: if estaLogado() && resource.data != null && (
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clinicaId == request.auth.uid ||
+        resource.data.colaboradorId == request.auth.uid
+      );
+
+      allow create: if estaLogado() && request.resource.data != null && (
+        request.resource.data.profissionalId == request.auth.uid ||
+        request.resource.data.clinicaId == request.auth.uid ||
+        request.resource.data.colaboradorId == request.auth.uid
+      );
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /avaliacoes/{avaliacaoId} {
+      allow read: if true;
+      allow create: if estaLogado();
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "agendamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clinicaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dataFiltro",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "agendamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clinicaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dataFiltro",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "colaboradorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "horario",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "agendamentos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "clinicaId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
