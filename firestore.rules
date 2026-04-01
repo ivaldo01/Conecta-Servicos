@@ -70,6 +70,7 @@ service cloud.firestore {
       }
 
       match /avaliacoes/{avaliacaoId} {
+  // Permite leitura pública das avaliações de profissionais
         allow read: if true;
         allow create: if estaLogado();
         allow update: if ehDono(userId);
