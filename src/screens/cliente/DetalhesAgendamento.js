@@ -179,7 +179,8 @@ export default function DetalhesAgendamento({ route, navigation }) {
         }
 
         try {
-            const avaliacaoRef = doc(db, "avaliacoes", agendamento.id);
+            const profissionalId = agendamento.colaboradorId || agendamento.clinicaId;
+            const avaliacaoRef = doc(db, "usuarios", profissionalId, "avaliacoes", agendamento.id);
             const avaliacaoSnap = await getDoc(avaliacaoRef);
             setJaAvaliado(avaliacaoSnap.exists());
         } catch (error) {
