@@ -172,9 +172,12 @@ export default function BuscaProfissionais({ navigation, route }) {
           id: d.id,
           ...d.data(),
         }));
+        console.log('[BuscaProfissionais] Profissionais carregados por tipo:', listaBase.length);
+      } else {
+        console.warn('[BuscaProfissionais] Nenhum profissional encontrado com tipo=profissional');
       }
     } catch (error) {
-      console.log("Erro ao carregar profissionais por tipo:", error);
+      console.error("Erro ao carregar profissionais por tipo:", error);
     }
 
     if (listaBase.length === 0) {
@@ -191,10 +194,17 @@ export default function BuscaProfissionais({ navigation, route }) {
             id: d.id,
             ...d.data(),
           }));
+          console.log('[BuscaProfissionais] Profissionais carregados por perfil:', listaBase.length);
+        } else {
+          console.warn('[BuscaProfissionais] Nenhum profissional encontrado com perfil=profissional');
         }
       } catch (error) {
-        console.log("Erro ao carregar profissionais por perfil:", error);
+        console.error("Erro ao carregar profissionais por perfil:", error);
       }
+    }
+
+    if (listaBase.length === 0) {
+      console.error('[BuscaProfissionais] ALERTA: Nenhum profissional foi encontrado no banco de dados');
     }
 
     return listaBase;
@@ -211,6 +221,12 @@ export default function BuscaProfissionais({ navigation, route }) {
         getDocs(collection(db, "avaliacoes")),
         user ? getDocs(collection(db, "usuarios", user.uid, "favoritos")) : Promise.resolve(null),
       ]);
+
+      console.log('[BuscaProfissionais] Dados carregados:', {
+        profissionaisCount: profissionaisBase.length,
+        avaliacoesCount: avaliacoesSnap.size,
+        favoritosCount: favoritosSnap?.size || 0,
+      });
 
       const avaliacoesAgrupadas = {};
 
@@ -275,9 +291,13 @@ export default function BuscaProfissionais({ navigation, route }) {
       if (ordenada.length > 0) {
         setSelectedPro(ordenada[0]);
       }
+
+      if (lista.length === 0) {
+        console.warn('[BuscaProfissionais] Nenhum profissional foi retornado da query');
+      }
     } catch (e) {
-      console.log("Erro ao carregar profissionais:", e);
-      Alert.alert("Erro", "Não foi possível carregar os profissionais.");
+      console.error("Erro ao carregar profissionais:", e);
+      Alert.alert("Erro", "Não foi possível carregar os profissionais. " + (e?.message || ''));
     } finally {
       setLoading(false);
     }

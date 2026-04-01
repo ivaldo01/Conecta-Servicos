@@ -320,6 +320,15 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
         bodyRequest.cliente.cpfCnpj = cliente.cpfCnpj;
     }
 
+    console.log('[gerarCobrancaAgendamento] Enviando request:', {
+        agendamentoId: agendamento.id,
+        valor,
+        formaPagamento,
+        descricao: `Pagamento do agendamento ${agendamento.id}`,
+        clienteEmail: cliente.email,
+        temCpf: !!cliente.cpfCnpj,
+    });
+
     const response = await fetch(`${BACKEND_URL}/api/createPayment`, {
         method: 'POST',
         headers: {
@@ -331,8 +340,14 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
     const data = await response.json();
 
     if (!response.ok) {
+        console.error('[gerarCobrancaAgendamento] Erro na resposta:', {
+            status: response.status,
+            error: data?.error,
+            errorMessage: data?.error?.errors?.[0]?.description || data?.error?.message,
+        });
         throw new Error(
             data?.error?.errors?.[0]?.description ||
+            data?.error?.message ||
             data?.error ||
             'Erro ao gerar cobrança'
         );
