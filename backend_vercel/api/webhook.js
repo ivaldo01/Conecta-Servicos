@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     }
 
     const { event, payment } = req.body;
-    
+
     // O externalReference é o ID do agendamento que enviamos ao criar a cobrança
     const agendamentoId = payment.externalReference;
 
@@ -31,11 +31,17 @@ module.exports = async (req, res) => {
         const agendamentoRef = db.collection('agendamentos').doc(agendamentoId);
         const pagamentoRef = db.collection('pagamentos').doc(agendamentoId);
 
+        console.log(`[Webhook] Processando evento: ${event} para agendamentoId: ${agendamentoId}`, {
+            paymentId: payment.id,
+            paymentStatus: payment.status,
+        });
+
         // Lógica baseada no evento recebido
         switch (event) {
             case 'PAYMENT_RECEIVED':
             case 'PAYMENT_CONFIRMED':
                 // Pagamento Confirmado
+                console.log('[Webhook] Atualizando status do pagamento para PAGO');
                 await pagamentoRef.update({
                     status: 'pago',
                     pagoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -48,10 +54,12 @@ module.exports = async (req, res) => {
                     statusPagamento: 'pago',
                     atualizadoEm: admin.firestore.FieldValue.serverTimestamp()
                 });
+                console.log('[Webhook] Pagamento marcado como PAGO com sucesso');
                 break;
 
             case 'PAYMENT_OVERDUE':
                 // Pagamento Vencido
+                console.log('[Webhook] Atualizando status do pagamento para VENCIDO');
                 await pagamentoRef.update({
                     status: 'vencido',
                     gatewayStatus: payment.status,
@@ -60,7 +68,9 @@ module.exports = async (req, res) => {
                 break;
 
             case 'PAYMENT_DELETED':
+            case 'PAYMENT_CANCELLED':
                 // Pagamento Deletado/Cancelado
+                console.log('[Webhook] Atualizando status do pagamento para CANCELADO');
                 await pagamentoRef.update({
                     status: 'cancelado',
                     gatewayStatus: payment.status,
@@ -69,14 +79,20 @@ module.exports = async (req, res) => {
                 break;
 
             default:
-                console.log(`[Webhook] Evento ignorado: ${event}`);
+                console.log(`[Webhook] Evento ignorado (não há handler): ${event}`);
                 break;
         }
 
+        console.log('[Webhook] Evento processado com sucesso');
         return res.status(200).json({ success: true });
 
     } catch (error) {
-        console.error('[Webhook] Erro ao processar:', error);
+        console.error('[Webhook] Erro ao processar:', {
+            agendamentoId,
+            event,
+            errorMessage: error.message,
+            stack: error.stack,
+        });
         return res.status(500).json({ error: 'Erro interno no servidor' });
     }
 };
