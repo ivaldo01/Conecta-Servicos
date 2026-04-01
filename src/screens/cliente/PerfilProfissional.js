@@ -115,7 +115,7 @@ export default function PerfilProfissional({ route, navigation }) {
       setServicos(listaServicos);
 
       const avaliacoesQuery = query(
-        collection(db, "avaliacoes"),
+        collection(db, "usuarios", proId, "avaliacoes"),
         where("profissionalId", "==", proId)
       );
 

@@ -253,22 +253,32 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
         atualizadoEm: serverTimestamp(),
     };
 
-    await setDoc(doc(db, 'pagamentos', agendamento.id), pagamento, { merge: true });
+    try {
+        await setDoc(doc(db, 'pagamentos', agendamento.id), pagamento, { merge: true });
+    } catch (err) {
+        console.error('[salvarPagamentoFirestore] Erro ao salvar pagamento:', err.message);
+        // Continua sem lançar erro para não quebrar fluxo do usuário
+    }
 
-    await setDoc(
-        doc(db, 'agendamentos', agendamento.id),
-        {
-            pagamentoId: agendamento.id,
-            cobrancaGerada: true,
-            cobrancaGeradaEm: serverTimestamp(),
-            formaPagamento,
-            formaPagamentoLabel,
-            statusPagamento: STATUS_PAGAMENTO.GERADA,
-            gatewayPagamento: 'asaas',
-            atualizadoEm: serverTimestamp(),
-        },
-        { merge: true }
-    );
+    try {
+        await setDoc(
+            doc(db, 'agendamentos', agendamento.id),
+            {
+                pagamentoId: agendamento.id,
+                cobrancaGerada: true,
+                cobrancaGeradaEm: serverTimestamp(),
+                formaPagamento,
+                formaPagamentoLabel,
+                statusPagamento: STATUS_PAGAMENTO.GERADA,
+                gatewayPagamento: 'asaas',
+                atualizadoEm: serverTimestamp(),
+            },
+            { merge: true }
+        );
+    } catch (err) {
+        console.error('[salvarPagamentoFirestore] Erro ao atualizar agendamento:', err.message);
+        // Não propaga erro para manter UX estável em caso de regras restritivas
+    }
 
     return pagamento;
 }
