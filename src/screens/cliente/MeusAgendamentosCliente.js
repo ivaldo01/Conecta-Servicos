@@ -604,6 +604,23 @@ export default function MeusAgendamentosCliente({ navigation }) {
                 </Text>
             </View>
 
+            <View style={styles.summaryCard}>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{contagemPorStatus.todos}</Text>
+                    <Text style={styles.summaryLabel}>Total</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                    <Text style={[styles.summaryValue, { color: '#D97706' }]}>{contagemPorStatus.pendente}</Text>
+                    <Text style={styles.summaryLabel}>Pendentes</Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                    <Text style={[styles.summaryValue, { color: colors.primary }]}>{contagemPorStatus.confirmado}</Text>
+                    <Text style={styles.summaryLabel}>Confirmados</Text>
+                </View>
+            </View>
+
             <View style={styles.filtrosWrapper}>
                 <ScrollView
                     horizontal
@@ -637,25 +654,72 @@ export default function MeusAgendamentosCliente({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F0F3F8',
     },
 
     headerArea: {
         paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 12,
+        paddingTop: 12,
+        paddingBottom: 18,
+        backgroundColor: colors.primary,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
 
     title: {
         fontSize: 24,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#FFF',
     },
 
     subtitle: {
         fontSize: 14,
-        color: colors.secondary,
+        color: 'rgba(255,255,255,0.84)',
         marginTop: 4,
+    },
+
+    summaryCard: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 10,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        paddingVertical: 16,
+        paddingHorizontal: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+    },
+
+    summaryItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+
+    summaryValue: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: colors.textDark,
+    },
+
+    summaryLabel: {
+        marginTop: 4,
+        fontSize: 12,
+        color: colors.secondary,
+        fontWeight: '700',
+    },
+
+    summaryDivider: {
+        width: 1,
+        height: 34,
+        backgroundColor: '#E8EDF5',
     },
 
     filtrosWrapper: {
@@ -669,11 +733,13 @@ const styles = StyleSheet.create({
     },
 
     filtroChip: {
-        backgroundColor: '#EEF1F4',
+        backgroundColor: '#FFF',
         paddingHorizontal: 14,
         paddingVertical: 10,
         borderRadius: 20,
         marginRight: 10,
+        borderWidth: 1,
+        borderColor: '#E4EAF2',
     },
 
     filtroChipAtivo: {
@@ -701,13 +767,13 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 18,
         marginBottom: 14,
-        elevation: 2,
+        elevation: 3,
         shadowColor: '#000',
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
         borderWidth: 1,
-        borderColor: '#EEF1F4',
+        borderColor: '#E8EDF5',
     },
 
     topRow: {

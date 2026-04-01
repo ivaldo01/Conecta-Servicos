@@ -15,6 +15,7 @@ import {
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
 import { Ionicons } from '@expo/vector-icons';
+import NetInfo from "@react-native-community/netinfo";
 import {
   collection,
   doc,
@@ -210,7 +211,7 @@ function QuickStatCard({ label, value, icon, color, onPress }) {
 
 function SlideCard({ item, onPress }) {
   return (
-    <View style={[styles.slideCard, { width: CLIENT_SLIDE_WIDTH, height: 250 }]}>
+    <View style={[styles.slideCard, { width: CLIENT_SLIDE_WIDTH, height: 290 }]}>
       <View style={styles.slideDecorCircleOne} />
       <View style={styles.slideDecorCircleTwo} />
 
@@ -221,8 +222,8 @@ function SlideCard({ item, onPress }) {
             <Text style={styles.slideMiniBadgeText}>Conecta Solutions</Text>
           </View>
 
-          <Text style={styles.slideTitle}>{item.title}</Text>
-          <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
+          <Text style={styles.slideTitle} numberOfLines={3}>{item.title}</Text>
+          <Text style={styles.slideSubtitle} numberOfLines={3}>{item.subtitle}</Text>
 
           <TouchableOpacity style={styles.slideButton} activeOpacity={0.92} onPress={onPress}>
             <Text style={styles.slideButtonText}>{item.cta}</Text>
@@ -248,10 +249,19 @@ export default function HomeScreen({ navigation }) {
   const [favoritosIds, setFavoritosIds] = useState([]);
   const [totalNotificacoesNaoLidas, setTotalNotificacoesNaoLidas] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
 
   const slidesRef = useRef(null);
   const primeiroNome = getPrimeiroNome(usuario?.nome);
   const statsAtuais = useMemo(() => FALLBACK_STATS_CLIENTE, []);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOffline(!state.isConnected);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const carregarTudo = useCallback(async () => {
     try {
@@ -592,6 +602,12 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.wrapper}>
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#FFF" />
+          <Text style={styles.offlineTextBanner}>Você está offline. Algumas informações podem estar desatualizadas.</Text>
+        </View>
+      )}
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
@@ -601,6 +617,9 @@ export default function HomeScreen({ navigation }) {
         }
       >
         <View style={styles.header}>
+          <View style={styles.headerCircle} />
+          <View style={styles.headerCircleTwo} />
+
           <View style={styles.headerBrandBlock}>
             <Image source={logo} style={styles.logo} />
             <View>
@@ -615,7 +634,7 @@ export default function HomeScreen({ navigation }) {
               activeOpacity={0.9}
               onPress={() => navigation.navigate('Notificacoes')}
             >
-              <Ionicons name="notifications-outline" size={22} color={colors.textDark} />
+              <Ionicons name="notifications-outline" size={22} color="#FFF" />
 
               {totalNotificacoesNaoLidas > 0 && (
                 <View style={styles.notificationBadge}>
@@ -631,7 +650,7 @@ export default function HomeScreen({ navigation }) {
               activeOpacity={0.9}
               onPress={abrirPerfilCliente}
             >
-              <Ionicons name="person-outline" size={22} color={colors.textDark} />
+              <Ionicons name="person-outline" size={22} color="#FFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -673,13 +692,11 @@ export default function HomeScreen({ navigation }) {
               <NativeAdCard
                 key={item.id}
                 width={CLIENT_SLIDE_WIDTH}
-                height={250}
+                height={280}
               />
             )
           )}
         </ScrollView>
-
-        <AdBanner />
 
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
@@ -712,6 +729,8 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
         </View>
+
+        <AdBanner />
 
         <View style={styles.sectionHeader}>
           <View>
@@ -828,7 +847,24 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#F5F7FB',
+    backgroundColor: '#F0F3F8',
+  },
+
+  offlineBanner: {
+    backgroundColor: '#EF4444',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  offlineTextBanner: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 8,
+    textAlign: 'center',
   },
 
   container: {
@@ -844,7 +880,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F7FB',
+    backgroundColor: '#EEF3F9',
   },
 
   loadingText: {
@@ -858,43 +894,76 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 18,
+    backgroundColor: colors.primary,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+
+  headerCircle: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -34,
+    right: -18,
+  },
+
+  headerCircleTwo: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -18,
+    left: -10,
   },
 
   headerBrandBlock: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    zIndex: 2,
   },
 
   logo: {
-    width: 48,
-    height: 48,
+    width: 50,
+    height: 50,
     borderRadius: 14,
     marginRight: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
 
   helloText: {
     fontSize: 13,
-    color: colors.secondary,
+    color: 'rgba(255,255,255,0.80)',
     marginBottom: 2,
   },
 
   pageTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.textDark,
+    color: '#FFF',
   },
 
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    zIndex: 2,
   },
 
   notificationButton: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -912,6 +981,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
 
   notificationBadgeText: {
@@ -924,7 +995,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -937,6 +1008,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 56,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E4EAF2',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
 
   searchInput: {
@@ -1186,6 +1264,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: 'center',
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
 
   categoryIconBox: {
@@ -1211,6 +1296,8 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 18,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   emptyText: {
@@ -1226,6 +1313,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.05)',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
 
   featureIconCircle: {
@@ -1260,6 +1354,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   profCard: {
@@ -1270,6 +1366,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginRight: 12,
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
 
   profTopRow: {

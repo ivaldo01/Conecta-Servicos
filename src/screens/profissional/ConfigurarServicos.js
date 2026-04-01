@@ -14,7 +14,7 @@ import {
     Keyboard,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
-import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, getDoc } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import CustomButton from '../../components/CustomButton';
@@ -25,8 +25,21 @@ export default function ConfigurarServicos() {
     const [servicos, setServicos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [salvando, setSalvando] = useState(false);
+    const [perfilUsuario, setPerfilUsuario] = useState(null);
 
     const precoRef = useRef(null);
+    const ehColaborador = perfilUsuario?.perfil === 'colaborador';
+
+    const formatarMoedaInput = (valor) => {
+        // Remove tudo que não é número
+        let cleanValue = valor.replace(/\D/g, "");
+
+        // Converte para número e divide por 100 para ter as casas decimais
+        let numberValue = (Number(cleanValue) / 100).toFixed(2);
+
+        // Formata para o padrão brasileiro de input (ponto como separador interno para o Firestore)
+        return numberValue;
+    };
 
     useEffect(() => {
         carregarServicos();
@@ -37,11 +50,26 @@ export default function ConfigurarServicos() {
         if (!user) return;
 
         try {
-            const querySnapshot = await getDocs(collection(db, "usuarios", user.uid, "servicos"));
-            const lista = querySnapshot.docs.map((docSnap) => ({
+            const perfilSnap = await getDoc(doc(db, "usuarios", user.uid));
+            const dadosPerfil = perfilSnap.exists() ? perfilSnap.data() : {};
+            setPerfilUsuario(dadosPerfil);
+
+            const ehSubconta = dadosPerfil?.perfil === 'colaborador';
+            const ownerId = ehSubconta ? (dadosPerfil?.clinicaId || user.uid) : user.uid;
+            const servicosHabilitados = Array.isArray(dadosPerfil?.servicosHabilitados)
+                ? dadosPerfil.servicosHabilitados
+                : [];
+
+            const querySnapshot = await getDocs(collection(db, "usuarios", ownerId, "servicos"));
+            let lista = querySnapshot.docs.map((docSnap) => ({
                 id: docSnap.id,
                 ...docSnap.data(),
             }));
+
+            if (ehSubconta && servicosHabilitados.length > 0) {
+                lista = lista.filter((item) => servicosHabilitados.includes(item.id));
+            }
+
             setServicos(lista);
         } catch (error) {
             Alert.alert("Erro", "Não foi possível carregar os serviços.");
@@ -54,6 +82,12 @@ export default function ConfigurarServicos() {
         Keyboard.dismiss();
 
         const user = auth.currentUser;
+
+        if (ehColaborador) {
+            Alert.alert("Acesso restrito", "Os serviços da sua subconta são definidos pela conta principal.");
+            return;
+        }
+
         if (!nomeServico.trim() || !preco.trim()) {
             Alert.alert("Atenção", "Preencha o nome do serviço e o preço.");
             return;
@@ -90,6 +124,11 @@ export default function ConfigurarServicos() {
     const confirmarExclusao = (id) => {
         Keyboard.dismiss();
 
+        if (ehColaborador) {
+            Alert.alert("Acesso restrito", "Somente a conta principal pode remover ou alterar os serviços.");
+            return;
+        }
+
         Alert.alert(
             "Excluir Serviço",
             "Deseja remover este serviço do seu catálogo?",
@@ -125,12 +164,14 @@ export default function ConfigurarServicos() {
                     </Text>
                 </View>
 
-                <TouchableOpacity
-                    onPress={() => confirmarExclusao(item.id)}
-                    style={styles.deleteBtn}
-                >
-                    <Ionicons name="trash-outline" size={22} color={colors.danger} />
-                </TouchableOpacity>
+                {!ehColaborador && (
+                    <TouchableOpacity
+                        onPress={() => confirmarExclusao(item.id)}
+                        style={styles.deleteBtn}
+                    >
+                        <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -144,47 +185,67 @@ export default function ConfigurarServicos() {
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View style={styles.container}>
                     <View style={styles.header}>
-                        <Text style={styles.title}>Configurar Serviços</Text>
+                        <Text style={styles.title}>{ehColaborador ? 'Serviços liberados' : 'Configurar Serviços'}</Text>
                         <Text style={styles.subtitle}>
-                            Gerencie seu catálogo de serviços e preços
+                            {ehColaborador
+                                ? 'Consulte os serviços definidos pela conta principal para a sua subconta'
+                                : 'Gerencie seu catálogo de serviços e preços'}
                         </Text>
                     </View>
 
-                    <View style={styles.form}>
-                        <Text style={styles.label}>Novo Serviço</Text>
+                    {ehColaborador ? (
+                        <View style={styles.noticeCard}>
+                            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.noticeTitle}>Edição bloqueada para colaborador</Text>
+                                <Text style={styles.noticeText}>
+                                    Serviços e preços são controlados pela conta principal. Aqui você pode apenas consultar o que foi liberado para o seu atendimento.
+                                </Text>
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={styles.form}>
+                            <Text style={styles.label}>Novo Serviço</Text>
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nome (ex: Corte Masculino)"
-                            placeholderTextColor="#999"
-                            value={nomeServico}
-                            onChangeText={setNomeServico}
-                            returnKeyType="next"
-                            onSubmitEditing={() => precoRef.current?.focus()}
-                        />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nome (ex: Corte Masculino)"
+                                placeholderTextColor="#999"
+                                value={nomeServico}
+                                onChangeText={setNomeServico}
+                                returnKeyType="next"
+                                onSubmitEditing={() => precoRef.current?.focus()}
+                            />
 
-                        <TextInput
-                            ref={precoRef}
-                            style={styles.input}
-                            placeholder="Preço (ex: 45.00)"
-                            placeholderTextColor="#999"
-                            value={preco}
-                            onChangeText={setPreco}
-                            keyboardType="numeric"
-                            returnKeyType="done"
-                            onSubmitEditing={handleAddServico}
-                        />
+                            <TextInput
+                                ref={precoRef}
+                                style={styles.input}
+                                placeholder="Preço (ex: 45.00)"
+                                placeholderTextColor="#999"
+                                value={preco}
+                                onChangeText={(val) => {
+                                    // Máscara simples: permite apenas números e um ponto
+                                    const formatted = val.replace(/[^0-9.]/g, '');
+                                    setPreco(formatted);
+                                }}
+                                keyboardType="decimal-pad"
+                                returnKeyType="done"
+                                onSubmitEditing={handleAddServico}
+                            />
 
-                        <CustomButton
-                            title={salvando ? "Salvando..." : "Adicionar ao Catálogo"}
-                            onPress={handleAddServico}
-                            color={colors.primary}
-                            disabled={salvando}
-                        />
-                    </View>
+                            <CustomButton
+                                title={salvando ? "Salvando..." : "Adicionar ao Catálogo"}
+                                onPress={handleAddServico}
+                                color={colors.primary}
+                                disabled={salvando}
+                            />
+                        </View>
+                    )}
 
                     <View style={styles.listSection}>
-                        <Text style={styles.listTitle}>Seus Serviços ({servicos.length})</Text>
+                        <Text style={styles.listTitle}>
+                            {ehColaborador ? `Serviços disponíveis para você (${servicos.length})` : `Seus Serviços (${servicos.length})`}
+                        </Text>
 
                         {loading ? (
                             <ActivityIndicator
@@ -200,7 +261,11 @@ export default function ConfigurarServicos() {
                                 showsVerticalScrollIndicator={false}
                                 contentContainerStyle={styles.listContent}
                                 ListEmptyComponent={
-                                    <Text style={styles.empty}>Nenhum serviço disponível.</Text>
+                                    <Text style={styles.empty}>
+                                        {ehColaborador
+                                            ? 'Nenhum serviço foi liberado pela conta principal ainda.'
+                                            : 'Nenhum serviço disponível.'}
+                                    </Text>
                                 }
                                 keyboardShouldPersistTaps="handled"
                                 keyboardDismissMode="on-drag"
@@ -216,62 +281,99 @@ export default function ConfigurarServicos() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        backgroundColor: '#F0F3F8',
     },
 
     header: {
-        padding: 25,
-        paddingTop: 60,
-        backgroundColor: '#FFF',
+        padding: 20,
+        paddingTop: 52,
+        backgroundColor: colors.primary,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        marginBottom: 8,
     },
 
     title: {
         fontSize: 24,
-        fontWeight: 'bold',
-        color: colors.textDark,
+        fontWeight: '800',
+        color: '#FFF',
     },
 
     subtitle: {
         fontSize: 14,
-        color: colors.secondary,
+        color: 'rgba(255,255,255,0.82)',
         marginTop: 4,
     },
 
     form: {
         backgroundColor: '#FFF',
-        padding: 20,
-        margin: 20,
-        borderRadius: 20,
+        padding: 18,
+        marginHorizontal: 16,
+        marginTop: -6,
+        marginBottom: 16,
+        borderRadius: 22,
         elevation: 4,
         shadowColor: '#000',
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
+    },
+
+    noticeCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        backgroundColor: '#FFF',
+        padding: 16,
+        marginHorizontal: 16,
+        marginTop: -6,
+        marginBottom: 16,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#D9E7FF',
+    },
+
+    noticeTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: '#1F3B73',
+        marginBottom: 4,
+    },
+
+    noticeText: {
+        fontSize: 13,
+        color: '#5E6B7A',
+        lineHeight: 18,
     },
 
     label: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: colors.textDark,
-        marginBottom: 10,
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#5C6470',
+        marginBottom: 8,
     },
 
     input: {
-        backgroundColor: '#F1F3F5',
-        padding: 15,
-        borderRadius: 12,
-        fontSize: 16,
+        backgroundColor: '#F8FAFD',
+        padding: 14,
+        borderRadius: 14,
+        fontSize: 15,
         marginBottom: 15,
         color: '#333',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
 
     listSection: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
     },
 
     listTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '800',
         color: colors.textDark,
         marginBottom: 15,
     },
@@ -286,13 +388,16 @@ const styles = StyleSheet.create({
 
     card: {
         backgroundColor: '#FFF',
-        borderRadius: 16,
+        borderRadius: 18,
         marginBottom: 12,
         padding: 16,
-        elevation: 2,
+        elevation: 3,
         shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
     },
 
     cardContent: {
@@ -333,8 +438,13 @@ const styles = StyleSheet.create({
 
     empty: {
         textAlign: 'center',
-        color: '#999',
+        color: '#7A8596',
         marginTop: 30,
         fontSize: 14,
+        backgroundColor: '#FFF',
+        padding: 18,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
     },
 });

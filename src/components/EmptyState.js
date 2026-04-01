@@ -10,7 +10,9 @@ export default function EmptyState({
 }) {
     return (
         <View style={styles.container}>
-            <Ionicons name={icon} size={46} color={colors.secondary} />
+            <View style={styles.iconWrap}>
+                <Ionicons name={icon} size={34} color={colors.primary} />
+            </View>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
@@ -22,18 +24,32 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 24,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
+    },
+    iconWrap: {
+        width: 68,
+        height: 68,
+        borderRadius: 22,
+        backgroundColor: '#EEF3FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
     },
     title: {
         marginTop: 10,
-        fontSize: 17,
-        fontWeight: 'bold',
-        color: '#333',
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.textDark,
+        textAlign: 'center',
     },
     subtitle: {
         marginTop: 6,
         fontSize: 14,
-        color: '#777',
+        color: '#6B7280',
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 21,
     },
 });

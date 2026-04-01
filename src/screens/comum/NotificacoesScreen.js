@@ -231,10 +231,7 @@ export default function NotificacoesScreen({ navigation }) {
     };
 
     const abrirTelaMain = (screen, params = {}) => {
-        navigation.navigate('Main', {
-            screen,
-            params,
-        });
+        navigation.navigate(screen, params);
     };
 
     const abrirDetalhesAgendamentoCliente = async (item) => {
@@ -305,7 +302,7 @@ export default function NotificacoesScreen({ navigation }) {
     };
 
     const abrirRelatoriosProfissional = async () => {
-        abrirTelaMain('FinanceiroPro');
+        abrirTelaMain('RelatoriosPro');
     };
 
     const abrirDestinoNotificacao = async (item) => {
@@ -581,7 +578,7 @@ export default function NotificacoesScreen({ navigation }) {
                     onPress={() => navigation.goBack()}
                     activeOpacity={0.88}
                 >
-                    <Ionicons name="arrow-back" size={20} color={colors.textDark} />
+                    <Ionicons name="arrow-back" size={20} color="#FFF" />
                 </TouchableOpacity>
 
                 <View style={styles.headerText}>
@@ -671,23 +668,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 14,
+        paddingTop: 10,
+        paddingBottom: 18,
+        backgroundColor: colors.primary,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        marginBottom: 8,
     },
 
     backButton: {
         width: 42,
         height: 42,
         borderRadius: 14,
-        backgroundColor: '#FFF',
+        backgroundColor: 'rgba(255,255,255,0.18)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
     },
 
     headerText: {
@@ -697,12 +693,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#FFF',
     },
 
     subtitle: {
         fontSize: 14,
-        color: colors.secondary,
+        color: 'rgba(255,255,255,0.82)',
         marginTop: 4,
     },
 
@@ -710,14 +706,19 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         marginBottom: 12,
         backgroundColor: '#FFF',
-        borderRadius: 18,
+        borderRadius: 20,
         paddingVertical: 16,
         paddingHorizontal: 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#EEF1F4',
+        borderColor: '#E8EDF5',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
     },
 
     summaryItem: {
@@ -786,6 +787,11 @@ const styles = StyleSheet.create({
         paddingVertical: 11,
         flexDirection: 'row',
         alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
     },
 
     markAllButtonDisabled: {
@@ -812,9 +818,13 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        elevation: 2,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
         borderWidth: 1,
-        borderColor: '#EEF1F4',
+        borderColor: '#E8EDF5',
     },
 
     cardNaoLida: {

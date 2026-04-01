@@ -587,12 +587,15 @@ export default function BuscaProfissionais({ navigation, route }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topArea}>
+        <View style={styles.topAreaCircleOne} />
+        <View style={styles.topAreaCircleTwo} />
+
         <View style={styles.topRow}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.textDark} />
+            <Ionicons name="arrow-back" size={22} color="#FFF" />
           </TouchableOpacity>
 
           <View style={styles.titleArea}>
@@ -858,35 +861,55 @@ export default function BuscaProfissionais({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F8FA',
+    backgroundColor: '#EEF3F9',
   },
 
   topArea: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 14,
-    backgroundColor: '#F7F8FA',
+    paddingTop: 10,
+    paddingBottom: 18,
+    backgroundColor: colors.primary,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+
+  topAreaCircleOne: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -36,
+    right: -20,
+  },
+
+  topAreaCircleTwo: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    bottom: -16,
+    left: -10,
   },
 
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 14,
+    zIndex: 2,
   },
 
   backButton: {
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
   },
 
   titleArea: {
@@ -896,27 +919,30 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.textDark,
+    color: '#FFF',
   },
 
   pageSubtitle: {
     marginTop: 2,
     fontSize: 13,
-    color: colors.secondary,
+    color: 'rgba(255,255,255,0.84)',
   },
 
   searchBox: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 18,
     paddingHorizontal: 16,
     height: 56,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     elevation: 3,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E4EAF2',
+    zIndex: 2,
   },
 
   input: {
@@ -952,14 +978,17 @@ const styles = StyleSheet.create({
   },
 
   heroSection: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#1E2535',
     borderRadius: 22,
     padding: 18,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EEF1F4',
+    shadowColor: '#1E2535',
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 
   heroLeft: {
@@ -970,21 +999,21 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: colors.textDark,
+    color: '#FFF',
     marginBottom: 6,
   },
 
   heroDescription: {
     fontSize: 13,
     lineHeight: 20,
-    color: colors.secondary,
+    color: 'rgba(255,255,255,0.84)',
   },
 
   heroIconBox: {
     width: 60,
     height: 60,
     borderRadius: 18,
-    backgroundColor: `${colors.primary}12`,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1020,7 +1049,12 @@ const styles = StyleSheet.create({
     padding: 14,
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#EEF1F4',
+    borderColor: '#E8EDF5',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
 
   quickCardSelected: {
@@ -1086,11 +1120,13 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: 'hidden',
     elevation: 8,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOpacity: 0.10,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
     marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   proCardBannerArea: {
@@ -1271,16 +1307,17 @@ const styles = StyleSheet.create({
 
   resultsSection: {
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderRadius: 26,
     paddingTop: 16,
     paddingHorizontal: 16,
     paddingBottom: 12,
-    elevation: 10,
+    elevation: 6,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   resultsHeader: {
@@ -1321,8 +1358,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#EEF1F4',
+    borderColor: '#E8EDF5',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
 
   resultCardSelected: {

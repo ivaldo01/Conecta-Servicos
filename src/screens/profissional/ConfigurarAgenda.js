@@ -21,12 +21,14 @@ export default function ConfigurarAgenda({ route }) {
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [diasSelecionados, setDiasSelecionados] = useState([]);
+  const [perfilUsuario, setPerfilUsuario] = useState(null);
 
   const [horaInicio, setHoraInicio] = useState("08:00");
   const [horaFim, setHoraFim] = useState("18:00");
   const [intervaloMinutos, setIntervaloMinutos] = useState(60);
 
   const user = auth.currentUser;
+  const ehColaborador = perfilUsuario?.perfil === 'colaborador' && !colaboradorId;
 
   const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
   const intervalosDisponiveis = [15, 30, 45, 60];
@@ -82,11 +84,23 @@ export default function ConfigurarAgenda({ route }) {
 
     setLoading(true);
     try {
-      const docRef = colaboradorId
-        ? doc(db, "usuarios", user.uid, "colaboradores", colaboradorId, "configuracoes", "agenda")
-        : doc(db, "usuarios", user.uid, "configuracoes", "agenda");
+      const perfilSnap = await getDoc(doc(db, "usuarios", user.uid));
+      const dadosPerfil = perfilSnap.exists() ? perfilSnap.data() : {};
+      setPerfilUsuario(dadosPerfil);
 
-      const snap = await getDoc(docRef);
+      const ehSubconta = dadosPerfil?.perfil === 'colaborador' && !colaboradorId;
+      const donoAgendaId = ehSubconta ? (dadosPerfil?.clinicaId || user.uid) : user.uid;
+      const agendaColaboradorId = colaboradorId || (ehSubconta ? user.uid : null);
+
+      let docRef = agendaColaboradorId
+        ? doc(db, "usuarios", donoAgendaId, "colaboradores", agendaColaboradorId, "configuracoes", "agenda")
+        : doc(db, "usuarios", donoAgendaId, "configuracoes", "agenda");
+
+      let snap = await getDoc(docRef);
+
+      if (!snap.exists() && ehSubconta && dadosPerfil?.clinicaId) {
+        snap = await getDoc(doc(db, "usuarios", dadosPerfil.clinicaId, "configuracoes", "agenda"));
+      }
 
       if (snap.exists()) {
         const data = snap.data();
@@ -128,6 +142,11 @@ export default function ConfigurarAgenda({ route }) {
   const salvarAgenda = async () => {
     if (!user) {
       Alert.alert("Erro", "Usuário não autenticado.");
+      return;
+    }
+
+    if (ehColaborador) {
+      Alert.alert("Acesso restrito", "A disponibilidade e a escala são definidas pela conta principal.");
       return;
     }
 
@@ -189,12 +208,30 @@ export default function ConfigurarAgenda({ route }) {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>
-          {colaboradorNome ? `Agenda de ${colaboradorNome}` : "Minha Agenda Geral"}
+          {ehColaborador
+            ? 'Minha agenda de atendimento'
+            : colaboradorNome
+              ? `Agenda de ${colaboradorNome}`
+              : "Minha Agenda Geral"}
         </Text>
         <Text style={styles.subtitle}>
-          Defina os dias, horário inicial, horário final e intervalo dos atendimentos.
+          {ehColaborador
+            ? 'Sua disponibilidade é definida pela conta principal. Consulte abaixo os horários liberados para você.'
+            : 'Defina os dias, horário inicial, horário final e intervalo dos atendimentos.'}
         </Text>
       </View>
+
+      {ehColaborador && (
+        <View style={styles.noticeCard}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.noticeTitle}>Consulta somente leitura</Text>
+            <Text style={styles.noticeText}>
+              Alterações em agenda, escala e disponibilidade são feitas pela conta principal da empresa.
+            </Text>
+          </View>
+        </View>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>
@@ -202,15 +239,27 @@ export default function ConfigurarAgenda({ route }) {
         </Text>
 
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickBtn} onPress={selecionarDiasUteis}>
+          <TouchableOpacity
+            style={[styles.quickBtn, ehColaborador && styles.disabledAction]}
+            onPress={selecionarDiasUteis}
+            disabled={ehColaborador}
+          >
             <Text style={styles.quickBtnText}>Seg a Sex</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickBtn} onPress={selecionarTodosDias}>
+          <TouchableOpacity
+            style={[styles.quickBtn, ehColaborador && styles.disabledAction]}
+            onPress={selecionarTodosDias}
+            disabled={ehColaborador}
+          >
             <Text style={styles.quickBtnText}>Todos</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickBtnDanger} onPress={limparDias}>
+          <TouchableOpacity
+            style={[styles.quickBtnDanger, ehColaborador && styles.disabledAction]}
+            onPress={limparDias}
+            disabled={ehColaborador}
+          >
             <Text style={styles.quickBtnDangerText}>Limpar</Text>
           </TouchableOpacity>
         </View>
@@ -222,8 +271,10 @@ export default function ConfigurarAgenda({ route }) {
               style={[
                 styles.diaBox,
                 diasSelecionados.includes(index) && styles.boxSelected,
+                ehColaborador && styles.disabledAction,
               ]}
               onPress={() => toggleDia(index)}
+              disabled={ehColaborador}
             >
               <Text
                 style={[
@@ -251,6 +302,7 @@ export default function ConfigurarAgenda({ route }) {
             style={styles.picker}
             dropdownIconColor={colors.primary}
             itemStyle={styles.pickerItem}
+            enabled={!ehColaborador}
           >
             {listaHorariosDisponiveis.map((hora) => (
               <Picker.Item
@@ -271,6 +323,7 @@ export default function ConfigurarAgenda({ route }) {
             style={styles.picker}
             dropdownIconColor={colors.primary}
             itemStyle={styles.pickerItem}
+            enabled={!ehColaborador}
           >
             {listaHorariosDisponiveis.map((hora) => (
               <Picker.Item
@@ -291,6 +344,7 @@ export default function ConfigurarAgenda({ route }) {
             style={styles.picker}
             dropdownIconColor={colors.primary}
             itemStyle={styles.pickerItem}
+            enabled={!ehColaborador}
           >
             {intervalosDisponiveis.map((intervalo) => (
               <Picker.Item
@@ -330,17 +384,19 @@ export default function ConfigurarAgenda({ route }) {
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.btnSalvar, { opacity: salvando ? 0.7 : 1 }]}
-        onPress={salvarAgenda}
-        disabled={salvando}
-      >
-        {salvando ? (
-          <ActivityIndicator color="#FFF" />
-        ) : (
-          <Text style={styles.btnText}>SALVAR CONFIGURAÇÕES</Text>
-        )}
-      </TouchableOpacity>
+      {!ehColaborador && (
+        <TouchableOpacity
+          style={[styles.btnSalvar, { opacity: salvando ? 0.7 : 1 }]}
+          onPress={salvarAgenda}
+          disabled={salvando}
+        >
+          {salvando ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.btnText}>SALVAR CONFIGURAÇÕES</Text>
+          )}
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -376,6 +432,33 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 20,
     elevation: 1,
+  },
+
+  noticeCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FFF',
+    marginHorizontal: 15,
+    marginTop: 15,
+    marginBottom: 0,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#D9E7FF',
+  },
+
+  noticeTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F3B73',
+    marginBottom: 4,
+  },
+
+  noticeText: {
+    fontSize: 13,
+    color: '#5E6B7A',
+    lineHeight: 18,
   },
 
   sectionTitle: {
@@ -421,6 +504,10 @@ const styles = StyleSheet.create({
     color: '#D9534F',
     fontWeight: 'bold',
     fontSize: 13,
+  },
+
+  disabledAction: {
+    opacity: 0.55,
   },
 
   diasContainer: {

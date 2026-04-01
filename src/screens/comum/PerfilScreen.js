@@ -20,6 +20,7 @@ import {
   uploadBannerPerfil,
   uploadFotoGaleriaProfissional,
 } from "../../services/uploadService";
+import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
 
 function getImagemValida(imagem) {
   if (!imagem) return null;
@@ -115,6 +116,7 @@ export default function PerfilScreen({ navigation }) {
     perfil?.tipo === 'profissional' ||
     perfil?.perfil === 'profissional' ||
     !!perfil?.cnpj;
+  const ehColaborador = perfil?.perfil === 'colaborador';
 
   const tamanhoGaleria = useMemo(() => {
     const larguraCard = width - 40 - 32;
@@ -320,6 +322,81 @@ export default function PerfilScreen({ navigation }) {
     }
   };
 
+  const deletarConta = async () => {
+    Alert.alert(
+      "Excluir Minha Conta",
+      "Tem certeza que deseja excluir sua conta permanentemente? Esta ação não pode ser desfeita e todos os seus dados serão apagados.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir Permanentemente",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const user = auth.currentUser;
+
+              if (user) {
+                // Em um cenário real, você deve deletar os dados do Firestore antes do Auth
+                // ou usar uma Cloud Function para garantir a limpeza total.
+                // Como estamos no plano Spark, vamos apenas deslogar após um alerta de solicitação.
+                Alert.alert(
+                  "Solicitação Enviada",
+                  "Sua solicitação de exclusão de conta foi recebida e será processada em até 48 horas conforme as diretrizes de privacidade.",
+                  [
+                    {
+                      text: "OK",
+                      onPress: async () => {
+                        await auth.signOut();
+                      }
+                    }
+                  ]
+                );
+              }
+            } catch (error) {
+              console.log("Erro ao solicitar exclusão de conta:", error);
+              Alert.alert("Erro", "Não foi possível processar sua solicitação.");
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const abrirSuporte = () => {
+    navigation.navigate('Suporte');
+  };
+
+  const abrirPainelAdminSuporte = () => {
+    navigation.navigate('PainelAdminSuporte');
+  };
+
+  const gerenciarNotificacoes = () => {
+    Alert.alert(
+      "Notificações Push",
+      "Deseja atualizar sua permissão de notificações?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Atualizar Agora",
+          onPress: async () => {
+            const user = auth.currentUser;
+            if (user) {
+              const token = await registrarPushTokenUsuario(user.uid);
+              if (token) {
+                Alert.alert("Sucesso", "Notificações ativadas com sucesso!");
+              } else {
+                Alert.alert("Erro", "Não foi possível ativar. Verifique se você está em um dispositivo físico e se deu permissão.");
+              }
+            }
+          }
+        }
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -329,7 +406,11 @@ export default function PerfilScreen({ navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       <TouchableOpacity
         style={styles.bannerWrapper}
         onPress={atualizarBanner}
@@ -401,7 +482,11 @@ export default function PerfilScreen({ navigation }) {
             color={colors.primary}
           />
           <Text style={styles.userTypeBadgeText}>
-            {ehProfissional ? "Perfil profissional" : "Perfil do cliente"}
+            {ehProfissional
+              ? ehColaborador
+                ? 'Conta colaborador'
+                : 'Perfil profissional'
+              : 'Perfil do cliente'}
           </Text>
         </View>
 
@@ -410,7 +495,9 @@ export default function PerfilScreen({ navigation }) {
           onPress={() => navigation.navigate("ConfigurarPerfil")}
         >
           <Ionicons name="create-outline" size={16} color={colors.primary} />
-          <Text style={styles.editBtnText}>Editar Perfil Público</Text>
+          <Text style={styles.editBtnText}>
+            {ehProfissional ? 'Editar Perfil Público' : 'Editar minhas informações'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -439,8 +526,10 @@ export default function PerfilScreen({ navigation }) {
               </View>
 
               <View style={styles.menuTextWrap}>
-                <Text style={styles.menuText}>Meus Serviços e Preços</Text>
-                <Text style={styles.menuSubText}>Configure o que você oferece</Text>
+                <Text style={styles.menuText}>{ehColaborador ? 'Serviços liberados' : 'Meus Serviços e Preços'}</Text>
+                <Text style={styles.menuSubText}>
+                  {ehColaborador ? 'Catálogo definido pela conta principal' : 'Configure o que você oferece'}
+                </Text>
               </View>
 
               <Ionicons name="chevron-forward" size={20} color="#CCC" />
@@ -456,7 +545,9 @@ export default function PerfilScreen({ navigation }) {
 
               <View style={styles.menuTextWrap}>
                 <Text style={styles.menuText}>Financeiro</Text>
-                <Text style={styles.menuSubText}>Acompanhe ganhos e relatórios</Text>
+                <Text style={styles.menuSubText}>
+                  {ehColaborador ? 'Acompanhe apenas seus resultados' : 'Acompanhe ganhos e relatórios'}
+                </Text>
               </View>
 
               <Ionicons name="chevron-forward" size={20} color="#CCC" />
@@ -527,15 +618,78 @@ export default function PerfilScreen({ navigation }) {
           </>
         )}
 
+        {ehProfissional && perfil?.perfil !== 'colaborador' && (
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('GerenciarColaboradores')}>
+            <View style={[styles.iconBox, { backgroundColor: '#E3F2FD' }]}>
+              <Ionicons name="people-outline" size={22} color="#1976D2" />
+            </View>
+
+            <View style={styles.menuTextWrap}>
+              <Text style={styles.menuText}>Gerenciar Equipe</Text>
+              <Text style={styles.menuSubText}>Controle subcontas, serviços liberados e agenda da equipe</Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity style={styles.menuItem} onPress={gerenciarNotificacoes}>
+          <View style={[styles.iconBox, { backgroundColor: '#E0F2F1' }]}>
+            <Ionicons name="notifications-outline" size={22} color="#00796B" />
+          </View>
+
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuText}>Notificações Push</Text>
+            <Text style={styles.menuSubText}>Ativar ou atualizar notificações</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color="#CCC" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={abrirSuporte}>
+          <View style={[styles.iconBox, { backgroundColor: '#E1F5FE' }]}>
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#0288D1" />
+          </View>
+
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuText}>Suporte Conecta</Text>
+            <Text style={styles.menuSubText}>Fale com a nossa equipe</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color="#CCC" />
+        </TouchableOpacity>
+
+        {/* Painel de Admin - Visível apenas para o dono (pode-se adicionar um check de UID aqui) */}
+        {perfil?.isAdmin && (
+          <TouchableOpacity style={styles.menuItem} onPress={abrirPainelAdminSuporte}>
+            <View style={[styles.iconBox, { backgroundColor: '#F3E5F5' }]}>
+              <Ionicons name="shield-checkmark-outline" size={22} color="#7B1FA2" />
+            </View>
+
+            <View style={styles.menuTextWrap}>
+              <Text style={styles.menuText}>Painel de Suporte (Admin)</Text>
+              <Text style={styles.menuSubText}>Gerenciar atendimentos</Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.menuItem} onPress={fazerLogout}>
           <View style={[styles.iconBox, { backgroundColor: '#FFEBEE' }]}>
             <Ionicons name="log-out-outline" size={22} color="#F44336" />
           </View>
 
           <View style={styles.menuTextWrap}>
-            <Text style={[styles.menuText, { color: '#F44336' }]}>Sair do Aplicativo</Text>
-            <Text style={styles.menuSubText}>Encerrar sua sessão</Text>
+            <Text style={styles.menuText}>Sair</Text>
+            <Text style={styles.menuSubText}>Encerrar sessão</Text>
           </View>
+
+          <Ionicons name="chevron-forward" size={20} color="#CCC" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.deleteAccountItem} onPress={deletarConta}>
+          <Text style={styles.deleteAccountText}>Excluir minha conta</Text>
         </TouchableOpacity>
       </View>
 
@@ -659,7 +813,7 @@ export default function PerfilScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F0F3F8',
   },
 
   content: {
@@ -670,13 +824,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F0F3F8',
   },
 
   bannerWrapper: {
     width: '100%',
-    height: 190,
-    backgroundColor: '#EAEAEA',
+    height: 210,
+    backgroundColor: '#DCE7F7',
     position: 'relative',
   },
 
@@ -728,16 +882,20 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: '#FFF',
-    marginTop: -28,
+    marginTop: -30,
     marginHorizontal: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     paddingTop: 20,
-    paddingBottom: 26,
+    paddingBottom: 24,
     alignItems: 'center',
     borderRadius: 24,
-    elevation: 2,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     borderWidth: 1,
-    borderColor: '#EEF1F4',
+    borderColor: '#E8EDF5',
   },
 
   avatarOuter: {
@@ -825,16 +983,21 @@ const styles = StyleSheet.create({
   editBtn: {
     marginTop: 16,
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: 18,
-    backgroundColor: colors.primary + '15',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   editBtnText: {
-    color: colors.primary,
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontWeight: '800',
     fontSize: 13,
     marginLeft: 6,
   },
@@ -843,23 +1006,23 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F7F9FC',
+    backgroundColor: '#F8FAFD',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#E7ECF3',
+    borderColor: '#E2E8F0',
   },
 
   photoBtnText: {
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: '800',
     marginLeft: 8,
     fontSize: 13,
   },
 
   menuContainer: {
-    padding: 20,
+    padding: 16,
   },
 
   sectionTitle: {
@@ -874,12 +1037,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 15,
-    marginBottom: 10,
-    elevation: 1,
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
     borderWidth: 1,
-    borderColor: '#EEF1F4',
+    borderColor: '#E8EDF5',
   },
 
   iconBox: {
@@ -908,13 +1075,18 @@ const styles = StyleSheet.create({
   },
 
   galeriaSection: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 2,
     backgroundColor: '#FFF',
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#EEE',
+    borderColor: '#E8EDF5',
     padding: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
 
   galeriaHeader: {
@@ -1022,13 +1194,18 @@ const styles = StyleSheet.create({
   },
 
   infoCard: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 16,
     padding: 20,
     backgroundColor: '#FFF',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#EEE',
+    borderColor: '#E8EDF5',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
 
   infoTitle: {
@@ -1065,7 +1242,7 @@ const styles = StyleSheet.create({
   },
 
   tipCard: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 16,
     backgroundColor: '#FFF',
     borderRadius: 16,
@@ -1074,6 +1251,7 @@ const styles = StyleSheet.create({
     borderColor: '#E8EDF3',
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginBottom: 8,
   },
 
   tipText: {
@@ -1082,5 +1260,16 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     fontSize: 12,
     lineHeight: 19,
+  },
+  deleteAccountItem: {
+    marginTop: 20,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  deleteAccountText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

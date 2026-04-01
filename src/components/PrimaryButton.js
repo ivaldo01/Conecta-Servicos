@@ -26,16 +26,26 @@ export default function PrimaryButton({
 const styles = StyleSheet.create({
     button: {
         backgroundColor: colors.primary,
-        padding: 16,
-        borderRadius: 14,
+        minHeight: 54,
+        paddingVertical: 15,
+        paddingHorizontal: 18,
+        borderRadius: 16,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.22,
+        shadowRadius: 14,
+        elevation: 5,
     },
     disabled: {
-        opacity: 0.7,
+        opacity: 0.65,
     },
     text: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontWeight: '800',
         fontSize: 16,
+        letterSpacing: 0.2,
     },
 });

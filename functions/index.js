@@ -5,7 +5,9 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
-exports.criarColaborador = onCall(async (request) => {
+exports.criarColaborador = onCall(
+    {region: "southamerica-east1"},
+    async (request) => {
   const auth = request.auth;
   const data = request.data;
 

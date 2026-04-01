@@ -57,63 +57,83 @@ export default function TermosUso({ navigation }) {
                 </Text>
 
                 <Text style={styles.text}>
-                    A Conecta Solutions é uma plataforma digital que conecta clientes a profissionais e empresas prestadoras de serviços.
-                    Ao utilizar o aplicativo, você concorda com os termos abaixo.
+                    Bem-vindo à Conecta Solutions. Ao acessar ou utilizar nosso aplicativo e serviços, você concorda em cumprir e estar vinculado aos seguintes Termos de Uso. Por favor, leia-os com atenção.
                 </Text>
 
-                <Text style={styles.sectionTitle}>1. Intermediação</Text>
+                <Text style={styles.sectionTitle}>1. Aceitação dos Termos</Text>
                 <Text style={styles.text}>
-                    A plataforma atua exclusivamente como intermediadora tecnológica entre cliente e profissional,
-                    não sendo responsável pela execução dos serviços.
+                    Ao criar uma conta ou utilizar a plataforma Conecta Solutions, você declara ter lido, compreendido e aceitado estes Termos. Se você não concorda com qualquer parte destes termos, não deve utilizar nossos serviços.
                 </Text>
 
-                <Text style={styles.sectionTitle}>2. Pagamentos</Text>
+                <Text style={styles.sectionTitle}>2. Descrição dos Serviços</Text>
                 <Text style={styles.text}>
-                    Os pagamentos realizados na plataforma são processados por meio de parceiros financeiros.
-                    A Conecta Solutions pode reter temporariamente valores para garantir segurança e integridade das transações.
+                    A Conecta Solutions é uma plataforma tecnológica que facilita a conexão entre Clientes que buscam serviços e Profissionais ou Empresas que os prestam. A plataforma funciona como um marketplace de agendamento e gestão.
                 </Text>
 
-                <Text style={styles.sectionTitle}>3. Taxa da Plataforma</Text>
+                <Text style={styles.sectionTitle}>3. Cadastro e Segurança da Conta</Text>
                 <Text style={styles.text}>
-                    Será aplicada uma taxa de 10% sobre cada transação realizada, referente ao uso da plataforma.
+                    Para utilizar a maioria das funcionalidades, você deve criar uma conta. Você é responsável por:
+                    {"\n"}• Fornecer informações precisas e completas.
+                    {"\n"}• Manter a confidencialidade de suas credenciais de acesso.
+                    {"\n"}• Todas as atividades que ocorrem sob sua conta.
+                    {"\n"}• Notificar-nos imediatamente sobre qualquer uso não autorizado.
                 </Text>
 
-                <Text style={styles.sectionTitle}>4. Repasse ao Profissional</Text>
+                <Text style={styles.sectionTitle}>4. Relação entre as Partes</Text>
                 <Text style={styles.text}>
-                    Após confirmação do pagamento, o valor será disponibilizado ao profissional como saldo para saque.
-                    O saque pode ser solicitado a qualquer momento.
+                    A Conecta Solutions não é uma prestadora de serviços, agência de empregos ou seguradora. Não existe vínculo empregatício, de parceria ou de representação entre a Conecta Solutions e os Profissionais cadastrados. Os Profissionais atuam de forma independente e são os únicos responsáveis pela qualidade e execução dos serviços.
                 </Text>
 
-                <Text style={styles.sectionTitle}>5. Saque Automático</Text>
+                <Text style={styles.sectionTitle}>5. Pagamentos e Taxas</Text>
                 <Text style={styles.text}>
-                    Caso o profissional não solicite saque em até 30 dias, o valor será automaticamente transferido
-                    para sua conta cadastrada.
+                    5.1. **Taxa de Intermediação**: A plataforma cobra uma taxa de 10% (dez por cento) sobre o valor bruto de cada serviço agendado e pago através do sistema.
+                    {"\n"}5.2. **Processamento**: Os pagamentos são processados por parceiros de pagamentos integrados.
+                    {"\n"}5.3. **Repasses**: O saldo líquido (valor bruto menos taxas) será disponibilizado na carteira digital do Profissional após a conclusão do serviço.
+                    {"\n"}5.4. **Saques**: O Profissional pode solicitar o saque de seu saldo disponível a qualquer momento, observando os prazos de processamento bancário.
                 </Text>
 
-                <Text style={styles.sectionTitle}>6. Cancelamentos e Estornos</Text>
+                <Text style={styles.sectionTitle}>6. Cancelamentos e Reembolsos</Text>
                 <Text style={styles.text}>
-                    Cancelamentos e estornos poderão ocorrer conforme regras da plataforma.
-                    Em caso de disputa ou chargeback, valores poderão ser bloqueados temporariamente.
+                    6.1. **Pelo Cliente**: Cancelamentos podem estar sujeitos a taxas caso ocorram fora do prazo estipulado pelo profissional.
+                    {"\n"}6.2. **Pelo Profissional**: O profissional deve manter sua agenda atualizada para evitar cancelamentos. Cancelamentos recorrentes podem levar à suspensão da conta.
+                    {"\n"}6.3. **Disputas**: Em caso de problemas na prestação do serviço, as partes devem buscar uma solução amigável. A plataforma pode mediar disputas, mas não garante o resultado.
                 </Text>
 
-                <Text style={styles.sectionTitle}>7. Responsabilidade</Text>
+                <Text style={styles.sectionTitle}>7. Obrigações do Profissional</Text>
                 <Text style={styles.text}>
-                    O profissional é responsável pela execução do serviço, qualidade, prazos e obrigações legais.
+                    O Profissional compromete-se a:
+                    {"\n"}• Prestar os serviços com qualidade e ética.
+                    {"\n"}• Cumprir os horários agendados.
+                    {"\n"}• Manter toda a documentação legal e fiscal necessária para sua atividade.
+                    {"\n"}• Ser o único responsável pelo recolhimento de impostos e encargos.
                 </Text>
 
-                <Text style={styles.sectionTitle}>8. Obrigações Fiscais</Text>
+                <Text style={styles.sectionTitle}>8. Propriedade Intelectual</Text>
                 <Text style={styles.text}>
-                    O profissional é responsável pela emissão de notas fiscais e pagamento de tributos.
+                    Todo o conteúdo do aplicativo (logos, software, design) é de propriedade exclusiva da Conecta Solutions ou de seus licenciadores e é protegido por leis de direitos autorais.
                 </Text>
 
-                <Text style={styles.sectionTitle}>9. Segurança</Text>
+                <Text style={styles.sectionTitle}>9. Limitação de Responsabilidade</Text>
                 <Text style={styles.text}>
-                    A plataforma poderá bloquear contas ou transações em caso de suspeita de fraude ou uso indevido.
+                    A Conecta Solutions não se responsabiliza por:
+                    {"\n"}• Danos diretos ou indiretos decorrentes do uso da plataforma.
+                    {"\n"}• Conduta de qualquer usuário (Cliente ou Profissional).
+                    {"\n"}• Falhas técnicas inerentes à internet ou dispositivos móveis.
                 </Text>
 
-                <Text style={styles.sectionTitle}>10. Alterações</Text>
+                <Text style={styles.sectionTitle}>10. Privacidade</Text>
                 <Text style={styles.text}>
-                    A Conecta Solutions poderá atualizar estes termos a qualquer momento.
+                    O uso de seus dados pessoais é regido por nossa Política de Privacidade, que faz parte integrante destes Termos.
+                </Text>
+
+                <Text style={styles.sectionTitle}>11. Modificações dos Termos</Text>
+                <Text style={styles.text}>
+                    Reservamo-nos o direito de modificar estes Termos a qualquer momento. Notificaremos os usuários sobre mudanças significativas através do aplicativo ou e-mail.
+                </Text>
+
+                <Text style={styles.sectionTitle}>12. Foro</Text>
+                <Text style={styles.text}>
+                    Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da comarca da sede da empresa para dirimir quaisquer dúvidas.
                 </Text>
 
                 <TouchableOpacity

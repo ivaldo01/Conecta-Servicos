@@ -147,7 +147,11 @@ function limparDocumento(documento = '') {
     return String(documento).replace(/\D/g, '');
 }
 
-async function getDadosClienteAtual() {
+function requerCpfCnpj(formaPagamento) {
+    return formaPagamento === 'pix' || formaPagamento === 'boleto';
+}
+
+async function getDadosClienteAtual(formaPagamento = 'pix') {
     const user = auth.currentUser;
 
     if (!user?.uid) {
@@ -176,14 +180,14 @@ async function getDadosClienteAtual() {
         ''
     );
 
-    if (!cpfCnpj) {
-        throw new Error('CPF_CLIENTE_NAO_ENCONTRADO');
+    if (!cpfCnpj && requerCpfCnpj(formaPagamento)) {
+        console.warn('[paymentService] CPF/CNPJ não encontrado para método', formaPagamento, '— prosseguindo sem ele.');
     }
 
     return {
         uid: user.uid,
         nome,
-        cpfCnpj,
+        cpfCnpj: cpfCnpj || null,
         email: userData?.email || user?.email || '',
         telefone:
             userData?.telefone ||
@@ -208,15 +212,24 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
     const taxaPlataforma = toMoney(valorBruto * 0.1);
     const valorLiquidoProfissional = toMoney(valorBruto - taxaPlataforma);
 
+    const formaPagamento = agendamento?.formaPagamento || 'pix';
+    const formaPagamentoLabel =
+        agendamento?.formaPagamentoLabel ||
+        getFormaPagamentoLabel(formaPagamento);
+
     const pagamento = {
         agendamentoId: agendamento.id,
         clienteId: agendamento?.clienteId || auth.currentUser?.uid || null,
-        profissionalId: agendamento?.profissionalId || null,
+        profissionalId:
+            agendamento?.profissionalId ||
+            agendamento?.colaboradorId ||
+            agendamento?.clinicaId ||
+            null,
         clinicaId: agendamento?.clinicaId || null,
         colaboradorId: agendamento?.colaboradorId || null,
 
-        formaPagamento: 'pix',
-        formaPagamentoLabel: 'Pix',
+        formaPagamento,
+        formaPagamentoLabel,
 
         gateway: 'asaas',
         gatewayPaymentId: pagamentoGateway?.paymentId || null,
@@ -224,6 +237,7 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
         gatewayStatus: pagamentoGateway?.status || 'PENDING',
         status: STATUS_PAGAMENTO.GERADA,
 
+        valorCobrado: valorBruto,
         valorBruto,
         taxaPlataforma,
         valorLiquidoProfissional,
@@ -235,6 +249,7 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
         integracao: 'asaas_vercel',
 
         criadoEm: serverTimestamp(),
+        geradaEm: serverTimestamp(),
         atualizadoEm: serverTimestamp(),
     };
 
@@ -245,8 +260,9 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
         {
             pagamentoId: agendamento.id,
             cobrancaGerada: true,
-            formaPagamento: 'pix',
-            formaPagamentoLabel: 'Pix',
+            cobrancaGeradaEm: serverTimestamp(),
+            formaPagamento,
+            formaPagamentoLabel,
             statusPagamento: STATUS_PAGAMENTO.GERADA,
             gatewayPagamento: 'asaas',
             atualizadoEm: serverTimestamp(),
@@ -283,25 +299,33 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
         };
     }
 
-    const cliente = await getDadosClienteAtual();
+    const formaPagamento = agendamento?.formaPagamento || 'pix';
+
+    const cliente = await getDadosClienteAtual(formaPagamento);
     const valor = calcularValorTotalAgendamento(agendamento);
+
+    const bodyRequest = {
+        agendamentoId: agendamento.id,
+        valor,
+        formaPagamento,
+        descricao: `Pagamento do agendamento ${agendamento.id}`,
+        cliente: {
+            nome: cliente.nome,
+            email: cliente.email || undefined,
+            telefone: cliente.telefone || undefined,
+        },
+    };
+
+    if (cliente.cpfCnpj) {
+        bodyRequest.cliente.cpfCnpj = cliente.cpfCnpj;
+    }
 
     const response = await fetch(`${BACKEND_URL}/api/createPayment`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            agendamentoId: agendamento.id,
-            valor,
-            descricao: `Pagamento do agendamento ${agendamento.id}`,
-            cliente: {
-                nome: cliente.nome,
-                cpfCnpj: cliente.cpfCnpj,
-                email: cliente.email || undefined,
-                telefone: cliente.telefone || undefined,
-            },
-        }),
+        body: JSON.stringify(bodyRequest),
     });
 
     const data = await response.json();

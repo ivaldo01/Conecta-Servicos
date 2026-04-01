@@ -390,6 +390,11 @@ export default function FavoritosCliente({ navigation }) {
                 </Text>
             </View>
 
+            <View style={styles.summaryCard}>
+                <Text style={styles.summaryNumber}>{favoritos.length}</Text>
+                <Text style={styles.summaryText}>profissional(is) salvo(s) na sua lista</Text>
+            </View>
+
             {favoritos.length === 0 ? (
                 <View style={styles.emptyState}>
                     <View style={styles.emptyIconWrap}>
@@ -424,12 +429,12 @@ export default function FavoritosCliente({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F0F3F8',
     },
 
     centered: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F0F3F8',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -443,16 +448,48 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 18,
         paddingTop: 12,
-        paddingBottom: 10,
+        paddingBottom: 18,
+        backgroundColor: colors.primary,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
 
     title: {
         fontSize: 24,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#FFF',
     },
 
     subtitle: {
+        marginTop: 4,
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.84)',
+    },
+
+    summaryCard: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 8,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+    },
+
+    summaryNumber: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+
+    summaryText: {
         marginTop: 4,
         fontSize: 13,
         color: colors.secondary,
@@ -469,8 +506,13 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         marginBottom: 14,
         borderWidth: 1,
-        borderColor: '#ECEFF4',
+        borderColor: '#E8EDF5',
         overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
     },
 
     bannerArea: {

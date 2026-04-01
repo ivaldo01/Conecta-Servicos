@@ -26,6 +26,7 @@ function extrairMensagemFirebase(error) {
     'unauthenticated': 'Sua sessão expirou. Entre novamente.',
     'invalid-argument': 'Alguns dados enviados são inválidos.',
     'cancelled': 'A operação foi cancelada.',
+    'CPF_OU_CNPJ_OBRIGATORIO': 'O CPF ou CNPJ do cliente é obrigatório para gerar o pagamento. Por favor, complete seu cadastro.',
   };
 
   if (!code) return null;

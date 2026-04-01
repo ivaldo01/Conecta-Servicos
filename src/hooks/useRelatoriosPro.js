@@ -23,31 +23,51 @@ export function useRelatoriosPro(uid) {
                 return;
             }
 
-            const qAgendamentos = query(
-                collection(db, 'agendamentos'),
-                where('clinicaId', '==', uid),
-                where('status', '==', 'concluido')
-            );
+            const consultasAgendamentos = [
+                query(collection(db, 'agendamentos'), where('clinicaId', '==', uid)),
+                query(collection(db, 'agendamentos'), where('profissionalId', '==', uid)),
+                query(collection(db, 'agendamentos'), where('colaboradorId', '==', uid)),
+            ];
 
-            const qAvaliacoes = query(
-                collection(db, 'avaliacoes'),
-                where('profissionalId', '==', uid)
-            );
+            const consultasAvaliacoes = [
+                query(collection(db, 'avaliacoes'), where('profissionalId', '==', uid)),
+                query(collection(db, 'avaliacoes'), where('clinicaId', '==', uid)),
+            ];
 
-            const [agendamentosSnap, avaliacoesSnap] = await Promise.all([
-                getDocs(qAgendamentos),
-                getDocs(qAvaliacoes),
+            const [agendamentosResultados, avaliacoesResultados] = await Promise.all([
+                Promise.allSettled(consultasAgendamentos.map((consulta) => getDocs(consulta))),
+                Promise.allSettled(consultasAvaliacoes.map((consulta) => getDocs(consulta))),
             ]);
 
-            const listaAgendamentos = agendamentosSnap.docs.map((docSnap) => ({
-                id: docSnap.id,
-                ...docSnap.data(),
-            }));
+            const mapaAgendamentos = new Map();
+            agendamentosResultados.forEach((resultado) => {
+                if (resultado.status === 'fulfilled') {
+                    resultado.value.forEach((docSnap) => {
+                        mapaAgendamentos.set(docSnap.id, {
+                            id: docSnap.id,
+                            ...docSnap.data(),
+                        });
+                    });
+                }
+            });
 
-            const listaAvaliacoes = avaliacoesSnap.docs.map((docSnap) => ({
-                id: docSnap.id,
-                ...docSnap.data(),
-            }));
+            const mapaAvaliacoes = new Map();
+            avaliacoesResultados.forEach((resultado) => {
+                if (resultado.status === 'fulfilled') {
+                    resultado.value.forEach((docSnap) => {
+                        mapaAvaliacoes.set(docSnap.id, {
+                            id: docSnap.id,
+                            ...docSnap.data(),
+                        });
+                    });
+                }
+            });
+
+            const listaAgendamentos = Array.from(mapaAgendamentos.values()).filter(
+                (item) => item?.status === 'concluido'
+            );
+
+            const listaAvaliacoes = Array.from(mapaAvaliacoes.values());
 
             const ordenados = [...listaAgendamentos].sort((a, b) => {
                 const dataA = a.dataCriacao?.seconds || 0;

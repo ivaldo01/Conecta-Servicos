@@ -22,6 +22,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import colors from "../../constants/colors";
 import PrimaryButton from "../../components/PrimaryButton";
 import { prepararDadosCategoriaParaProfissional } from "../../utils/categoriaUtils";
+import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
 
 import logo from '../../../assets/logo.png';
 
@@ -245,6 +246,8 @@ export default function SignUpProEmpresa({ navigation }) {
 
         ...dadosCategoria,
       });
+
+      await registrarPushTokenUsuario(user.uid);
 
       Alert.alert(
         "Bem-vindo!",
@@ -672,67 +675,78 @@ const styles = StyleSheet.create({
 
   screen: {
     flex: 1,
-    backgroundColor: '#F4F7F8',
+    backgroundColor: '#F0F3F8',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#F4F7F8',
+    backgroundColor: '#F0F3F8',
   },
 
   scrollContent: {
-    padding: 15,
+    padding: 16,
     paddingBottom: 80,
   },
 
   topBanner: {
-    marginTop: 30,
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 16,
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 22,
+    backgroundColor: colors.primary,
+    borderRadius: 24,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
 
   logo: {
-    width: 150,
-    height: 150,
+    width: 108,
+    height: 108,
     resizeMode: 'contain',
     marginBottom: 10,
   },
 
   headerTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFF',
     textAlign: 'center',
   },
 
   headerSubtitle: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.86)',
     marginTop: 8,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
   },
 
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 16,
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111',
+    fontWeight: '800',
+    color: colors.textDark,
     marginBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-    paddingBottom: 6,
+    borderBottomColor: '#EEF1F4',
+    paddingBottom: 8,
   },
 
   inputGroup: {
@@ -742,17 +756,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#555',
+    color: '#5C6470',
     marginBottom: 5,
   },
 
   input: {
-    backgroundColor: '#FBFBFB',
+    backgroundColor: '#F8FAFD',
     borderRadius: 12,
     padding: 12,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#E2E8F0',
     color: '#333',
   },
 
@@ -761,10 +775,10 @@ const styles = StyleSheet.create({
   },
 
   pickerOuter: {
-    backgroundColor: '#FBFBFB',
+    backgroundColor: '#F8FAFD',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
     justifyContent: 'center',
   },
@@ -773,7 +787,7 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 180 : 56,
     width: '100%',
     color: '#222',
-    backgroundColor: '#FBFBFB',
+    backgroundColor: '#F8FAFD',
   },
 
   pickerItem: {
@@ -841,10 +855,10 @@ const styles = StyleSheet.create({
 
   passwordWrapper: {
     minHeight: 50,
-    backgroundColor: '#FBFBFB',
+    backgroundColor: '#F8FAFD',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#E2E8F0',
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 12,
@@ -867,7 +881,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
     marginBottom: 20,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   termsTextBox: {
@@ -877,7 +896,7 @@ const styles = StyleSheet.create({
 
   termsText: {
     fontSize: 14,
-    color: '#666',
+    color: '#5C6470',
     lineHeight: 20,
   },
 

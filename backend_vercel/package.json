@@ -1,0 +1,13 @@
+{
+  "name": "conecta-backend",
+  "version": "1.0.0",
+  "description": "Backend para integração com Asaas e Firebase Admin",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "axios": "^1.6.0"
+  }
+}

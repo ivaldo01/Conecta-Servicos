@@ -32,6 +32,7 @@ export default function NativeAdCard({
 }) {
     const [nativeAd, setNativeAd] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
     useEffect(() => {
         let active = true;
@@ -57,6 +58,7 @@ export default function NativeAdCard({
             })
             .catch((error) => {
                 console.log("Erro ao carregar Native Ad:", error);
+                if (active) setError(true);
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -71,22 +73,11 @@ export default function NativeAdCard({
     }, []);
 
     if (loading) {
-        return (
-            <View style={[styles.card, { width, height }, style]}>
-                <View style={styles.loadingBox}>
-                    <ActivityIndicator color={colors.primary} />
-                    <Text style={styles.loadingText}>Carregando anúncio...</Text>
-                </View>
-            </View>
-        );
+        return null;
     }
 
-    if (!nativeAd) {
-        return (
-            <View style={[styles.card, { width, height }, style]}>
-                <Text style={styles.fallback}>Anúncio indisponível</Text>
-            </View>
-        );
+    if (!nativeAd || error) {
+        return null;
     }
 
     return (

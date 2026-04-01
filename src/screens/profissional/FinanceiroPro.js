@@ -11,17 +11,24 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import {
   collection,
   doc,
   onSnapshot,
   query,
   where,
+  getDocs,
+  updateDoc,
+  getDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 
 import colors from '../../constants/colors';
 import { db } from '../../services/firebaseConfig';
 import { useAuth } from '../../hooks/useAuth';
+import { useUsuario } from '../../hooks/useUsuario';
 import { solicitarSaqueProfissional } from '../../services/paymentService';
 
 function formatCurrency(value) {
@@ -150,17 +157,48 @@ function EmptyState({ icon, title, subtitle }) {
 }
 
 export default function FinanceiroPro() {
-  const { usuario, loadingAuth } = useAuth();
+  const { usuario: authUser, loadingAuth } = useAuth();
+  const { dadosUsuario, loadingUsuario } = useUsuario(authUser?.uid);
+
+  const usuario = useMemo(
+    () => ({
+      ...(authUser || {}),
+      ...(dadosUsuario || {}),
+    }),
+    [authUser, dadosUsuario]
+  );
+
+  const ehColaborador = useMemo(() => {
+    if (usuario?.perfil === 'colaborador') return true;
+    if (dadosUsuario?.perfil === 'colaborador') return true;
+    if (usuario?.clinicaId && usuario?.clinicaId !== usuario?.uid && !usuario?.cnpj) {
+      return true;
+    }
+    return false;
+  }, [usuario, dadosUsuario]);
 
   const [loading, setLoading] = useState(true);
   const [pagamentos, setPagamentos] = useState([]);
+  const [agendamentos, setAgendamentos] = useState([]);
   const [saques, setSaques] = useState([]);
   const [saldoConta, setSaldoConta] = useState(null);
+  const [colaboradores, setColaboradores] = useState([]);
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalBancoVisible, setModalBancoVisible] = useState(false);
   const [valorSaque, setValorSaque] = useState('');
   const [chavePix, setChavePix] = useState('');
   const [loadingSaque, setLoadingSaque] = useState(false);
+
+  const [dadosBancarios, setDadosBancarios] = useState({
+    banco: '',
+    agencia: '',
+    conta: '',
+    tipoConta: 'corrente',
+    chavePixPerfil: '',
+  });
+  const [loadingBanco, setLoadingBanco] = useState(false);
+  const [loadingExport, setLoadingExport] = useState(false);
 
   useEffect(() => {
     if (!usuario?.uid) {
@@ -175,6 +213,7 @@ export default function FinanceiroPro() {
     let iniciouClinica = false;
     let iniciouColaborador = false;
     let iniciouSaques = false;
+    let iniciouEquipe = false;
 
     let pagamentosProfissional = [];
     let pagamentosClinica = [];
@@ -187,7 +226,8 @@ export default function FinanceiroPro() {
         iniciouProfissional &&
         iniciouClinica &&
         iniciouColaborador &&
-        iniciouSaques
+        iniciouSaques &&
+        (ehColaborador || iniciouEquipe)
       ) {
         setLoading(false);
       }
@@ -222,6 +262,36 @@ export default function FinanceiroPro() {
         atualizarLoading();
       }
     );
+
+    // Carregar dados bancários do perfil
+    const carregarDadosBancarios = async () => {
+      try {
+        const userSnap = await getDoc(doc(db, 'usuarios', usuario.uid));
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          setDadosBancarios({
+            banco: data.banco || '',
+            agencia: data.agencia || '',
+            conta: data.conta || '',
+            tipoConta: data.tipoConta || 'corrente',
+            chavePixPerfil: data.chavePix || data.pixAddressKey || '',
+          });
+        }
+      } catch (e) {
+        console.log('Erro ao carregar dados bancários:', e);
+      }
+    };
+    carregarDadosBancarios();
+
+    // Carregar lista de colaboradores se for gestor
+    if (!ehColaborador) {
+      const qColabs = query(collection(db, 'usuarios', usuario.uid, 'colaboradores'));
+      const unsubColabs = onSnapshot(qColabs, (snap) => {
+        setColaboradores(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        iniciouEquipe = true;
+        atualizarLoading();
+      });
+    }
 
     const unsubProfissional = onSnapshot(
       query(collection(db, 'pagamentos'), where('profissionalId', '==', usuario.uid)),
@@ -298,7 +368,128 @@ export default function FinanceiroPro() {
       unsubColaborador?.();
       unsubSaques?.();
     };
-  }, [usuario?.uid]);
+  }, [usuario?.uid, ehColaborador]);
+
+  useEffect(() => {
+    if (!usuario?.uid) {
+      setAgendamentos([]);
+      return;
+    }
+
+    let agendamentosProfissional = [];
+    let agendamentosClinica = [];
+    let agendamentosColaborador = [];
+
+    function atualizarAgendamentos() {
+      const mapa = new Map();
+
+      [
+        ...agendamentosProfissional,
+        ...agendamentosClinica,
+        ...agendamentosColaborador,
+      ].forEach((item) => {
+        mapa.set(item.id, item);
+      });
+
+      setAgendamentos(Array.from(mapa.values()));
+    }
+
+    const unsubAgendaProfissional = onSnapshot(
+      query(collection(db, 'agendamentos'), where('profissionalId', '==', usuario.uid)),
+      (snap) => {
+        agendamentosProfissional = snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+        atualizarAgendamentos();
+      },
+      (error) => {
+        console.log('Erro ao ouvir agendamentos por profissionalId:', error);
+        agendamentosProfissional = [];
+        atualizarAgendamentos();
+      }
+    );
+
+    const unsubAgendaColaborador = onSnapshot(
+      query(collection(db, 'agendamentos'), where('colaboradorId', '==', usuario.uid)),
+      (snap) => {
+        agendamentosColaborador = snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+        atualizarAgendamentos();
+      },
+      (error) => {
+        console.log('Erro ao ouvir agendamentos por colaboradorId:', error);
+        agendamentosColaborador = [];
+        atualizarAgendamentos();
+      }
+    );
+
+    const unsubAgendaClinica = !ehColaborador
+      ? onSnapshot(
+        query(collection(db, 'agendamentos'), where('clinicaId', '==', usuario.uid)),
+        (snap) => {
+          agendamentosClinica = snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+          atualizarAgendamentos();
+        },
+        (error) => {
+          console.log('Erro ao ouvir agendamentos por clinicaId:', error);
+          agendamentosClinica = [];
+          atualizarAgendamentos();
+        }
+      )
+      : null;
+
+    return () => {
+      unsubAgendaProfissional?.();
+      unsubAgendaColaborador?.();
+      unsubAgendaClinica?.();
+    };
+  }, [usuario?.uid, ehColaborador]);
+
+  const rendimentosPorColaborador = useMemo(() => {
+    if (ehColaborador) return [];
+
+    const rendimentos = {};
+
+    // Inicializa com zero para todos os colaboradores da equipe
+    colaboradores.forEach(c => {
+      rendimentos[c.id] = {
+        nome: c.nome || 'Sem nome',
+        total: 0,
+        servicos: 0,
+        id: c.id
+      };
+    });
+
+    // Inclui o próprio gestor se ele realiza serviços
+    if (usuario?.uid) {
+      rendimentos[usuario.uid] = {
+        nome: usuario?.nome || usuario?.nomeNegocio || 'Conta principal',
+        total: 0,
+        servicos: 0,
+        id: usuario.uid
+      };
+    }
+
+    pagamentos.forEach(p => {
+      const status = getStatusPagamento(p);
+      if (status === 'pago' || status === 'received' || status === 'confirmed') {
+        const valor = getValorBruto(p);
+        const colabId = p.colaboradorId || p.profissionalId;
+
+        if (colabId && rendimentos[colabId]) {
+          rendimentos[colabId].total += valor;
+          rendimentos[colabId].servicos += 1;
+        } else if (colabId) {
+          // Se for um colaborador que não está na lista (ex: removido)
+          rendimentos[colabId] = {
+            nome: p.colaboradorNome || 'Profissional Externo',
+            total: valor,
+            servicos: 1,
+            id: colabId
+          };
+        }
+      }
+    });
+
+    return Object.values(rendimentos).sort((a, b) => b.total - a.total);
+  }, [pagamentos, colaboradores, usuario, ehColaborador]);
 
   const resumo = useMemo(() => {
     const hoje = new Date();
@@ -312,10 +503,23 @@ export default function FinanceiroPro() {
     let cobrancasPagas = 0;
     let cobrancasCanceladas = 0;
     let cobrancasVencidas = 0;
+    let valorEmAberto = 0;
 
-    pagamentos.forEach((item) => {
+    const agendamentosConcluidosIds = new Set(
+      agendamentos
+        .filter((item) => String(item?.status || '').toLowerCase() === 'concluido')
+        .map((item) => item.id)
+    );
+
+    const pagamentosConsiderados = ehColaborador
+      ? pagamentos.filter((item) => agendamentosConcluidosIds.has(item?.agendamentoId || item?.id))
+      : pagamentos;
+
+    pagamentosConsiderados.forEach((item) => {
       const status = getStatusPagamento(item);
       const valorBruto = getValorBruto(item);
+      const valorLiquido = getValorLiquido(item);
+      const valorConsiderado = ehColaborador ? valorLiquido : valorBruto;
 
       if (
         status === 'gerada' ||
@@ -323,11 +527,12 @@ export default function FinanceiroPro() {
         status === 'aguardando_cobranca'
       ) {
         cobrancasGeradas += 1;
+        valorEmAberto += valorBruto;
       }
 
       if (status === 'pago' || status === 'received' || status === 'confirmed') {
         cobrancasPagas += 1;
-        totalRecebido += valorBruto;
+        totalRecebido += valorConsiderado;
 
         const dataPagamento =
           typeof item?.confirmadoEm?.toDate === 'function'
@@ -342,11 +547,11 @@ export default function FinanceiroPro() {
 
         if (dataPagamento instanceof Date && !Number.isNaN(dataPagamento.getTime())) {
           if (dataPagamento >= inicioHoje) {
-            recebidoHoje += valorBruto;
+            recebidoHoje += valorConsiderado;
           }
 
           if (dataPagamento >= inicioMes) {
-            recebidoMes += valorBruto;
+            recebidoMes += valorConsiderado;
           }
         }
       }
@@ -365,7 +570,7 @@ export default function FinanceiroPro() {
     const saldoBloqueadoFirestore = parseNumero(saldoConta?.saldoBloqueado ?? 0);
 
     const saldoDisponivelFallback = pagamentos
-      .filter((item) => getStatusPagamento(item) === 'pago')
+      .filter((item) => ['pago', 'received', 'confirmed'].includes(getStatusPagamento(item)))
       .reduce((acc, item) => acc + getValorLiquido(item), 0);
 
     const saldoDisponivel =
@@ -397,12 +602,19 @@ export default function FinanceiroPro() {
 
     const ticketMedio = cobrancasPagas > 0 ? totalRecebido / cobrancasPagas : 0;
 
-    const listaComparativo = [
-      { label: 'Saldo disponível', valor: saldoDisponivel },
-      { label: 'Saldo pendente', valor: saldoPendente },
-      { label: 'Saldo sacado', valor: totalSacado },
-      { label: 'Saldo bloqueado', valor: saldoBloqueado },
-    ];
+    const listaComparativo = ehColaborador
+      ? [
+        { label: 'Recebido hoje', valor: recebidoHoje },
+        { label: 'Recebido no mês', valor: recebidoMes },
+        { label: 'Total recebido', valor: totalRecebido },
+        { label: 'Em aberto', valor: valorEmAberto },
+      ]
+      : [
+        { label: 'Saldo disponível', valor: saldoDisponivel },
+        { label: 'Saldo pendente', valor: saldoPendente },
+        { label: 'Saldo sacado', valor: totalSacado },
+        { label: 'Saldo bloqueado', valor: saldoBloqueado },
+      ];
 
     const maiorValor = Math.max(...listaComparativo.map((item) => item.valor), 1);
 
@@ -420,6 +632,7 @@ export default function FinanceiroPro() {
       saldoBloqueado,
       totalSacado,
       saquesSolicitados,
+      valorEmAberto,
       cobrancasGeradas,
       cobrancasPagas,
       cobrancasCanceladas,
@@ -429,7 +642,7 @@ export default function FinanceiroPro() {
       saqueAutomaticoEm: saldoConta?.saqueAutomaticoEm || null,
       ultimaLiberacaoEm: saldoConta?.ultimaLiberacaoEm || null,
     };
-  }, [pagamentos, saques, saldoConta]);
+  }, [pagamentos, agendamentos, saques, saldoConta, ehColaborador]);
 
   const ultimasCobrancas = useMemo(() => {
     return [...pagamentos]
@@ -528,7 +741,204 @@ export default function FinanceiroPro() {
     }
   }
 
-  if (loadingAuth || loading) {
+  async function salvarDadosBancarios() {
+    if (!dadosBancarios.banco || !dadosBancarios.agencia || !dadosBancarios.conta) {
+      Alert.alert('Campos obrigatórios', 'Por favor, preencha Banco, Agência e Conta.');
+      return;
+    }
+
+    try {
+      setLoadingBanco(true);
+      const userRef = doc(db, 'usuarios', usuario.uid);
+      await updateDoc(userRef, {
+        banco: dadosBancarios.banco.trim(),
+        agencia: dadosBancarios.agencia.trim(),
+        conta: dadosBancarios.conta.trim(),
+        tipoConta: dadosBancarios.tipoConta,
+        chavePix: dadosBancarios.chavePixPerfil.trim(),
+        pixAddressKey: dadosBancarios.chavePixPerfil.trim(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setModalBancoVisible(false);
+      Alert.alert('Sucesso', 'Dados bancários atualizados com sucesso!');
+    } catch (error) {
+      console.log('Erro ao salvar dados bancários:', error);
+      Alert.alert('Erro', 'Não foi possível salvar os dados bancários.');
+    } finally {
+      setLoadingBanco(false);
+    }
+  }
+
+  async function exportarRelatorioFinanceiro() {
+    try {
+      setLoadingExport(true);
+
+      const totalBruto = resumo.totalRecebido;
+      const totalTaxas = pagamentos.reduce((acc, p) => {
+        const status = getStatusPagamento(p);
+        if (status === 'pago' || status === 'received' || status === 'confirmed') {
+          return acc + (getValorBruto(p) - getValorLiquido(p));
+        }
+        return acc;
+      }, 0);
+      const totalLiquido = totalBruto - totalTaxas;
+
+      const pagamentosHTML = pagamentos
+        .filter(p => {
+          const status = getStatusPagamento(p);
+          return status === 'pago' || status === 'received' || status === 'confirmed';
+        })
+        .sort((a, b) => {
+          const dataA = a?.confirmadoEm?.toDate?.() || new Date(0);
+          const dataB = b?.confirmadoEm?.toDate?.() || new Date(0);
+          return dataB - dataA;
+        })
+        .map(p => `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 10px; font-size: 11px;">${formatDateBR(p.confirmadoEm || p.pagoEm)}</td>
+            <td style="padding: 10px; font-size: 11px;">${p.clienteNome || 'Cliente'}</td>
+            <td style="padding: 10px; font-size: 11px;">${p.colaboradorNome || 'Eu'}</td>
+            <td style="padding: 10px; font-size: 11px; text-align: right;">${formatCurrency(getValorBruto(p))}</td>
+            <td style="padding: 10px; font-size: 11px; text-align: right; color: #d32f2f;">-${formatCurrency(getValorBruto(p) - getValorLiquido(p))}</td>
+            <td style="padding: 10px; font-size: 11px; text-align: right; font-weight: bold; color: #2e7d32;">${formatCurrency(getValorLiquido(p))}</td>
+          </tr>
+        `).join('');
+
+      const equipeHTML = rendimentosPorColaborador.map(c => `
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ccc;">
+          <span>${c.nome}</span>
+          <span style="font-weight: bold;">${formatCurrency(c.total)}</span>
+        </div>
+      `).join('');
+
+      const saquesHTML = saques
+        .sort((a, b) => {
+          const dataA = a?.solicitadoEm?.toDate?.() || new Date(0);
+          const dataB = b?.solicitadoEm?.toDate?.() || new Date(0);
+          return dataB - dataA;
+        })
+        .map(s => `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 10px; font-size: 11px;">${formatDateBR(s.solicitadoEm || s.criadoEm)}</td>
+            <td style="padding: 10px; font-size: 11px;">${s.pixAddressKey || s.chavePix || 'Não informada'}</td>
+            <td style="padding: 10px; font-size: 11px; text-align: center;">
+              <span style="padding: 2px 8px; border-radius: 10px; background: #eee; font-size: 9px; font-weight: bold;">
+                ${String(s.status || 'pendente').toUpperCase()}
+              </span>
+            </td>
+            <td style="padding: 10px; font-size: 11px; text-align: right; font-weight: bold;">${formatCurrency(s.valor || s.valorSolicitado || 0)}</td>
+          </tr>
+        `).join('');
+
+      const html = `
+        <html>
+        <head>
+          <style>
+            body { font-family: 'Helvetica', sans-serif; padding: 20px; color: #333; }
+            .header { text-align: center; border-bottom: 2px solid ${colors.primary}; padding-bottom: 20px; margin-bottom: 20px; }
+            .title { font-size: 22px; font-weight: bold; color: ${colors.primary}; }
+            .summary-box { display: flex; justify-content: space-between; margin-bottom: 30px; background: #f8f9fa; padding: 15px; border-radius: 8px; flex-wrap: wrap; gap: 10px; }
+            .summary-item { text-align: center; flex: 1; min-width: 120px; }
+            .summary-label { font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+            .summary-value { font-size: 16px; font-weight: bold; }
+            .section-title { font-size: 14px; font-weight: bold; margin: 25px 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #eee; color: ${colors.primary}; }
+            table { width: 100%; border-collapse: collapse; }
+            th { background: #f4f4f4; padding: 10px; text-align: left; font-size: 11px; text-transform: uppercase; }
+            .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #999; }
+            .total-balance-box { margin-top: 20px; padding: 15px; background: ${colors.primary}; color: #fff; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">RELATÓRIO FINANCEIRO DETALHADO</div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">Período: ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}</div>
+          </div>
+
+          <div class="summary-box">
+            <div class="summary-item">
+              <div class="summary-label">Total Bruto</div>
+              <div class="summary-value">${formatCurrency(totalBruto)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Taxas Plataforma</div>
+              <div class="summary-value" style="color: #d32f2f;">-${formatCurrency(totalTaxas)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Líquido</div>
+              <div class="summary-value" style="color: #2e7d32;">${formatCurrency(totalLiquido)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Saldo Atual</div>
+              <div class="summary-value" style="color: ${colors.primary};">${formatCurrency(resumo.saldoDisponivel)}</div>
+            </div>
+          </div>
+
+          ${!ehColaborador ? `
+            <div class="section-title">RENDIMENTOS POR EQUIPE</div>
+            <div style="background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 5px;">
+              ${equipeHTML}
+            </div>
+          ` : ''}
+
+          <div class="section-title">DETALHAMENTO DE TRANSAÇÕES</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Cliente</th>
+                <th>Profissional</th>
+                <th style="text-align: right;">Bruto</th>
+                <th style="text-align: right;">Taxas</th>
+                <th style="text-align: right;">Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pagamentosHTML}
+            </tbody>
+          </table>
+
+          ${saques.length > 0 ? `
+            <div class="section-title">SOLICITAÇÕES DE SAQUE</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Chave Pix</th>
+                  <th style="text-align: center;">Status</th>
+                  <th style="text-align: right;">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${saquesHTML}
+              </tbody>
+            </table>
+          ` : ''}
+
+          <div class="total-balance-box">
+            <span style="font-weight: bold; text-transform: uppercase; font-size: 12px;">Saldo Disponível para Saque</span>
+            <span style="font-size: 20px; font-weight: bold;">${formatCurrency(resumo.saldoDisponivel)}</span>
+          </div>
+
+          <div class="footer">
+            Relatório gerado em ${new Date().toLocaleString('pt-BR')} por ${usuario.nome || 'Gestor'}<br/>
+            Sistema Conecta Serviços - Gestão Financeira Inteligente
+          </div>
+        </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Relatório Financeiro' });
+    } catch (error) {
+      console.log('Erro ao exportar PDF:', error);
+      Alert.alert('Erro', 'Não foi possível gerar o relatório financeiro.');
+    } finally {
+      setLoadingExport(false);
+    }
+  }
+
+  if (loadingAuth || loadingUsuario || loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -548,49 +958,107 @@ export default function FinanceiroPro() {
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Financeiro</Text>
             <Text style={styles.subtitle}>
-              Acompanhe saldos, cobranças e solicitações de saque
+              {ehColaborador
+                ? 'Veja apenas seus resultados e histórico de atendimentos'
+                : 'Acompanhe saldos, cobranças e solicitações de saque'}
             </Text>
           </View>
 
-          <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.refreshButton}>
-            <Ionicons name="cash-outline" size={20} color={colors.primary} />
-          </TouchableOpacity>
+          {!ehColaborador && (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity onPress={exportarRelatorioFinanceiro} style={styles.refreshButton} disabled={loadingExport}>
+                {loadingExport ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setModalBancoVisible(true)} style={styles.refreshButton}>
+                <Ionicons name="settings-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.refreshButton}>
+                <Ionicons name="cash-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
+        {!ehColaborador && rendimentosPorColaborador.length > 0 && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Rendimentos por Equipe</Text>
+              <Ionicons name="people-outline" size={20} color={colors.primary} />
+            </View>
+
+            <View style={styles.colabsList}>
+              {rendimentosPorColaborador.map((colab) => (
+                <View key={colab.id} style={styles.colabFinanceCard}>
+                  <View style={styles.colabFinanceLeft}>
+                    <View style={styles.colabAvatar}>
+                      <Text style={styles.colabAvatarText}>{colab.nome.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.colabName}>{colab.nome}</Text>
+                      <Text style={styles.colabMeta}>{colab.servicos} serviços este mês</Text>
+                    </View>
+                  </View>
+                  <View style={styles.colabFinanceRight}>
+                    <Text style={styles.colabValue}>{formatCurrency(colab.total)}</Text>
+                    <View style={styles.miniProgressContainer}>
+                      <View
+                        style={[
+                          styles.miniProgressBar,
+                          { width: `${Math.min(100, (colab.total / (resumo.totalRecebido || 1)) * 100)}%` }
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={styles.mainCard}>
-          <Text style={styles.cardLabel}>Saldo disponível</Text>
-          <Text style={styles.totalValue}>{formatCurrency(resumo.saldoDisponivel)}</Text>
+          <Text style={styles.cardLabel}>{ehColaborador ? 'Rendimentos recebidos' : 'Saldo disponível'}</Text>
+          <Text style={styles.totalValue}>
+            {formatCurrency(ehColaborador ? resumo.totalRecebido : resumo.saldoDisponivel)}
+          </Text>
 
           <View style={styles.divider} />
 
           <View style={styles.row}>
-            <Ionicons name="wallet-outline" size={20} color="#FFF" />
+            <Ionicons name={ehColaborador ? "stats-chart-outline" : "wallet-outline"} size={20} color="#FFF" />
             <Text style={styles.subText}>
-              {formatCurrency(resumo.saquesSolicitados)} em saques solicitados
+              {ehColaborador
+                ? `${resumo.cobrancasPagas} serviço(s) concluído(s) já pagos para você`
+                : `${formatCurrency(resumo.saquesSolicitados)} em saques solicitados`}
             </Text>
           </View>
 
-          {!!resumo.saqueAutomaticoEm && (
+          {!ehColaborador && !!resumo.saqueAutomaticoEm && (
             <Text style={styles.nextTransferText}>
               Saque automático previsto: {formatDateBR(resumo.saqueAutomaticoEm)}
             </Text>
           )}
         </View>
 
-        <View style={styles.ctaRow}>
-          <TouchableOpacity
-            style={[styles.ctaButton, styles.ctaPrimary]}
-            onPress={() => setModalVisible(true)}
-          >
-            <Ionicons name="arrow-up-circle-outline" size={20} color="#FFF" />
-            <Text style={styles.ctaPrimaryText}>Solicitar saque</Text>
-          </TouchableOpacity>
+        {!ehColaborador && (
+          <View style={styles.ctaRow}>
+            <TouchableOpacity
+              style={[styles.ctaButton, styles.ctaPrimary]}
+              onPress={() => setModalVisible(true)}
+            >
+              <Ionicons name="arrow-up-circle-outline" size={20} color="#FFF" />
+              <Text style={styles.ctaPrimaryText}>Solicitar saque</Text>
+            </TouchableOpacity>
 
-          <View style={styles.ctaSecondary}>
-            <Text style={styles.ctaSecondaryLabel}>Saldo pendente</Text>
-            <Text style={styles.ctaSecondaryValue}>{formatCurrency(resumo.saldoPendente)}</Text>
+            <View style={styles.ctaSecondary}>
+              <Text style={styles.ctaSecondaryLabel}>Saldo pendente</Text>
+              <Text style={styles.ctaSecondaryValue}>{formatCurrency(resumo.saldoPendente)}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.infoGrid}>
           <InfoMiniCard
@@ -607,9 +1075,9 @@ export default function FinanceiroPro() {
           />
           <InfoMiniCard
             icon="checkmark-done-circle-outline"
-            label="Total recebido"
+            label={ehColaborador ? 'Total já recebido' : 'Total recebido'}
             value={formatCurrency(resumo.totalRecebido)}
-            subtitle={`${resumo.cobrancasPagas} cobrança(s) paga(s)`}
+            subtitle={ehColaborador ? `${resumo.cobrancasPagas} serviço(s) concluído(s) pagos` : `${resumo.cobrancasPagas} cobrança(s) paga(s)`}
           />
           <InfoMiniCard
             icon="trending-up-outline"
@@ -623,16 +1091,27 @@ export default function FinanceiroPro() {
             value={String(resumo.cobrancasGeradas)}
             subtitle="aguardando pagamento"
           />
-          <InfoMiniCard
-            icon="card-outline"
-            label="Total sacado"
-            value={formatCurrency(resumo.totalSacado)}
-            subtitle={`${ultimosSaques.filter((item) => String(item.status).toLowerCase() === 'pago').length} saque(s) pagos`}
-          />
+          {ehColaborador ? (
+            <InfoMiniCard
+              icon="cash-outline"
+              label="Em aberto"
+              value={formatCurrency(resumo.valorEmAberto)}
+              subtitle="cobranças aguardando pagamento"
+            />
+          ) : (
+            <InfoMiniCard
+              icon="card-outline"
+              label="Total sacado"
+              value={formatCurrency(resumo.totalSacado)}
+              subtitle={`${ultimosSaques.filter((item) => String(item.status).toLowerCase() === 'pago').length} saque(s) pagos`}
+            />
+          )}
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Comparativo dos saldos</Text>
+          <Text style={styles.sectionTitle}>
+            {ehColaborador ? 'Comparativo dos resultados' : 'Comparativo dos saldos'}
+          </Text>
 
           {resumo.dadosGrafico.map((item) => (
             <View key={item.label} style={styles.barItem}>
@@ -648,56 +1127,58 @@ export default function FinanceiroPro() {
           ))}
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Saques recentes</Text>
+        {!ehColaborador && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Saques recentes</Text>
 
-          {ultimosSaques.length === 0 ? (
-            <EmptyState
-              icon="cash-outline"
-              title="Nenhum saque solicitado"
-              subtitle="Quando você solicitar um saque, ele aparecerá aqui."
-            />
-          ) : (
-            ultimosSaques.map((item) => {
-              const statusColor = getSaqueStatusColor(String(item?.status || '').toLowerCase());
+            {ultimosSaques.length === 0 ? (
+              <EmptyState
+                icon="cash-outline"
+                title="Nenhum saque solicitado"
+                subtitle="Quando você solicitar um saque, ele aparecerá aqui."
+              />
+            ) : (
+              ultimosSaques.map((item) => {
+                const statusColor = getSaqueStatusColor(String(item?.status || '').toLowerCase());
 
-              return (
-                <View key={item.id} style={styles.saqueCard}>
-                  <View style={styles.saqueLeft}>
-                    <View style={[styles.saqueIconWrap, { backgroundColor: `${statusColor}15` }]}>
-                      <Ionicons name="arrow-up-circle-outline" size={18} color={statusColor} />
+                return (
+                  <View key={item.id} style={styles.saqueCard}>
+                    <View style={styles.saqueLeft}>
+                      <View style={[styles.saqueIconWrap, { backgroundColor: `${statusColor}15` }]}>
+                        <Ionicons name="arrow-up-circle-outline" size={18} color={statusColor} />
+                      </View>
+
+                      <View style={styles.saqueTextBox}>
+                        <Text style={styles.saqueTitle}>
+                          {formatCurrency(
+                            item?.valor ??
+                            item?.valorSolicitado ??
+                            item?.valorAprovado ??
+                            0
+                          )}
+                        </Text>
+                        <Text style={styles.saqueSubtitle}>
+                          {item?.pixAddressKey || item?.chavePix
+                            ? `Chave Pix: ${item?.pixAddressKey || item?.chavePix}`
+                            : 'Chave Pix não informada'}
+                        </Text>
+                      </View>
                     </View>
 
-                    <View style={styles.saqueTextBox}>
-                      <Text style={styles.saqueTitle}>
-                        {formatCurrency(
-                          item?.valor ??
-                          item?.valorSolicitado ??
-                          item?.valorAprovado ??
-                          0
-                        )}
+                    <View style={styles.saqueRight}>
+                      <Text style={[styles.saqueStatus, { color: statusColor }]}>
+                        {getSaqueStatusLabel(String(item?.status || '').toLowerCase())}
                       </Text>
-                      <Text style={styles.saqueSubtitle}>
-                        {item?.pixAddressKey || item?.chavePix
-                          ? `Chave Pix: ${item?.pixAddressKey || item?.chavePix}`
-                          : 'Chave Pix não informada'}
+                      <Text style={styles.saqueDate}>
+                        {formatDateBR(item?.solicitadoEm || item?.criadoEm)}
                       </Text>
                     </View>
                   </View>
-
-                  <View style={styles.saqueRight}>
-                    <Text style={[styles.saqueStatus, { color: statusColor }]}>
-                      {getSaqueStatusLabel(String(item?.status || '').toLowerCase())}
-                    </Text>
-                    <Text style={styles.saqueDate}>
-                      {formatDateBR(item?.solicitadoEm || item?.criadoEm)}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
+                );
+              })
+            )}
+          </View>
+        )}
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Últimas cobranças</Text>
@@ -739,9 +1220,15 @@ export default function FinanceiroPro() {
         <View style={styles.tipCard}>
           <Ionicons name="bulb-outline" size={22} color="#856404" />
           <Text style={styles.tipText}>
-            Agora o financeiro usa o documento de saldo como fonte principal. Quando o pagamento
-            for confirmado pelo webhook, o valor líquido deve aparecer em
-            <Text style={styles.tipBold}> saldo disponível</Text>.
+            {ehColaborador ? (
+              'Esta subconta mostra apenas os seus rendimentos, atualizados automaticamente conforme os pagamentos recebidos nos serviços concluídos por você. Saques e saldo principal seguem sob gestão da conta superior.'
+            ) : (
+              <>
+                Agora o financeiro usa o documento de saldo como fonte principal. Quando o pagamento
+                for confirmado pelo webhook, o valor líquido deve aparecer em
+                <Text style={styles.tipBold}> saldo disponível</Text>.
+              </>
+            )}
           </Text>
         </View>
       </ScrollView>
@@ -793,6 +1280,78 @@ export default function FinanceiroPro() {
                 <>
                   <Ionicons name="arrow-up-circle-outline" size={18} color="#FFF" />
                   <Text style={styles.modalButtonText}>Confirmar solicitação</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modalBancoVisible} transparent animationType="slide" onRequestClose={() => setModalBancoVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Dados Bancários</Text>
+              <TouchableOpacity onPress={() => setModalBancoVisible(false)}>
+                <Ionicons name="close-outline" size={24} color={colors.textDark} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+              <Text style={styles.inputLabel}>Banco</Text>
+              <TextInput
+                value={dadosBancarios.banco}
+                onChangeText={(text) => setDadosBancarios(prev => ({ ...prev, banco: text }))}
+                placeholder="Ex: Nubank, Itaú..."
+                style={styles.input}
+                placeholderTextColor="#999"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Agência</Text>
+                  <TextInput
+                    value={dadosBancarios.agencia}
+                    onChangeText={(text) => setDadosBancarios(prev => ({ ...prev, agencia: text }))}
+                    placeholder="0001"
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholderTextColor="#999"
+                  />
+                </View>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.inputLabel}>Conta</Text>
+                  <TextInput
+                    value={dadosBancarios.conta}
+                    onChangeText={(text) => setDadosBancarios(prev => ({ ...prev, conta: text }))}
+                    placeholder="12345-6"
+                    style={styles.input}
+                    placeholderTextColor="#999"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Chave Pix para Saques</Text>
+              <TextInput
+                value={dadosBancarios.chavePixPerfil}
+                onChangeText={(text) => setDadosBancarios(prev => ({ ...prev, chavePixPerfil: text }))}
+                placeholder="CPF, E-mail ou Celular"
+                style={styles.input}
+                placeholderTextColor="#999"
+              />
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalButton, loadingBanco && { opacity: 0.7 }]}
+              onPress={salvarDadosBancarios}
+              disabled={loadingBanco}
+            >
+              {loadingBanco ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="save-outline" size={18} color="#FFF" />
+                  <Text style={styles.modalButtonText}>Salvar Dados</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -1001,6 +1560,87 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#777',
     marginTop: 4,
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+
+  colabsList: {
+    gap: 12,
+  },
+
+  colabFinanceCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+
+  colabFinanceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  colabAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  colabAvatarText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  colabName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.textDark,
+  },
+
+  colabMeta: {
+    fontSize: 11,
+    color: '#6C757D',
+    marginTop: 2,
+  },
+
+  colabFinanceRight: {
+    alignItems: 'flex-end',
+    width: 100,
+  },
+
+  colabValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+
+  miniProgressContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#E9ECEF',
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+
+  miniProgressBar: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
   },
 
   sectionCard: {

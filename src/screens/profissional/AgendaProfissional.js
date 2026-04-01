@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
@@ -15,6 +16,8 @@ import {
     query,
     where,
     onSnapshot,
+    or,
+    doc,
 } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
@@ -93,9 +96,15 @@ function getPrimeiraLetra(nome = '') {
 
 export default function AgendaProfissional({ navigation }) {
     const [agendamentos, setAgendamentos] = useState([]);
+    const [colaboradores, setColaboradores] = useState([]);
+    const [perfilUsuario, setPerfilUsuario] = useState(null);
     const [loading, setLoading] = useState(true);
     const [filtroStatus, setFiltroStatus] = useState('todos');
+    const [filtroColaborador, setFiltroColaborador] = useState('todos');
+    const [abaAtiva, setAbaAtiva] = useState('minha'); // 'minha' ou 'equipe'
     const [refreshing, setRefreshing] = useState(false);
+
+    const ehChefe = useMemo(() => perfilUsuario?.perfil !== 'colaborador', [perfilUsuario]);
 
     const filtros = [
         { key: 'todos', label: 'Todos' },
@@ -108,6 +117,37 @@ export default function AgendaProfissional({ navigation }) {
 
     useEffect(() => {
         const user = auth.currentUser;
+        if (!user) return;
+
+        const unsubPerfil = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+            if (snap.exists()) {
+                const dados = snap.data();
+                setPerfilUsuario(dados);
+                // Se for colaborador, forçar a aba 'minha'
+                if (dados.perfil === 'colaborador') {
+                    setAbaAtiva('minha');
+                }
+            }
+        });
+
+        return () => unsubPerfil();
+    }, []);
+
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user || !ehChefe) return;
+
+        const q = query(collection(db, 'usuarios', user.uid, 'colaboradores'));
+        const unsubColabs = onSnapshot(q, (snap) => {
+            const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setColaboradores(lista);
+        });
+
+        return () => unsubColabs();
+    }, [ehChefe]);
+
+    useEffect(() => {
+        const user = auth.currentUser;
 
         if (!user) {
             setLoading(false);
@@ -116,7 +156,11 @@ export default function AgendaProfissional({ navigation }) {
 
         const q = query(
             collection(db, "agendamentos"),
-            where("clinicaId", "==", user.uid)
+            or(
+                where("clinicaId", "==", user.uid),
+                where("profissionalId", "==", user.uid),
+                where("colaboradorId", "==", user.uid)
+            )
         );
 
         const unsubscribe = onSnapshot(
@@ -149,9 +193,31 @@ export default function AgendaProfissional({ navigation }) {
     };
 
     const agendamentosFiltrados = useMemo(() => {
-        if (filtroStatus === 'todos') return agendamentos;
-        return agendamentos.filter((item) => (item.status || 'pendente') === filtroStatus);
-    }, [agendamentos, filtroStatus]);
+        let filtrados = agendamentos;
+
+        // 1. Filtro de Aba (Minha vs Equipe)
+        if (ehChefe) {
+            if (abaAtiva === 'minha') {
+                // Mostra apenas agendamentos onde o GESTOR é o profissional
+                filtrados = filtrados.filter(a => a.colaboradorId === auth.currentUser?.uid || (!a.colaboradorId && a.clinicaId === auth.currentUser?.uid));
+            } else {
+                // Aba Equipe: Mostra agendamentos de COLABORADORES
+                filtrados = filtrados.filter(a => a.colaboradorId && a.colaboradorId !== auth.currentUser?.uid);
+
+                // Filtro por colaborador específico na aba equipe
+                if (filtroColaborador !== 'todos') {
+                    filtrados = filtrados.filter(a => a.colaboradorId === filtroColaborador);
+                }
+            }
+        }
+
+        // 2. Filtro de Status
+        if (filtroStatus !== 'todos') {
+            filtrados = filtrados.filter((item) => (item.status || 'pendente') === filtroStatus);
+        }
+
+        return filtrados;
+    }, [agendamentos, filtroStatus, abaAtiva, filtroColaborador, ehChefe]);
 
     const contagemPorStatus = useMemo(() => {
         return {
@@ -289,11 +355,51 @@ export default function AgendaProfissional({ navigation }) {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Minha Agenda</Text>
+                <View style={styles.titleRow}>
+                    <Text style={styles.title}>{abaAtiva === 'minha' ? 'Minha Agenda' : 'Agenda Equipe'}</Text>
+                    {ehChefe && (
+                        <View style={styles.abaSwitcher}>
+                            <TouchableOpacity
+                                style={[styles.abaBtn, abaAtiva === 'minha' && styles.abaBtnAtivo]}
+                                onPress={() => setAbaAtiva('minha')}
+                            >
+                                <Text style={[styles.abaBtnText, abaAtiva === 'minha' && styles.abaBtnTextAtivo]}>EU</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.abaBtn, abaAtiva === 'equipe' && styles.abaBtnAtivo]}
+                                onPress={() => setAbaAtiva('equipe')}
+                            >
+                                <Text style={[styles.abaBtnText, abaAtiva === 'equipe' && styles.abaBtnTextAtivo]}>EQUIPE</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
                 <Text style={styles.subtitle}>
                     {agendamentosFiltrados.length} agendamento(s) neste filtro
                 </Text>
             </View>
+
+            {ehChefe && abaAtiva === 'equipe' && colaboradores.length > 0 && (
+                <View style={styles.colaboradoresFiltroWrapper}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colabsContainer}>
+                        <TouchableOpacity
+                            style={[styles.colabChip, filtroColaborador === 'todos' && styles.colabChipAtivo]}
+                            onPress={() => setFiltroColaborador('todos')}
+                        >
+                            <Text style={[styles.colabChipText, filtroColaborador === 'todos' && styles.colabChipTextAtivo]}>Todos</Text>
+                        </TouchableOpacity>
+                        {colaboradores.map(c => (
+                            <TouchableOpacity
+                                key={c.id}
+                                style={[styles.colabChip, filtroColaborador === c.id && styles.colabChipAtivo]}
+                                onPress={() => setFiltroColaborador(c.id)}
+                            >
+                                <Text style={[styles.colabChipText, filtroColaborador === c.id && styles.colabChipTextAtivo]}>{c.nome}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
             <View style={styles.resumeCard}>
                 <View style={styles.resumeItem}>
@@ -366,7 +472,7 @@ export default function AgendaProfissional({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F0F3F8',
     },
 
     centered: {
@@ -384,36 +490,112 @@ const styles = StyleSheet.create({
 
     header: {
         paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 12,
+        paddingTop: 12,
+        paddingBottom: 18,
+        backgroundColor: colors.primary,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+
+    abaSwitcher: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255,255,255,0.16)',
+        borderRadius: 20,
+        padding: 4,
+    },
+
+    abaBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+
+    abaBtnAtivo: {
         backgroundColor: '#FFF',
+    },
+
+    abaBtnText: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: 'rgba(255,255,255,0.82)',
+    },
+
+    abaBtnTextAtivo: {
+        color: colors.primary,
+    },
+
+    colaboradoresFiltroWrapper: {
+        backgroundColor: 'transparent',
+        paddingTop: 10,
+        paddingBottom: 4,
+    },
+
+    colabsContainer: {
+        paddingHorizontal: 16,
+    },
+
+    colabChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#FFF',
+        marginRight: 8,
+        borderWidth: 1,
+        borderColor: '#E0E7F0',
+    },
+
+    colabChipAtivo: {
+        backgroundColor: '#EEF3FF',
+        borderColor: colors.primary,
+    },
+
+    colabChipText: {
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '600',
+    },
+
+    colabChipTextAtivo: {
+        color: colors.primary,
+        fontWeight: 'bold',
     },
 
     title: {
         fontSize: 24,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#FFF',
     },
 
     subtitle: {
         fontSize: 14,
-        color: colors.secondary,
+        color: 'rgba(255,255,255,0.82)',
         marginTop: 4,
     },
 
     resumeCard: {
         marginHorizontal: 16,
-        marginTop: 14,
+        marginTop: 12,
         marginBottom: 10,
         backgroundColor: '#FFF',
-        borderRadius: 18,
+        borderRadius: 20,
         paddingVertical: 16,
         paddingHorizontal: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#EEF1F4',
+        borderColor: '#E8EDF5',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
     },
 
     resumeItem: {

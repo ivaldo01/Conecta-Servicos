@@ -12,10 +12,13 @@ import {
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
+    Modal,
 } from 'react-native';
-import { auth, db, functions } from "../../services/firebaseConfig";
-import { collection, getDocs } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { auth, db } from "../../services/firebaseConfig";
+import { collection, getDocs, doc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { app } from "../../services/firebaseConfig";
+import { initializeApp, getApps } from "firebase/app";
 import { MultiSelect } from 'react-native-element-dropdown';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
@@ -29,6 +32,10 @@ export default function GerenciarColaboradores({ navigation }) {
     const [equipe, setEquipe] = useState([]);
     const [loading, setLoading] = useState(true);
     const [salvando, setSalvando] = useState(false);
+    const [modalServicosVisible, setModalServicosVisible] = useState(false);
+    const [colaboradorEditando, setColaboradorEditando] = useState(null);
+    const [servicosEdicao, setServicosEdicao] = useState([]);
+    const [salvandoServicos, setSalvandoServicos] = useState(false);
 
     const emailRef = useRef(null);
     const senhaRef = useRef(null);
@@ -36,6 +43,16 @@ export default function GerenciarColaboradores({ navigation }) {
     useEffect(() => {
         carregarDados();
     }, []);
+
+    const getResumoServicos = (ids = []) => {
+        if (!Array.isArray(ids) || ids.length === 0) return 'Nenhum serviço liberado';
+
+        const nomes = ids
+            .map((id) => servicosDisponiveis.find((servico) => servico.value === id)?.label)
+            .filter(Boolean);
+
+        return nomes.length > 0 ? nomes.join(', ') : `${ids.length} serviço(s) liberado(s)`;
+    };
 
     const carregarDados = async () => {
         const user = auth.currentUser;
@@ -60,11 +77,64 @@ export default function GerenciarColaboradores({ navigation }) {
         }
     };
 
+    const abrirEditorServicos = (colaborador) => {
+        Keyboard.dismiss();
+        setColaboradorEditando(colaborador);
+        setServicosEdicao(Array.isArray(colaborador?.servicosHabilitados) ? colaborador.servicosHabilitados : []);
+        setModalServicosVisible(true);
+    };
+
+    const salvarServicosColaborador = async () => {
+        const user = auth.currentUser;
+
+        if (!user || !colaboradorEditando?.id) {
+            Alert.alert("Erro", "Não foi possível identificar o colaborador.");
+            return;
+        }
+
+        setSalvandoServicos(true);
+
+        try {
+            const batch = writeBatch(db);
+            const payload = {
+                servicosHabilitados: Array.isArray(servicosEdicao) ? servicosEdicao : [],
+                updatedAt: serverTimestamp(),
+            };
+
+            batch.set(doc(db, "usuarios", user.uid, "colaboradores", colaboradorEditando.id), payload, { merge: true });
+            batch.set(doc(db, "usuarios", colaboradorEditando.id), payload, { merge: true });
+            await batch.commit();
+
+            setEquipe((prev) => prev.map((item) => (
+                item.id === colaboradorEditando.id
+                    ? { ...item, servicosHabilitados: payload.servicosHabilitados }
+                    : item
+            )));
+
+            setModalServicosVisible(false);
+            setColaboradorEditando(null);
+            setServicosEdicao([]);
+            Alert.alert("Sucesso", "Serviços do colaborador atualizados com sucesso.");
+        } catch (e) {
+            console.error("Erro ao atualizar serviços do colaborador:", e);
+            Alert.alert("Erro", "Não foi possível atualizar os serviços deste colaborador.");
+        } finally {
+            setSalvandoServicos(false);
+        }
+    };
+
     const salvarColaborador = async () => {
         Keyboard.dismiss();
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
         if (!nome.trim() || !email.trim() || !senha.trim() || servicosSelecionados.length === 0) {
             Alert.alert("Atenção", "Por favor, preencha todos os campos.");
+            return;
+        }
+
+        if (!emailRegex.test(email.trim())) {
+            Alert.alert("E-mail Inválido", "Por favor, insira um e-mail válido para o colaborador.");
             return;
         }
 
@@ -75,48 +145,110 @@ export default function GerenciarColaboradores({ navigation }) {
 
         setSalvando(true);
 
-        try {
-            const criarColaborador = httpsCallable(functions, "criarColaborador");
+        // Criamos um app secundário para isolar o Auth e não deslogar o gestor
+        const secondaryAppName = `SecondaryApp_${Date.now()}`;
+        const secondaryApp = initializeApp(app.options, secondaryAppName);
+        const secondaryAuth = getAuth(secondaryApp);
+        const userDono = auth.currentUser;
 
-            const response = await criarColaborador({
+        try {
+            // 1. Criar o usuário no Auth (isolado)
+            const userCredential = await createUserWithEmailAndPassword(
+                secondaryAuth,
+                email.trim().toLowerCase(),
+                senha
+            );
+
+            const novoColabId = userCredential.user.uid;
+
+            // 2. Gravar no Firestore (usando o Auth principal do gestor)
+            const batch = writeBatch(db);
+
+            // Perfil principal do colaborador
+            const usuarioRef = doc(db, "usuarios", novoColabId);
+            batch.set(usuarioRef, {
+                uid: novoColabId,
                 nome: nome.trim(),
+                nomeCompleto: nome.trim(),
                 email: email.trim().toLowerCase(),
-                senha,
-                servicosSelecionados
+                tipo: "profissional",
+                perfil: "colaborador",
+                clinicaId: userDono.uid,
+                servicosHabilitados: servicosSelecionados,
+                ativo: true,
+                createdAt: serverTimestamp(),
             });
 
-            if (response?.data?.ok) {
-                Alert.alert("Sucesso!", "Colaborador criado com sucesso.");
+            // Referência na equipe da empresa
+            const subcolabRef = doc(db, "usuarios", userDono.uid, "colaboradores", novoColabId);
+            batch.set(subcolabRef, {
+                id: novoColabId,
+                nome: nome.trim(),
+                email: email.trim().toLowerCase(),
+                servicosHabilitados: servicosSelecionados,
+                ativo: true,
+                dataCriacao: serverTimestamp(),
+            });
 
-                setNome('');
-                setEmail('');
-                setSenha('');
-                setServicosSelecionados([]);
+            // Saldo inicial
+            const saldoRef = doc(db, "saldos", novoColabId);
+            batch.set(saldoRef, {
+                usuarioId: novoColabId,
+                saldo: 0,
+                saldoBloqueado: 0,
+                ultimaAtualizacao: serverTimestamp(),
+            });
 
-                await carregarDados();
-            } else {
-                Alert.alert("Erro", "Não foi possível criar o colaborador.");
-            }
+            await batch.commit();
+
+            // 3. Limpar a sessão temporária
+            await secondaryAuth.signOut();
+
+            Alert.alert("Sucesso!", "Colaborador criado com sucesso.");
+
+            setNome('');
+            setEmail('');
+            setSenha('');
+            setServicosSelecionados([]);
+
+            await carregarDados();
         } catch (e) {
-            console.error("Erro detalhado:", e);
+            console.error("Erro ao criar colaborador:", e);
+            let msg = "Erro ao criar colaborador.";
+            if (e.code === 'auth/email-already-in-use') msg = "Este e-mail já está em uso.";
+            if (e.code === 'auth/weak-password') msg = "A senha deve ter no mínimo 6 caracteres.";
 
-            const code = e?.code || "";
-            const message = e?.message || "Erro ao criar colaborador.";
-
-            if (code.includes("already-exists")) {
-                Alert.alert("Erro", "Este e-mail já está em uso.");
-            } else if (code.includes("permission-denied")) {
-                Alert.alert("Erro", "Sua conta não tem permissão para criar colaboradores.");
-            } else if (code.includes("unauthenticated")) {
-                Alert.alert("Erro", "Você precisa estar logado.");
-            } else if (code.includes("invalid-argument")) {
-                Alert.alert("Erro", message);
-            } else {
-                Alert.alert("Erro", message);
-            }
+            Alert.alert("Erro", msg);
         } finally {
             setSalvando(false);
         }
+    };
+
+    const excluirColaborador = async (id, nome) => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        Alert.alert(
+            "Remover Colaborador",
+            `Deseja realmente remover ${nome} da sua equipe?`,
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Remover",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await deleteDoc(doc(db, "usuarios", user.uid, "colaboradores", id));
+                            Alert.alert("Sucesso", "Colaborador removido da sua lista.");
+                            await carregarDados();
+                        } catch (e) {
+                            console.error(e);
+                            Alert.alert("Erro", "Não foi possível remover o colaborador.");
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (loading) {
@@ -143,8 +275,15 @@ export default function GerenciarColaboradores({ navigation }) {
                 >
                     <Text style={styles.headerTitle}>Minha Equipe</Text>
 
+                    <View style={styles.helperCard}>
+                        <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                        <Text style={styles.helperText}>
+                            Cada colaborador funciona como uma subconta: você define os serviços liberados e a agenda de atendimento de cada um.
+                        </Text>
+                    </View>
+
                     <View style={styles.formCard}>
-                        <Text style={styles.formSubtitle}>Cadastrar Novo Profissional</Text>
+                        <Text style={styles.formSubtitle}>Cadastrar Novo Colaborador</Text>
 
                         <TextInput
                             style={styles.input}
@@ -184,7 +323,7 @@ export default function GerenciarColaboradores({ navigation }) {
                             onSubmitEditing={salvarColaborador}
                         />
 
-                        <Text style={styles.label}>Habilitar para os serviços:</Text>
+                        <Text style={styles.label}>Liberar estes serviços para a subconta:</Text>
                         <MultiSelect
                             style={styles.dropdown}
                             placeholder="Selecione os serviços..."
@@ -211,7 +350,7 @@ export default function GerenciarColaboradores({ navigation }) {
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.sectionTitle}>Colaboradores Cadastrados</Text>
+                    <Text style={styles.sectionTitle}>Colaboradores cadastrados</Text>
 
                     {equipe.length === 0 ? (
                         <Text style={styles.emptyText}>Nenhum profissional cadastrado.</Text>
@@ -223,29 +362,97 @@ export default function GerenciarColaboradores({ navigation }) {
                                     <Text style={styles.colabEmail}>{item.email}</Text>
                                     <View style={styles.badge}>
                                         <Text style={styles.badgeText}>
-                                            {item.servicosHabilitados?.length || 0} serviços
+                                            {item.servicosHabilitados?.length || 0} serviço(s) liberado(s)
                                         </Text>
                                     </View>
+                                    <Text style={styles.serviceSummaryText}>{getResumoServicos(item.servicosHabilitados)}</Text>
                                 </View>
 
-                                <TouchableOpacity
-                                    style={styles.agendaButton}
-                                    onPress={() => {
-                                        Keyboard.dismiss();
-                                        navigation.navigate("ConfigurarAgenda", {
-                                            colaboradorId: item.id,
-                                            colaboradorNome: item.nome
-                                        });
-                                    }}
-                                >
-                                    <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                                    <Text style={styles.agendaButtonText}>Agenda</Text>
-                                </TouchableOpacity>
+                                <View style={styles.actionsColumn}>
+                                    <TouchableOpacity
+                                        style={styles.serviceButton}
+                                        onPress={() => abrirEditorServicos(item)}
+                                    >
+                                        <Ionicons name="cut-outline" size={18} color="#7C3AED" />
+                                        <Text style={styles.serviceButtonText}>Serviços</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.agendaButton}
+                                        onPress={() => {
+                                            Keyboard.dismiss();
+                                            navigation.navigate("ConfigurarAgenda", {
+                                                colaboradorId: item.id,
+                                                colaboradorNome: item.nome
+                                            });
+                                        }}
+                                    >
+                                        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                                        <Text style={styles.agendaButtonText}>Agenda</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.deleteButton}
+                                        onPress={() => excluirColaborador(item.id, item.nome)}
+                                    >
+                                        <Ionicons name="trash-outline" size={18} color="#F44336" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         ))
                     )}
                 </ScrollView>
             </TouchableWithoutFeedback>
+
+            <Modal
+                visible={modalServicosVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setModalServicosVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flex: 1, paddingRight: 12 }}>
+                                <Text style={styles.modalTitle}>Editar serviços liberados</Text>
+                                <Text style={styles.modalSubtitle}>
+                                    {colaboradorEditando?.nome || 'Colaborador'} • subconta da equipe
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity onPress={() => setModalServicosVisible(false)}>
+                                <Ionicons name="close-outline" size={24} color={colors.textDark} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.label}>Selecione os serviços permitidos para este colaborador:</Text>
+                        <MultiSelect
+                            style={styles.dropdown}
+                            placeholder="Selecione os serviços..."
+                            placeholderStyle={styles.dropdownPlaceholder}
+                            data={servicosDisponiveis}
+                            labelField="label"
+                            valueField="value"
+                            value={servicosEdicao}
+                            onChange={(item) => setServicosEdicao(item)}
+                            selectedStyle={styles.selectedChip}
+                        />
+
+                        <TouchableOpacity
+                            style={[styles.mainButton, salvandoServicos && styles.mainButtonDisabled]}
+                            onPress={salvarServicosColaborador}
+                            disabled={salvandoServicos}
+                            activeOpacity={0.88}
+                        >
+                            {salvandoServicos ? (
+                                <ActivityIndicator color="#FFF" />
+                            ) : (
+                                <Text style={styles.buttonText}>SALVAR SERVIÇOS DO COLABORADOR</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 }
@@ -276,6 +483,26 @@ const styles = StyleSheet.create({
         margin: 20,
         marginTop: 50,
         color: colors.textDark
+    },
+
+    helperCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        backgroundColor: '#EEF4FF',
+        marginHorizontal: 20,
+        marginBottom: 4,
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#D7E3FF',
+    },
+
+    helperText: {
+        flex: 1,
+        fontSize: 13,
+        lineHeight: 18,
+        color: '#425466',
     },
 
     formCard: {
@@ -360,7 +587,8 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        elevation: 2
+        elevation: 2,
+        gap: 12,
     },
 
     colabInfo: {
@@ -393,13 +621,55 @@ const styles = StyleSheet.create({
         color: '#666'
     },
 
+    serviceSummaryText: {
+        marginTop: 8,
+        fontSize: 12,
+        lineHeight: 18,
+        color: '#5F6C7B',
+    },
+
+    actionsColumn: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+
+    deleteButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FFEBEE',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    serviceButton: {
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        backgroundColor: '#F4EEFF',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#7C3AED',
+        minWidth: 78,
+    },
+
+    serviceButtonText: {
+        fontSize: 11,
+        color: '#7C3AED',
+        fontWeight: 'bold',
+        marginTop: 2,
+    },
+
     agendaButton: {
         alignItems: 'center',
-        padding: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
         backgroundColor: '#F0F7FF',
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: colors.primary
+        borderColor: colors.primary,
+        minWidth: 78,
     },
 
     agendaButtonText: {
@@ -413,5 +683,37 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#999',
         marginTop: 20
+    },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+
+    modalCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 18,
+        padding: 18,
+    },
+
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.textDark,
+    },
+
+    modalSubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginTop: 4,
     }
 });

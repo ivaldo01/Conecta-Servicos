@@ -60,10 +60,22 @@ function EditarPerfil({ navigation }) {
 
     try {
       const perfilRef = doc(db, "usuarios", user.uid);
-      await updateDoc(perfilRef, {
+      
+      const dadosUpdate = {
         ...perfil,
         updatedAt: new Date().toISOString(),
-      });
+      };
+
+      // Se for colaborador, garante que ele não mude o clinicaId nem o perfil acidentalmente
+      if (perfil.perfil === 'colaborador') {
+        dadosUpdate.perfil = 'colaborador';
+        // Mantém o clinicaId original se existir
+        if (perfil.clinicaId) {
+          dadosUpdate.clinicaId = perfil.clinicaId;
+        }
+      }
+
+      await updateDoc(perfilRef, dadosUpdate);
 
       Alert.alert("Sucesso", "Perfil atualizado com sucesso!");
       navigation.goBack();
@@ -133,57 +145,33 @@ function EditarPerfil({ navigation }) {
               value={perfil.telefone || perfil.whatsapp || ''}
               onChangeText={(text) => setPerfil({ ...perfil, whatsapp: text, telefone: text })}
               keyboardType="phone-pad"
-              returnKeyType={
-                perfil.cpf !== undefined
-                  ? 'next'
-                  : perfil.cnpj !== undefined
-                    ? 'next'
-                    : 'next'
-              }
-              onSubmitEditing={() => {
-                if (perfil.cpf !== undefined) {
-                  cpfRef.current?.focus();
-                  return;
-                }
-                if (perfil.cnpj !== undefined) {
-                  cnpjRef.current?.focus();
-                  return;
-                }
-                enderecoRef.current?.focus();
-              }}
+              returnKeyType="next"
+              onSubmitEditing={() => cpfRef.current?.focus()}
             />
 
-            {perfil.cpf !== undefined && (
+            {perfil.tipo === 'cliente' || perfil.perfil === 'cliente' ? (
               <>
-                <Text style={styles.label}>CPF</Text>
+                <Text style={styles.label}>CPF (Obrigatório para Pagamentos)</Text>
                 <TextInput
                   ref={cpfRef}
                   style={styles.input}
-                  placeholder="CPF"
-                  value={perfil.cpf || ''}
-                  onChangeText={(text) => setPerfil({ ...perfil, cpf: text })}
+                  placeholder="000.000.000-00"
+                  value={perfil.cpf || perfil.cpfCnpj || ''}
+                  onChangeText={(text) => setPerfil({ ...perfil, cpf: text, cpfCnpj: text })}
                   keyboardType="numeric"
-                  returnKeyType={perfil.cnpj !== undefined ? 'next' : 'next'}
-                  onSubmitEditing={() => {
-                    if (perfil.cnpj !== undefined) {
-                      cnpjRef.current?.focus();
-                      return;
-                    }
-                    enderecoRef.current?.focus();
-                  }}
+                  returnKeyType="next"
+                  onSubmitEditing={() => enderecoRef.current?.focus()}
                 />
               </>
-            )}
-
-            {perfil.cnpj !== undefined && (
+            ) : (
               <>
-                <Text style={styles.label}>CNPJ</Text>
+                <Text style={styles.label}>CPF ou CNPJ (Obrigatório para Pagamentos)</Text>
                 <TextInput
-                  ref={cnpjRef}
+                  ref={cpfRef}
                   style={styles.input}
-                  placeholder="CNPJ"
-                  value={perfil.cnpj || ''}
-                  onChangeText={(text) => setPerfil({ ...perfil, cnpj: text })}
+                  placeholder="CPF ou CNPJ"
+                  value={perfil.cpfCnpj || perfil.cpf || perfil.cnpj || ''}
+                  onChangeText={(text) => setPerfil({ ...perfil, cpfCnpj: text })}
                   keyboardType="numeric"
                   returnKeyType="next"
                   onSubmitEditing={() => enderecoRef.current?.focus()}

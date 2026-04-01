@@ -17,46 +17,38 @@ import colors from "../../constants/colors";
 import CustomButton from '../../components/CustomButton';
 
 function formatCPF(value) {
-  return value
+  return String(value || '')
     .replace(/\D/g, '')
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-}
-
-function formatRG(value) {
-  return value
-    .replace(/\D/g, '')
-    .replace(/(\d{2})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1})$/, '$1-$2');
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    .slice(0, 14);
 }
 
 function formatTelefone(value) {
-  return value
+  return String(value || '')
     .replace(/\D/g, '')
     .replace(/(\d{2})(\d)/, '($1) $2')
-    .replace(/(\d{5})(\d)/, '$1-$2');
+    .replace(/(\d{5})(\d)/, '$1-$2')
+    .slice(0, 15);
 }
 
 function EditarMenor({ route, navigation }) {
   const { menorId } = route.params;
 
-  const [nomeMenor, setNomeMenor] = useState('');
-  const [idadeMenor, setIdadeMenor] = useState('');
-  const [cpfMenor, setCpfMenor] = useState('');
-  const [rgMenor, setRgMenor] = useState('');
-  const [telefoneMenor, setTelefoneMenor] = useState('');
+  const [nome, setNome] = useState('');
+  const [idade, setIdade] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [telefone, setTelefone] = useState('');
 
   const idadeRef = useRef(null);
   const cpfRef = useRef(null);
-  const rgRef = useRef(null);
   const telefoneRef = useRef(null);
 
   useEffect(() => {
     const fetchMenor = async () => {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user?.uid) return;
 
       try {
         const menorRef = doc(db, "usuarios", user.uid, "menores", menorId);
@@ -64,13 +56,13 @@ function EditarMenor({ route, navigation }) {
 
         if (menorSnap.exists()) {
           const data = menorSnap.data();
-          setNomeMenor(data.nomeMenor || data.nome || '');
-          setIdadeMenor(data.idadeMenor || data.idade || '');
-          setCpfMenor(data.cpfMenor || '');
-          setRgMenor(data.rgMenor || '');
-          setTelefoneMenor(data.telefoneMenor || '');
+          setNome(data.nome || '');
+          setIdade(data.idade || '');
+          setCpf(data.cpf || '');
+          setTelefone(data.telefone || '');
         }
       } catch (error) {
+        console.log("Erro ao carregar menor:", error);
         Alert.alert("Erro", "Erro ao carregar dados: " + error.message);
       }
     };
@@ -82,22 +74,31 @@ function EditarMenor({ route, navigation }) {
     Keyboard.dismiss();
 
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user?.uid) {
+      Alert.alert("Erro", "Usuário não autenticado.");
+      return;
+    }
+
+    if (!nome.trim() || !idade.trim()) {
+      Alert.alert("Atenção", "Preencha nome e idade.");
+      return;
+    }
 
     try {
       const menorRef = doc(db, "usuarios", user.uid, "menores", menorId);
+
       await updateDoc(menorRef, {
-        nomeMenor,
-        idadeMenor,
-        cpfMenor,
-        rgMenor,
-        telefoneMenor,
-        updatedAt: serverTimestamp()
+        nome: nome.trim(),
+        idade: idade.trim(),
+        cpf: cpf.trim(),
+        telefone: telefone.trim(),
+        atualizadoEm: serverTimestamp(),
       });
 
       Alert.alert("Sucesso", "Dados atualizados com sucesso!");
       navigation.goBack();
     } catch (error) {
+      console.log("Erro ao atualizar menor:", error);
       Alert.alert("Erro", "Erro ao atualizar: " + error.message);
     }
   };
@@ -115,13 +116,13 @@ function EditarMenor({ route, navigation }) {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Editar Menor</Text>
+          <Text style={styles.title}>Editar Dependente</Text>
 
           <TextInput
             style={styles.input}
             placeholder="Nome"
-            value={nomeMenor}
-            onChangeText={setNomeMenor}
+            value={nome}
+            onChangeText={setNome}
             returnKeyType="next"
             onSubmitEditing={() => idadeRef.current?.focus()}
           />
@@ -130,8 +131,8 @@ function EditarMenor({ route, navigation }) {
             ref={idadeRef}
             style={styles.input}
             placeholder="Idade"
-            value={idadeMenor}
-            onChangeText={setIdadeMenor}
+            value={idade}
+            onChangeText={setIdade}
             keyboardType="numeric"
             returnKeyType="next"
             onSubmitEditing={() => cpfRef.current?.focus()}
@@ -140,21 +141,10 @@ function EditarMenor({ route, navigation }) {
           <TextInput
             ref={cpfRef}
             style={styles.input}
-            placeholder="CPF"
+            placeholder="CPF (opcional)"
             keyboardType="numeric"
-            value={cpfMenor}
-            onChangeText={(t) => setCpfMenor(formatCPF(t))}
-            returnKeyType="next"
-            onSubmitEditing={() => rgRef.current?.focus()}
-          />
-
-          <TextInput
-            ref={rgRef}
-            style={styles.input}
-            placeholder="RG"
-            keyboardType="numeric"
-            value={rgMenor}
-            onChangeText={(t) => setRgMenor(formatRG(t))}
+            value={cpf}
+            onChangeText={(t) => setCpf(formatCPF(t))}
             returnKeyType="next"
             onSubmitEditing={() => telefoneRef.current?.focus()}
           />
@@ -162,10 +152,10 @@ function EditarMenor({ route, navigation }) {
           <TextInput
             ref={telefoneRef}
             style={styles.input}
-            placeholder="Telefone"
+            placeholder="Telefone (opcional)"
             keyboardType="numeric"
-            value={telefoneMenor}
-            onChangeText={(t) => setTelefoneMenor(formatTelefone(t))}
+            value={telefone}
+            onChangeText={(t) => setTelefone(formatTelefone(t))}
             returnKeyType="done"
             onSubmitEditing={handleUpdate}
           />
@@ -207,12 +197,13 @@ const styles = StyleSheet.create({
 
   input: {
     width: '90%',
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#ccc',
     marginBottom: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: '#fff',
+    color: colors.textDark,
   },
 
   buttonContainer: {

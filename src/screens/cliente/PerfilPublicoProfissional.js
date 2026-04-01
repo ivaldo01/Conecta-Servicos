@@ -777,7 +777,7 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#EEF3F9',
     },
 
     content: {
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
 
     centered: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#EEF3F9',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 24,
@@ -849,7 +849,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#E9EEF4',
-        elevation: 3,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
     },
 
     avatarShadow: {
@@ -934,6 +938,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 10,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
     },
 
     primaryActionText: {
@@ -989,6 +998,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E9EEF4',
         padding: 16,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
     },
 
     cardHeaderRow: {
@@ -1158,6 +1172,11 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         backgroundColor: colors.primary,
         flexDirection: 'row',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
         alignItems: 'center',
         justifyContent: 'center',
     },

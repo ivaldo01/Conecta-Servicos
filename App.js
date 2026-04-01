@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { Platform } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import mobileAds, { AdsConsent } from 'react-native-google-mobile-ads';
@@ -44,7 +45,12 @@ import ConfigurarPerfil from './src/screens/profissional/ConfigurarPerfil';
 import ConfigurarAgenda from './src/screens/profissional/ConfigurarAgenda';
 import GerenciarColaboradores from './src/screens/profissional/GerenciarColaboradores';
 import FinanceiroPro from './src/screens/profissional/FinanceiroPro';
+import RelatoriosPro from './src/screens/profissional/RelatoriosPro';
 import DetalhesAgendamentoPro from './src/screens/profissional/DetalhesAgendamentoPro';
+
+import SuporteScreen from './src/screens/comum/SuporteScreen';
+import PainelAdminSuporte from './src/screens/comum/PainelAdminSuporte';
+import ChatSuporteAdmin from './src/screens/comum/ChatSuporteAdmin';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -52,11 +58,29 @@ export const navigationRef = createNavigationContainerRef();
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
 });
+
+// Configuração de Canais para Android (Sons específicos)
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('suporte-admin', {
+    name: 'Mensagens de Suporte (Admin)',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FF231F7C',
+    sound: 'default', // Aqui você pode personalizar o som se tiver um arquivo local
+  });
+
+  Notifications.setNotificationChannelAsync('suporte-usuario', {
+    name: 'Mensagens de Suporte',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+  });
+}
 
 function normalizarTexto(value) {
   return String(value || '').trim().toLowerCase();
@@ -411,7 +435,9 @@ function AppNavigator() {
 
       if (usuario?.uid) {
         try {
-          await registrarPushTokenUsuario(usuario.uid);
+          console.log('Push: Iniciando registro de token para o usuário:', usuario.uid);
+          const token = await registrarPushTokenUsuario(usuario.uid);
+          console.log('Push: Resultado do registro:', token ? 'Token obtido' : 'Sem token');
         } catch (error) {
           console.log('Erro ao registrar push token no App:', error);
         }
@@ -516,6 +542,7 @@ function AppNavigator() {
               component={GerenciarColaboradores}
             />
             <Stack.Screen name="FinanceiroPro" component={FinanceiroPro} />
+            <Stack.Screen name="RelatoriosPro" component={RelatoriosPro} />
             <Stack.Screen name="EditarPerfil" component={EditarPerfil} />
             <Stack.Screen
               name="Notificacoes"
@@ -524,6 +551,9 @@ function AppNavigator() {
             <Stack.Screen name="ListaMenores" component={ListaMenores} />
             <Stack.Screen name="CadastroMenor" component={CadastroMenor} />
             <Stack.Screen name="EditarMenor" component={EditarMenor} />
+            <Stack.Screen name="Suporte" component={SuporteScreen} />
+            <Stack.Screen name="PainelAdminSuporte" component={PainelAdminSuporte} />
+            <Stack.Screen name="ChatSuporteAdmin" component={ChatSuporteAdmin} />
           </>
         )}
       </Stack.Navigator>

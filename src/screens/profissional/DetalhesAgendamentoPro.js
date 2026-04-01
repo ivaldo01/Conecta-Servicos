@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -13,11 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
 import {
     doc,
+    getDoc,
     updateDoc,
     serverTimestamp,
 } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { useUsuario } from '../../hooks/useUsuario';
 import {
     enviarPushAoCliente,
     salvarNotificacaoCliente,
@@ -28,6 +32,7 @@ import {
     calcularValorTotalAgendamento,
     gerarCobrancaAgendamento,
 } from '../../services/paymentService';
+import { liberarHorario } from '../../utils/agendaDisponibilidade';
 
 function getStatusConfig(status) {
     switch (status) {
@@ -195,6 +200,7 @@ function getResumoServicos(agendamento) {
 
 export default function DetalhesAgendamentoPro({ route, navigation }) {
     const [agendamentoAtual, setAgendamentoAtual] = useState(route?.params?.agendamento || null);
+    const [perfilUsuario, setPerfilUsuario] = useState(null);
     const [loadingAcao, setLoadingAcao] = useState(false);
     const [loadingCobranca, setLoadingCobranca] = useState(false);
     const [pagamentoGerado, setPagamentoGerado] = useState(null);
@@ -213,15 +219,30 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
         return calcularValorTotalAgendamento(agendamentoAtual);
     }, [agendamentoAtual]);
 
+    useEffect(() => {
+        const carregarPerfil = async () => {
+            const user = auth.currentUser;
+            if (user) {
+                const snap = await getDoc(doc(db, 'usuarios', user.uid));
+                if (snap.exists()) {
+                    setPerfilUsuario(snap.data());
+                }
+            }
+        };
+        carregarPerfil();
+    }, []);
+
     const resumoServicos = useMemo(() => {
         return getResumoServicos(agendamentoAtual);
     }, [agendamentoAtual]);
+
+    const ehChefe = perfilUsuario?.perfil !== 'colaborador';
 
     const podeConfirmar = agendamentoAtual?.status === 'pendente';
     const podeRecusar = agendamentoAtual?.status === 'pendente';
     const podeConcluir = agendamentoAtual?.status === 'confirmado';
     const cobrancaJaGerada = !!agendamentoAtual?.cobrancaGerada || !!agendamentoAtual?.pagamentoId;
-    const podeControlarCobranca = cobrancaJaGerada;
+    const podeControlarCobranca = cobrancaJaGerada && ehChefe;
     const pagamentoJaConfirmado = agendamentoAtual?.statusPagamento === 'pago';
     const pagamentoCancelado = agendamentoAtual?.statusPagamento === 'cancelado';
 
@@ -292,6 +313,19 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
         });
     };
 
+    const tentarLiberarHorario = async () => {
+        try {
+            await liberarHorario({
+                clinicaId: agendamentoAtual?.clinicaId,
+                data: agendamentoAtual?.dataFiltro,
+                horario: agendamentoAtual?.horario,
+                colaboradorId: agendamentoAtual?.colaboradorId,
+            });
+        } catch (erroLiberar) {
+            console.log('Aviso: erro ao liberar horário (pode já estar liberado):', erroLiberar);
+        }
+    };
+
     const atualizarStatus = async (novoStatus) => {
         if (!agendamentoAtual?.id) {
             Alert.alert("Erro", "Agendamento inválido.");
@@ -315,12 +349,20 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                 dadosUpdate.recusadoEm = serverTimestamp();
             }
 
+            if (novoStatus === 'cancelado') {
+                dadosUpdate.canceladoEm = serverTimestamp();
+            }
+
             if (novoStatus === 'concluido') {
                 dadosUpdate.concluidoEm = serverTimestamp();
             }
 
             await updateDoc(doc(db, "agendamentos", agendamentoAtual.id), dadosUpdate);
             setAgendamentoAtual((prev) => ({ ...prev, ...dadosUpdate, status: novoStatus }));
+
+            if (novoStatus === 'cancelado' || novoStatus === 'recusado') {
+                await tentarLiberarHorario();
+            }
 
             await enviarNotificacaoCompletaParaCliente(novoStatus);
 
@@ -345,6 +387,130 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                 },
             ]
         );
+    };
+
+    const gerarPDFOrdemServico = async () => {
+        try {
+            setLoadingAcao(true);
+            const status = getStatusConfig(agendamentoAtual?.status);
+            const statusPg = getStatusPagamentoConfig(agendamentoAtual?.statusPagamento);
+
+            const numeroOS = agendamentoAtual?.id
+                ? parseInt(agendamentoAtual.id.replace(/\D/g, '').substring(0, 10) || Date.now().toString().substring(5, 15))
+                : '000000';
+
+            const servicosHTML = agendamentoAtual?.servicos?.map(s => `
+                <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee;">
+                    <span>${s.nome}</span>
+                    <span style="font-weight: bold;">R$ ${Number(s.preco || 0).toFixed(2)}</span>
+                </div>
+            `).join('') || '';
+
+            const html = `
+                <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+                    <style>
+                        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
+                        .header { text-align: center; border-bottom: 2px solid ${colors.primary}; padding-bottom: 20px; margin-bottom: 30px; }
+                        .title { font-size: 24px; font-weight: bold; color: ${colors.primary}; margin-bottom: 5px; }
+                        .subtitle { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+                        .section { margin-bottom: 25px; }
+                        .section-title { font-size: 16px; font-weight: bold; background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid ${colors.primary}; }
+                        .info-row { display: flex; margin-bottom: 8px; }
+                        .info-label { width: 140px; font-weight: bold; color: #666; }
+                        .info-value { flex: 1; color: #333; }
+                        .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                        .status-badge { display: inline-block; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+                        .signatures { margin-top: 60px; display: flex; justify-content: space-between; }
+                        .sig-box { width: 45%; text-align: center; }
+                        .sig-line { border-top: 1px solid #333; padding-top: 10px; font-size: 11px; font-weight: bold; }
+                        .sig-name { font-size: 10px; color: #666; margin-top: 5px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="title">ORDEM DE SERVIÇO</div>
+                        <div class="subtitle">Nº OS: ${numeroOS}</div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">DADOS DO CLIENTE</div>
+                        <div class="info-row"><div class="info-label">Nome:</div><div class="info-value">${agendamentoAtual?.clienteNome || 'Não informado'}</div></div>
+                        <div class="info-row"><div class="info-label">WhatsApp:</div><div class="info-value">${agendamentoAtual?.clienteWhatsapp || 'Não informado'}</div></div>
+                        ${agendamentoAtual?.tipoAtendimento === 'menor' ? `
+                            <div class="info-row"><div class="info-label">Dependente:</div><div class="info-value">${agendamentoAtual?.menorNome || 'Não informado'}</div></div>
+                            <div class="info-row"><div class="info-label">Idade:</div><div class="info-value">${agendamentoAtual?.menorIdade || '-'}</div></div>
+                            <div class="info-row"><div class="info-label">Parentesco:</div><div class="info-value">${agendamentoAtual?.menorParentesco || '-'}</div></div>
+                            ${agendamentoAtual?.observacoesMenor ? `
+                                <div style="margin-top: 10px; padding: 10px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 5px;">
+                                    <div style="font-size: 10px; font-weight: bold; color: #92400e; margin-bottom: 5px;">NECESSIDADES / OBSERVAÇÕES:</div>
+                                    <div style="font-size: 11px; color: #78350f; line-height: 1.4;">${agendamentoAtual.observacoesMenor}</div>
+                                </div>
+                            ` : ''}
+                        ` : ''}
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">DETALHES DO ATENDIMENTO</div>
+                        <div class="info-row"><div class="info-label">Data:</div><div class="info-value">${agendamentoAtual?.data || '--/--/----'}</div></div>
+                        <div class="info-row"><div class="info-label">Horário:</div><div class="info-value">${agendamentoAtual?.horario || '--:--'}</div></div>
+                        <div class="info-row">
+                            <div class="info-label">Status:</div>
+                            <div class="info-value">
+                                <span class="status-badge" style="background: ${status.bg}; color: ${status.color};">${status.label}</span>
+                            </div>
+                        </div>
+                        <div class="info-row"><div class="info-label">Profissional:</div><div class="info-value">${agendamentoAtual?.colaboradorNome || 'Não atribuído'}</div></div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">SERVIÇOS REALIZADOS</div>
+                        ${servicosHTML}
+                        <div style="display: flex; justify-content: space-between; padding: 15px 0; margin-top: 10px; font-size: 18px; font-weight: bold; color: ${colors.primary};">
+                            <span>TOTAL</span>
+                            <span>R$ ${totalAgendamento.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-title">INFORMAÇÕES DE PAGAMENTO</div>
+                        <div class="info-row"><div class="info-label">Método:</div><div class="info-value">${getFormaPagamentoLabel(agendamentoAtual)}</div></div>
+                        <div class="info-row">
+                            <div class="info-label">Status:</div>
+                            <div class="info-value">
+                                <span class="status-badge" style="background: ${statusPg.bg}; color: ${statusPg.cor};">${statusPg.label}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="signatures">
+                        <div class="sig-box">
+                            <div class="sig-line">ASSINATURA DO PROFISSIONAL</div>
+                            <div class="sig-name">${agendamentoAtual?.colaboradorNome || 'Responsável Técnico'}</div>
+                        </div>
+                        <div class="sig-box">
+                            <div class="sig-line">ASSINATURA DO CLIENTE</div>
+                            <div class="sig-name">${agendamentoAtual?.clienteNome || 'Contratante'}</div>
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        Documento gerado em ${new Date().toLocaleString('pt-BR')}<br/>
+                        ${getNomeProfissional(agendamentoAtual)} - Sistema de Gestão Conecta Serviços
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const { uri } = await Print.printToFileAsync({ html });
+            await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Ordem de Serviço' });
+        } catch (error) {
+            console.log("Erro ao gerar PDF:", error);
+            Alert.alert("Erro", "Não foi possível gerar a Ordem de Serviço.");
+        } finally {
+            setLoadingAcao(false);
+        }
     };
 
     const recusarAgendamento = () => {
@@ -453,6 +619,14 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
     const gerarCobranca = async () => {
         if (cobrancaJaGerada) {
             await carregarCobrancaExistente();
+            return;
+        }
+
+        if (agendamentoAtual?.status !== 'concluido') {
+            Alert.alert(
+                'Atenção',
+                'Você só pode gerar a cobrança após marcar o serviço como concluído.'
+            );
             return;
         }
 
@@ -624,6 +798,15 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                                 {resumoServicos}
                             </Text>
                         </View>
+
+                        <TouchableOpacity
+                            style={styles.osButton}
+                            onPress={gerarPDFOrdemServico}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="document-text-outline" size={24} color={colors.primary} />
+                            <Text style={styles.osButtonText}>OS PDF</Text>
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.badgesRow}>
@@ -660,6 +843,35 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                             {agendamentoAtual?.clienteNome || "Cliente"}
                         </Text>
                     </View>
+
+                    {agendamentoAtual?.tipoAtendimento === 'menor' && (
+                        <View style={styles.menorInfoCard}>
+                            <View style={styles.menorInfoHeader}>
+                                <Ionicons name="people-outline" size={18} color={colors.primary} />
+                                <Text style={styles.menorInfoTitle}>DADOS DO DEPENDENTE</Text>
+                            </View>
+                            <View style={styles.menorInfoBody}>
+                                <View style={styles.menorInfoRow}>
+                                    <Text style={styles.menorLabel}>Nome:</Text>
+                                    <Text style={styles.menorValue}>{agendamentoAtual?.menorNome || 'Não informado'}</Text>
+                                </View>
+                                <View style={styles.menorInfoRow}>
+                                    <Text style={styles.menorLabel}>Idade:</Text>
+                                    <Text style={styles.menorValue}>{agendamentoAtual?.menorIdade || '-'}</Text>
+                                </View>
+                                <View style={styles.menorInfoRow}>
+                                    <Text style={styles.menorLabel}>Parentesco:</Text>
+                                    <Text style={styles.menorValue}>{agendamentoAtual?.menorParentesco || '-'}</Text>
+                                </View>
+                                {agendamentoAtual?.observacoesMenor && (
+                                    <View style={styles.menorObsBox}>
+                                        <Text style={styles.menorObsLabel}>NECESSIDADES / OBSERVAÇÕES:</Text>
+                                        <Text style={styles.menorObsValue}>{agendamentoAtual.observacoesMenor}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    )}
 
                     <View style={styles.infoBlock}>
                         <Text style={styles.label}>DATA E HORÁRIO</Text>
@@ -719,7 +931,7 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                     </View>
 
                     <Text style={styles.billingText}>
-                        O profissional já pode gerar a cobrança com base no valor do serviço e na forma de pagamento escolhida pelo cliente.
+                        Você poderá gerar a cobrança assim que o serviço for marcado como concluído.
                     </Text>
 
                     <View style={styles.billingInfoBox}>
@@ -768,10 +980,13 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.billingButton, loadingCobranca && styles.buttonDisabled]}
+                        style={[
+                            styles.billingButton,
+                            (loadingCobranca || (!ehChefe && !cobrancaJaGerada)) && styles.buttonDisabled
+                        ]}
                         onPress={gerarCobranca}
                         activeOpacity={0.9}
-                        disabled={loadingCobranca}
+                        disabled={loadingCobranca || (!ehChefe && !cobrancaJaGerada)}
                     >
                         {loadingCobranca ? (
                             <ActivityIndicator size="small" color="#FFF" />
@@ -788,6 +1003,12 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                             </>
                         )}
                     </TouchableOpacity>
+
+                    {!ehChefe && !cobrancaJaGerada && (
+                        <Text style={styles.billingRestrictionNote}>
+                            A geração de cobrança é restrita ao gestor.
+                        </Text>
+                    )}
 
                     {podeControlarCobranca && (
                         <View style={styles.billingControls}>
@@ -997,6 +1218,23 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontSize: 13,
         color: colors.secondary,
+    },
+
+    osButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 8,
+        backgroundColor: '#F0F7FF',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#D1E9FF',
+    },
+
+    osButtonText: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: colors.primary,
+        marginTop: 2,
     },
 
     badgesRow: {
@@ -1264,6 +1502,89 @@ const styles = StyleSheet.create({
         color: '#6C7A89',
         lineHeight: 18,
         fontSize: 12,
+        textAlign: 'center',
+    },
+
+    billingRestrictionNote: {
+        marginTop: 12,
+        color: '#EF4444',
+        fontSize: 12,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        backgroundColor: '#FEF2F2',
+        padding: 8,
+        borderRadius: 8,
+    },
+
+    menorInfoCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 8,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+
+    menorInfoHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        paddingBottom: 6,
+    },
+
+    menorInfoTitle: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: colors.primary,
+        marginLeft: 6,
+    },
+
+    menorInfoBody: {
+        gap: 4,
+    },
+
+    menorInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+
+    menorLabel: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#64748B',
+        width: 80,
+    },
+
+    menorValue: {
+        fontSize: 13,
+        color: '#1E293B',
+        fontWeight: '600',
+        flex: 1,
+    },
+
+    menorObsBox: {
+        marginTop: 10,
+        padding: 8,
+        backgroundColor: '#FFFBEB',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FEF3C7',
+    },
+
+    menorObsLabel: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#92400E',
+        marginBottom: 4,
+    },
+
+    menorObsValue: {
+        fontSize: 12,
+        color: '#78350F',
+        lineHeight: 16,
     },
 
     loadingBox: {

@@ -17,17 +17,19 @@ import {
     where,
     doc,
     getDoc,
+    onSnapshot,
 } from 'firebase/firestore';
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
+import { getHojeStr as getHojeFiltroStr } from '../../utils/agendamentoUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_WIDTH = Math.min(SCREEN_WIDTH - 44, 300);
 const HERO_HEIGHT = 250;
 
-function getHojeStr() {
+function getHojeExibicaoStr() {
     const hoje = new Date();
     const dia = String(hoje.getDate()).padStart(2, '0');
     const mes = String(hoje.getMonth() + 1).padStart(2, '0');
@@ -61,28 +63,46 @@ function getResumoFinanceiro(agendamentos = []) {
     const total = concluidos.reduce((acc, item) => {
         return acc + parseNumero(item?.valorTotal || item?.valor || 0);
     }, 0);
-
     return total;
+}
+
+function getCorStatus(status) {
+    switch (status) {
+        case 'confirmado': return '#16A34A';
+        case 'pendente': return '#D97706';
+        case 'concluido': return colors.primary;
+        case 'cancelado': return '#DC2626';
+        case 'recusado': return '#DC2626';
+        default: return '#6B7280';
+    }
 }
 
 function HeroSlide({ usuario }) {
     return (
         <View style={[styles.heroSlide, { width: HERO_WIDTH, height: HERO_HEIGHT }]}>
+            {/* Círculos decorativos de fundo */}
+            <View style={styles.heroCircle1} />
+            <View style={styles.heroCircle2} />
+
             <View style={styles.heroTopRow}>
                 <View style={styles.heroTextArea}>
+                    <Text style={styles.heroGreeting}>Bem-vindo de volta</Text>
                     <Text style={styles.heroTitle}>
-                        Olá, {getNomeProfissional(usuario)} 👋
+                        {getNomeProfissional(usuario)} 👋
                     </Text>
-                    <Text style={styles.heroSubtitle}>Seu painel profissional</Text>
                     <Text style={styles.heroDescription}>
-                        Organize sua agenda, acompanhe seus ganhos e visualize os próximos
-                        atendimentos em um só lugar.
+                        Organize sua agenda, acompanhe seus ganhos e visualize seus próximos atendimentos.
                     </Text>
                 </View>
 
                 <View style={styles.heroIconBox}>
-                    <Ionicons name="briefcase-outline" size={28} color={colors.primary} />
+                    <Ionicons name="briefcase-outline" size={28} color="#FFF" />
                 </View>
+            </View>
+
+            <View style={styles.heroBadge}>
+                <Ionicons name="star-outline" size={12} color="#FFF" />
+                <Text style={styles.heroBadgeText}>Painel profissional</Text>
             </View>
         </View>
     );
@@ -90,27 +110,38 @@ function HeroSlide({ usuario }) {
 
 function SummarySlide({ pendentes, confirmadosHoje, concluidos }) {
     return (
-        <View style={[styles.heroSlide, { width: HERO_WIDTH, height: HERO_HEIGHT }]}>
+        <View style={[styles.heroSlide, styles.heroSlideDark, { width: HERO_WIDTH, height: HERO_HEIGHT }]}>
+            <View style={styles.heroCircle1Dark} />
+
             <View style={styles.summaryTop}>
                 <View style={styles.summaryIconBox}>
-                    <Ionicons name="analytics-outline" size={24} color={colors.primary} />
+                    <Ionicons name="analytics-outline" size={22} color={colors.primary} />
                 </View>
                 <Text style={styles.summaryTitle}>Resumo do dia</Text>
             </View>
 
             <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Pendentes</Text>
-                <Text style={styles.summaryValue}>{pendentes}</Text>
+                <View style={styles.summaryRowLeft}>
+                    <View style={[styles.summaryDot, { backgroundColor: '#FBBF24' }]} />
+                    <Text style={styles.summaryLabel}>Pendentes</Text>
+                </View>
+                <Text style={[styles.summaryValue, { color: '#FBBF24' }]}>{pendentes}</Text>
             </View>
 
             <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Confirmados hoje</Text>
-                <Text style={styles.summaryValue}>{confirmadosHoje}</Text>
+                <View style={styles.summaryRowLeft}>
+                    <View style={[styles.summaryDot, { backgroundColor: '#34D399' }]} />
+                    <Text style={styles.summaryLabel}>Confirmados hoje</Text>
+                </View>
+                <Text style={[styles.summaryValue, { color: '#34D399' }]}>{confirmadosHoje}</Text>
             </View>
 
             <View style={styles.summaryRowNoBorder}>
-                <Text style={styles.summaryLabel}>Concluídos</Text>
-                <Text style={styles.summaryValue}>{concluidos}</Text>
+                <View style={styles.summaryRowLeft}>
+                    <View style={[styles.summaryDot, { backgroundColor: '#93C5FD' }]} />
+                    <Text style={styles.summaryLabel}>Concluídos</Text>
+                </View>
+                <Text style={[styles.summaryValue, { color: '#93C5FD' }]}>{concluidos}</Text>
             </View>
         </View>
     );
@@ -122,9 +153,26 @@ export default function HomeProfissional({ navigation }) {
     const [agendamentos, setAgendamentos] = useState([]);
     const [proximos, setProximos] = useState([]);
     const [heroIndex, setHeroIndex] = useState(0);
+    const [totalNotificacoesNaoLidas, setTotalNotificacoesNaoLidas] = useState(0);
 
     const heroRef = useRef(null);
-    const hojeStr = useMemo(() => getHojeStr(), []);
+    const hojeStr = useMemo(() => getHojeExibicaoStr(), []);
+    const hojeFiltro = useMemo(() => getHojeFiltroStr(), []);
+
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user?.uid) return;
+
+        const unsubscribe = onSnapshot(
+            collection(db, 'usuarios', user.uid, 'notificacoes'),
+            (snapshot) => {
+                const total = snapshot.docs.filter((item) => !item.data()?.lida).length;
+                setTotalNotificacoesNaoLidas(total);
+            }
+        );
+
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         let ativo = true;
@@ -199,8 +247,8 @@ export default function HomeProfissional({ navigation }) {
     }, []);
 
     const agendamentosHoje = useMemo(() => {
-        return agendamentos.filter((item) => item?.data === hojeStr);
-    }, [agendamentos, hojeStr]);
+        return agendamentos.filter((item) => item?.dataFiltro === hojeFiltro);
+    }, [agendamentos, hojeFiltro]);
 
     const pendentes = useMemo(() => {
         return agendamentos.filter((item) => item?.status === 'pendente').length;
@@ -242,36 +290,61 @@ export default function HomeProfissional({ navigation }) {
         return () => clearInterval(interval);
     }, [heroItems]);
 
-    const atalhos = [
-        {
-            id: 'agenda',
-            titulo: 'Agenda',
-            subtitulo: 'Gerencie seus atendimentos',
-            icon: 'calendar-outline',
-            onPress: () => navigation.navigate('AgendaProfissional'),
-        },
-        {
-            id: 'servicos',
-            titulo: 'Serviços',
-            subtitulo: 'Atualize o que você oferece',
-            icon: 'construct-outline',
-            onPress: () => navigation.navigate('ConfigurarServicos'),
-        },
-        {
-            id: 'financeiro',
-            titulo: 'Financeiro',
-            subtitulo: 'Acompanhe ganhos e saques',
-            icon: 'wallet-outline',
-            onPress: () => navigation.navigate('FinanceiroPro'),
-        },
-        {
-            id: 'perfil',
-            titulo: 'Perfil',
-            subtitulo: 'Edite seu perfil público',
-            icon: 'person-outline',
-            onPress: () => navigation.navigate('Perfil'),
-        },
-    ];
+    const atalhos = useMemo(() => {
+        const base = [
+            {
+                id: 'agenda',
+                titulo: 'Agenda',
+                subtitulo: 'Gerencie atendimentos',
+                icon: 'calendar-outline',
+                cor: colors.primary,
+                bg: '#EEF3FF',
+                onPress: () => navigation.navigate('AgendaProfissional'),
+            },
+            {
+                id: 'servicos',
+                titulo: 'Serviços',
+                subtitulo: 'O que você oferece',
+                icon: 'construct-outline',
+                cor: '#7C3AED',
+                bg: '#F3EEFF',
+                onPress: () => navigation.navigate('ConfigurarServicos'),
+            },
+            {
+                id: 'financeiro',
+                titulo: 'Financeiro',
+                subtitulo: 'Ganhos e saques',
+                icon: 'wallet-outline',
+                cor: '#16A34A',
+                bg: '#EEF9F1',
+                onPress: () => navigation.navigate('FinanceiroPro'),
+            },
+            {
+                id: 'perfil',
+                titulo: 'Perfil',
+                subtitulo: 'Seu perfil público',
+                icon: 'person-outline',
+                cor: '#D97706',
+                bg: '#FFF6E8',
+                onPress: () => navigation.navigate('Perfil'),
+            },
+        ];
+
+        // Se não for colaborador, adiciona Gerenciar Equipe
+        if (usuario?.perfil !== 'colaborador') {
+            base.push({
+                id: 'equipe',
+                titulo: 'Minha Equipe',
+                subtitulo: 'Gerencie sua equipe',
+                icon: 'people-outline',
+                cor: '#E91E63',
+                bg: '#FCE4EC',
+                onPress: () => navigation.navigate('GerenciarColaboradores'),
+            });
+        }
+
+        return base;
+    }, [usuario, navigation]);
 
     if (loading) {
         return (
@@ -285,8 +358,35 @@ export default function HomeProfissional({ navigation }) {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
+            {/* ── HEADER COLORIDO ── */}
+            <View style={styles.header}>
+                <View style={styles.headerCircle} />
+                <View style={styles.headerTitleArea}>
+                    <Text style={styles.headerTitle}>Painel Profissional</Text>
+                    <Text style={styles.headerSubtitle}>{hojeStr}</Text>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.notificationButton}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('Notificacoes')}
+                >
+                    <Ionicons name="notifications-outline" size={22} color="#FFF" />
+
+                    {totalNotificacoesNaoLidas > 0 && (
+                        <View style={styles.notificationBadge}>
+                            <Text style={styles.notificationBadgeText}>
+                                {totalNotificacoesNaoLidas > 9 ? '9+' : totalNotificacoesNaoLidas}
+                            </Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+                {/* ── CARROSSEL HERO ── */}
                 <ScrollView
                     ref={heroRef}
                     horizontal
@@ -323,34 +423,35 @@ export default function HomeProfissional({ navigation }) {
                     })}
                 </ScrollView>
 
+                {/* ── MÉTRICAS ── */}
                 <View style={styles.metricsGrid}>
-                    <View style={styles.metricCard}>
+                    <View style={[styles.metricCard, { borderTopColor: colors.primary }]}>
                         <View style={[styles.metricIconBox, { backgroundColor: '#EEF3FF' }]}>
-                            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                            <Ionicons name="calendar-outline" size={18} color={colors.primary} />
                         </View>
                         <Text style={styles.metricValue}>{agendamentosHoje.length}</Text>
                         <Text style={styles.metricLabel}>Hoje</Text>
                     </View>
 
-                    <View style={styles.metricCard}>
+                    <View style={[styles.metricCard, { borderTopColor: '#D97706' }]}>
                         <View style={[styles.metricIconBox, { backgroundColor: '#FFF6E8' }]}>
-                            <Ionicons name="time-outline" size={20} color="#D97706" />
+                            <Ionicons name="time-outline" size={18} color="#D97706" />
                         </View>
                         <Text style={styles.metricValue}>{pendentes}</Text>
                         <Text style={styles.metricLabel}>Pendentes</Text>
                     </View>
 
-                    <View style={styles.metricCard}>
+                    <View style={[styles.metricCard, { borderTopColor: '#16A34A' }]}>
                         <View style={[styles.metricIconBox, { backgroundColor: '#EEF9F1' }]}>
-                            <Ionicons name="checkmark-circle-outline" size={20} color="#16A34A" />
+                            <Ionicons name="checkmark-circle-outline" size={18} color="#16A34A" />
                         </View>
                         <Text style={styles.metricValue}>{confirmadosHoje}</Text>
                         <Text style={styles.metricLabel}>Confirmados</Text>
                     </View>
 
-                    <View style={styles.metricCard}>
+                    <View style={[styles.metricCard, { borderTopColor: '#7C3AED' }]}>
                         <View style={[styles.metricIconBox, { backgroundColor: '#F3EEFF' }]}>
-                            <Ionicons name="ribbon-outline" size={20} color="#7C3AED" />
+                            <Ionicons name="ribbon-outline" size={18} color="#7C3AED" />
                         </View>
                         <Text style={styles.metricValue}>{concluidos}</Text>
                         <Text style={styles.metricLabel}>Concluídos</Text>
@@ -359,10 +460,13 @@ export default function HomeProfissional({ navigation }) {
 
                 <AdBanner />
 
+                {/* ── CARD FINANCEIRO ── */}
                 <View style={styles.financeCard}>
-                    <View style={styles.financeHeader}>
-                        <Text style={styles.sectionTitle}>Resumo financeiro</Text>
-                        <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+                    <View style={styles.financeTop}>
+                        <View style={styles.financeIconBox}>
+                            <Ionicons name="wallet-outline" size={22} color="#FFF" />
+                        </View>
+                        <Text style={styles.financeCardTitle}>Resumo financeiro</Text>
                     </View>
 
                     <Text style={styles.financeValue}>{formatarMoeda(faturamentoTotal)}</Text>
@@ -374,11 +478,12 @@ export default function HomeProfissional({ navigation }) {
                         style={styles.financeButton}
                         onPress={() => navigation.navigate('FinanceiroPro')}
                     >
-                        <Text style={styles.financeButtonText}>Ir para financeiro</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                        <Text style={styles.financeButtonText}>Ver financeiro completo</Text>
+                        <Ionicons name="arrow-forward" size={16} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
 
+                {/* ── ATALHOS ── */}
                 <View style={styles.sectionBlock}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Atalhos rápidos</Text>
@@ -391,18 +496,20 @@ export default function HomeProfissional({ navigation }) {
                                 key={item.id}
                                 style={styles.shortcutCard}
                                 onPress={item.onPress}
-                                activeOpacity={0.9}
+                                activeOpacity={0.88}
                             >
-                                <View style={styles.shortcutIconBox}>
-                                    <Ionicons name={item.icon} size={22} color={colors.primary} />
+                                <View style={[styles.shortcutIconBox, { backgroundColor: item.bg }]}>
+                                    <Ionicons name={item.icon} size={22} color={item.cor} />
                                 </View>
                                 <Text style={styles.shortcutTitle}>{item.titulo}</Text>
                                 <Text style={styles.shortcutSubtitle}>{item.subtitulo}</Text>
+                                <View style={[styles.shortcutAccent, { backgroundColor: item.cor }]} />
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
+                {/* ── PRÓXIMOS ATENDIMENTOS ── */}
                 <View style={styles.sectionBlock}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Próximos atendimentos</Text>
@@ -411,56 +518,68 @@ export default function HomeProfissional({ navigation }) {
 
                     {proximos.length === 0 ? (
                         <View style={styles.emptyCard}>
-                            <Ionicons name="calendar-clear-outline" size={28} color="#A0A0A0" />
+                            <View style={styles.emptyIconBox}>
+                                <Ionicons name="calendar-clear-outline" size={28} color={colors.primary} />
+                            </View>
                             <Text style={styles.emptyTitle}>Nenhum atendimento encontrado</Text>
                             <Text style={styles.emptySubtitle}>
                                 Seus próximos agendamentos aparecerão aqui.
                             </Text>
                         </View>
                     ) : (
-                        proximos.map((item) => (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={styles.appointmentCard}
-                                onPress={() =>
-                                    navigation.navigate('DetalhesAgendamentoPro', {
-                                        agendamentoId: item.id,
-                                        agendamento: item,
-                                    })
-                                }
-                                activeOpacity={0.92}
-                            >
-                                <View style={styles.appointmentLeft}>
-                                    <View style={styles.appointmentDateBox}>
-                                        <Ionicons
-                                            name="calendar-outline"
-                                            size={18}
-                                            color={colors.primary}
-                                        />
+                        proximos.map((item) => {
+                            const corStatus = getCorStatus(item?.status);
+                            return (
+                                <TouchableOpacity
+                                    key={item.id}
+                                    style={styles.appointmentCard}
+                                    onPress={() =>
+                                        navigation.navigate('DetalhesAgendamentoPro', {
+                                            agendamentoId: item.id,
+                                            agendamento: item,
+                                        })
+                                    }
+                                    activeOpacity={0.88}
+                                >
+                                    <View style={[styles.appointmentAccent, { backgroundColor: corStatus }]} />
+
+                                    <View style={styles.appointmentLeft}>
+                                        <View style={[styles.appointmentDateBox, { backgroundColor: corStatus + '18' }]}>
+                                            <Ionicons
+                                                name="calendar-outline"
+                                                size={18}
+                                                color={corStatus}
+                                            />
+                                        </View>
+
+                                        <View style={styles.appointmentInfo}>
+                                            <Text style={styles.appointmentClient} numberOfLines={1}>
+                                                {item?.clienteNome || 'Cliente'}
+                                            </Text>
+                                            <Text style={styles.appointmentMeta} numberOfLines={1}>
+                                                {item?.data || '-'} às {item?.horario || '-'}
+                                            </Text>
+                                            <View style={[styles.statusBadge, { backgroundColor: corStatus + '18' }]}>
+                                                <View style={[styles.statusDot, { backgroundColor: corStatus }]} />
+                                                <Text style={[styles.statusBadgeText, { color: corStatus }]}>
+                                                    {item?.status || 'pendente'}
+                                                </Text>
+                                            </View>
+                                        </View>
                                     </View>
 
-                                    <View style={styles.appointmentInfo}>
-                                        <Text style={styles.appointmentClient} numberOfLines={1}>
-                                            {item?.clienteNome || 'Cliente'}
-                                        </Text>
-                                        <Text style={styles.appointmentMeta} numberOfLines={1}>
-                                            {item?.data || '-'} às {item?.horario || '-'}
-                                        </Text>
-                                        <Text style={styles.appointmentStatus} numberOfLines={1}>
-                                            Status: {item?.status || 'pendente'}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                <Ionicons
-                                    name="chevron-forward-outline"
-                                    size={18}
-                                    color={colors.secondary}
-                                />
-                            </TouchableOpacity>
-                        ))
+                                    <Ionicons
+                                        name="chevron-forward-outline"
+                                        size={18}
+                                        color="#C0C8D4"
+                                    />
+                                </TouchableOpacity>
+                            );
+                        })
                     )}
                 </View>
+
+                <View style={{ height: 20 }} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -469,7 +588,76 @@ export default function HomeProfissional({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F0F3F8',
+    },
+
+    // ── HEADER ──
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        backgroundColor: colors.primary,
+        overflow: 'hidden',
+    },
+
+    headerCircle: {
+        position: 'absolute',
+        width: 160,
+        height: 160,
+        borderRadius: 80,
+        backgroundColor: 'rgba(255,255,255,0.07)',
+        top: -60,
+        right: -30,
+    },
+
+    headerTitleArea: {
+        flex: 1,
+    },
+
+    headerTitle: {
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#FFF',
+        letterSpacing: 0.2,
+    },
+
+    headerSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.75)',
+        marginTop: 2,
+        fontWeight: '500',
+    },
+
+    notificationButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 12,
+    },
+
+    notificationBadge: {
+        position: 'absolute',
+        top: 7,
+        right: 7,
+        backgroundColor: '#EF4444',
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: colors.primary,
+    },
+
+    notificationBadgeText: {
+        color: '#FFF',
+        fontSize: 9,
+        fontWeight: 'bold',
     },
 
     content: {
@@ -489,6 +677,7 @@ const styles = StyleSheet.create({
         color: colors.secondary,
     },
 
+    // ── HERO CARROSSEL ──
     heroCarousel: {
         marginBottom: 16,
     },
@@ -498,19 +687,51 @@ const styles = StyleSheet.create({
     },
 
     heroSlide: {
-        backgroundColor: '#FFF',
+        backgroundColor: colors.primary,
         borderRadius: 22,
-        padding: 18,
+        padding: 20,
         marginRight: 12,
-        borderWidth: 1,
-        borderColor: '#EEF1F4',
         justifyContent: 'space-between',
         overflow: 'hidden',
     },
 
+    heroSlideDark: {
+        backgroundColor: '#1E2535',
+    },
+
+    heroCircle1: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: -60,
+        right: -50,
+    },
+
+    heroCircle2: {
+        position: 'absolute',
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        bottom: -30,
+        left: 20,
+    },
+
+    heroCircle1Dark: {
+        position: 'absolute',
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        top: -60,
+        right: -40,
+    },
+
     heroTopRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
     },
 
@@ -519,83 +740,118 @@ const styles = StyleSheet.create({
         paddingRight: 12,
     },
 
+    heroGreeting: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.75)',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 6,
+    },
+
     heroTitle: {
         fontSize: 22,
         fontWeight: '800',
-        color: colors.textDark,
-    },
-
-    heroSubtitle: {
-        marginTop: 4,
-        fontSize: 14,
-        color: colors.primary,
-        fontWeight: '700',
+        color: '#FFF',
+        lineHeight: 28,
     },
 
     heroDescription: {
-        marginTop: 12,
+        marginTop: 10,
         fontSize: 13,
         lineHeight: 20,
-        color: colors.secondary,
+        color: 'rgba(255,255,255,0.80)',
     },
 
     heroIconBox: {
-        width: 60,
-        height: 60,
-        borderRadius: 20,
+        width: 54,
+        height: 54,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EEF3FF',
+        backgroundColor: 'rgba(255,255,255,0.18)',
     },
 
+    heroBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        gap: 5,
+    },
+
+    heroBadgeText: {
+        fontSize: 11,
+        color: '#FFF',
+        fontWeight: '700',
+    },
+
+    // ── SUMMARY SLIDE ──
     summaryTop: {
-        marginBottom: 12,
+        marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
 
     summaryIconBox: {
-        width: 46,
-        height: 46,
-        borderRadius: 14,
-        backgroundColor: '#EEF3FF',
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.10)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
     },
 
     summaryTitle: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#FFF',
     },
 
     summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#EEF1F4',
+        borderBottomColor: 'rgba(255,255,255,0.08)',
     },
 
     summaryRowNoBorder: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
+    },
+
+    summaryRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+
+    summaryDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
     },
 
     summaryLabel: {
         fontSize: 13,
-        color: colors.secondary,
-        fontWeight: '600',
+        color: 'rgba(255,255,255,0.70)',
+        fontWeight: '500',
     },
 
     summaryValue: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '800',
-        color: colors.textDark,
     },
 
+    // ── MÉTRICAS ──
     metricsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -609,103 +865,134 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         padding: 16,
         marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#EEF1F4',
+        borderTopWidth: 4,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
     },
 
     metricIconBox: {
-        width: 42,
-        height: 42,
-        borderRadius: 14,
+        width: 38,
+        height: 38,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
 
     metricValue: {
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#1A1D2E',
     },
 
     metricLabel: {
-        marginTop: 6,
-        fontSize: 13,
-        color: colors.secondary,
+        marginTop: 4,
+        fontSize: 12,
+        color: '#8A94A6',
         fontWeight: '600',
     },
 
+    // ── CARD FINANCEIRO ──
     financeCard: {
-        backgroundColor: '#FFF',
+        backgroundColor: '#1E2535',
         borderRadius: 22,
-        padding: 18,
+        padding: 20,
         marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#EEF1F4',
+        overflow: 'hidden',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
     },
 
-    financeHeader: {
+    financeTop: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        gap: 10,
+        marginBottom: 14,
     },
 
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: colors.textDark,
+    financeIconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    financeCardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: 'rgba(255,255,255,0.85)',
     },
 
     financeValue: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: '800',
-        color: colors.primary,
+        color: '#FFF',
+        marginBottom: 6,
     },
 
     financeHint: {
-        marginTop: 8,
         fontSize: 13,
         lineHeight: 19,
-        color: colors.secondary,
+        color: 'rgba(255,255,255,0.55)',
+        marginBottom: 16,
     },
 
     financeButton: {
-        marginTop: 16,
-        backgroundColor: colors.primary,
-        borderRadius: 14,
-        paddingVertical: 12,
+        backgroundColor: '#FFF',
+        borderRadius: 12,
+        paddingVertical: 11,
         paddingHorizontal: 16,
         alignSelf: 'flex-start',
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 8,
     },
 
     financeButtonText: {
-        color: '#FFF',
+        color: colors.primary,
         fontWeight: '800',
-        marginRight: 8,
+        fontSize: 13,
     },
 
+    // ── SEÇÕES GERAIS ──
     sectionBlock: {
         backgroundColor: '#FFF',
         borderRadius: 22,
         padding: 18,
         marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#EEF1F4',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
     },
 
     sectionHeader: {
         marginBottom: 14,
     },
 
-    sectionSubtitle: {
-        marginTop: 4,
-        fontSize: 13,
-        color: colors.secondary,
+    sectionTitle: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#1A1D2E',
     },
 
+    sectionSubtitle: {
+        marginTop: 3,
+        fontSize: 12,
+        color: '#8A94A6',
+        fontWeight: '500',
+    },
+
+    // ── ATALHOS ──
     shortcutsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -719,64 +1006,97 @@ const styles = StyleSheet.create({
         padding: 14,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#E7ECF3',
+        borderColor: '#EAEEf5',
+        overflow: 'hidden',
     },
 
     shortcutIconBox: {
-        width: 42,
-        height: 42,
-        borderRadius: 14,
-        backgroundColor: '#EEF3FF',
+        width: 44,
+        height: 44,
+        borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
+        marginBottom: 10,
     },
 
     shortcutTitle: {
         fontSize: 15,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#1A1D2E',
     },
 
     shortcutSubtitle: {
-        marginTop: 6,
-        fontSize: 12,
-        color: colors.secondary,
-        lineHeight: 18,
+        marginTop: 4,
+        fontSize: 11,
+        color: '#8A94A6',
+        lineHeight: 16,
     },
 
+    shortcutAccent: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        borderBottomLeftRadius: 18,
+        borderBottomRightRadius: 18,
+        opacity: 0.7,
+    },
+
+    // ── EMPTY STATE ──
     emptyCard: {
-        paddingVertical: 24,
+        paddingVertical: 28,
         alignItems: 'center',
         justifyContent: 'center',
     },
 
+    emptyIconBox: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: '#EEF3FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
+    },
+
     emptyTitle: {
-        marginTop: 12,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#1A1D2E',
         textAlign: 'center',
     },
 
     emptySubtitle: {
         marginTop: 6,
         fontSize: 13,
-        color: colors.secondary,
+        color: '#8A94A6',
         textAlign: 'center',
         lineHeight: 20,
     },
 
+    // ── CARDS DE ATENDIMENTO ──
     appointmentCard: {
         backgroundColor: '#F8FAFD',
         borderRadius: 16,
         padding: 14,
         borderWidth: 1,
-        borderColor: '#E7ECF3',
+        borderColor: '#EAEEf5',
         marginBottom: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        overflow: 'hidden',
+    },
+
+    appointmentAccent: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        borderTopLeftRadius: 16,
+        borderBottomLeftRadius: 16,
     },
 
     appointmentLeft: {
@@ -784,13 +1104,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
         paddingRight: 10,
+        paddingLeft: 8,
     },
 
     appointmentDateBox: {
         width: 42,
         height: 42,
         borderRadius: 14,
-        backgroundColor: '#EEF3FF',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
@@ -803,19 +1123,36 @@ const styles = StyleSheet.create({
     appointmentClient: {
         fontSize: 15,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#1A1D2E',
     },
 
     appointmentMeta: {
         marginTop: 3,
         fontSize: 12,
-        color: colors.secondary,
+        color: '#8A94A6',
+        fontWeight: '500',
     },
 
-    appointmentStatus: {
-        marginTop: 4,
-        fontSize: 12,
-        color: colors.primary,
+    statusBadge: {
+        marginTop: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        gap: 5,
+    },
+
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+
+    statusBadgeText: {
+        fontSize: 11,
         fontWeight: '700',
+        textTransform: 'capitalize',
     },
 });

@@ -29,6 +29,14 @@ eas-build-pre-install.sh
 .env*.local
 .metro-health-check*
 
+# --- FIREBASE CONFIGS (PRODUÇÃO) ---
+google-services.json
+GoogleService-Info.plist
+firebase-debug.log
+*.runtimeconfig.json
+service-account.json
+backend_vercel/service-account.json
+
 # --- DEBUG E LOGS ---
 npm-debug.*
 yarn-debug.*

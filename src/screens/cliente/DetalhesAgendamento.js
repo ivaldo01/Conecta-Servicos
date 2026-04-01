@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
-import { doc, updateDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+import { liberarHorario } from '../../utils/agendaDisponibilidade';
 
 function parseNumero(valor, fallback = 0) {
     if (valor === null || valor === undefined || valor === '') return fallback;
@@ -234,7 +235,20 @@ export default function DetalhesAgendamento({ route, navigation }) {
                             const docRef = doc(db, "agendamentos", agendamento.id);
                             await updateDoc(docRef, {
                                 status: 'cancelado',
+                                canceladoEm: serverTimestamp(),
+                                atualizadoEm: serverTimestamp(),
                             });
+
+                            try {
+                                await liberarHorario({
+                                    clinicaId: agendamento?.clinicaId,
+                                    data: agendamento?.dataFiltro,
+                                    horario: agendamento?.horario,
+                                    colaboradorId: agendamento?.colaboradorId,
+                                });
+                            } catch (erroLiberar) {
+                                console.log('Aviso: erro ao liberar horário (pode já estar liberado):', erroLiberar);
+                            }
 
                             Alert.alert("Sucesso", "O agendamento foi cancelado.");
                             navigation.goBack();
@@ -503,7 +517,7 @@ export default function DetalhesAgendamento({ route, navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#EEF3F9',
     },
 
     content: {
@@ -511,16 +525,16 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        padding: 24,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderColor: '#EEE',
+        padding: 20,
+        backgroundColor: colors.primary,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
 
     title: {
         fontSize: 22,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#FFF',
     },
 
     badgesRow: {
@@ -564,13 +578,17 @@ const styles = StyleSheet.create({
 
     card: {
         backgroundColor: '#FFF',
-        marginHorizontal: 20,
+        marginHorizontal: 16,
         marginTop: 16,
         padding: 18,
         borderRadius: 18,
-        elevation: 2,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
         borderWidth: 1,
-        borderColor: '#EEF1F4',
+        borderColor: '#E8EDF5',
     },
 
     sectionTitle: {
@@ -766,33 +784,48 @@ const styles = StyleSheet.create({
         marginTop: 14,
         backgroundColor: colors.primary,
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 14,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
     },
 
     actionArea: {
-        marginHorizontal: 20,
+        marginHorizontal: 16,
         marginTop: 16,
     },
 
     cancelBtn: {
         backgroundColor: '#E74C3C',
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 14,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#E74C3C',
+        shadowOpacity: 0.14,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
     },
 
     rateBtn: {
         backgroundColor: colors.primary,
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 14,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
     },
 
     btnText: {
@@ -802,7 +835,7 @@ const styles = StyleSheet.create({
     },
 
     avaliadoBox: {
-        marginHorizontal: 20,
+        marginHorizontal: 16,
         marginTop: 16,
         backgroundColor: '#F0FFF4',
         borderRadius: 12,
@@ -821,14 +854,18 @@ const styles = StyleSheet.create({
     },
 
     btnVoltar: {
-        marginHorizontal: 20,
+        marginHorizontal: 16,
         marginTop: 16,
         padding: 15,
         alignItems: 'center',
+        backgroundColor: '#FFF',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#E8EDF5',
     },
 
     btnVoltarTxt: {
-        color: '#999',
+        color: colors.primary,
         fontWeight: '800',
     },
 });

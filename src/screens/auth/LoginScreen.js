@@ -203,32 +203,41 @@ const styles = StyleSheet.create({
 
   screen: {
     flex: 1,
-    backgroundColor: '#F4F7F8',
+    backgroundColor: '#F0F3F8',
   },
 
   content: {
     flexGrow: 1,
-    padding: 24,
+    padding: 18,
     justifyContent: 'center',
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
 
   logoArea: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 18,
+    backgroundColor: colors.primary,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 22,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
 
   logoImage: {
-    width: 170,
-    height: 170,
+    width: 118,
+    height: 118,
     resizeMode: 'contain',
     marginBottom: 12,
   },
 
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.secondary,
+    fontSize: 14,
+    lineHeight: 21,
+    color: 'rgba(255,255,255,0.86)',
     textAlign: 'center',
     paddingHorizontal: 8,
   },
@@ -242,6 +251,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   cardTitle: {
@@ -258,27 +269,27 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#555',
+    color: '#5C6470',
     marginBottom: 6,
   },
 
   input: {
-    backgroundColor: '#FBFBFB',
+    backgroundColor: '#F8FAFD',
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 52,
     fontSize: 15,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#E2E8F0',
     color: '#333',
   },
 
   passwordWrapper: {
     minHeight: 52,
-    backgroundColor: '#FBFBFB',
+    backgroundColor: '#F8FAFD',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: '#E2E8F0',
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 14,
@@ -298,12 +309,17 @@ const styles = StyleSheet.create({
 
   loginButton: {
     height: 54,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
     marginTop: 6,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
 
   loginButtonDisabled: {
@@ -318,6 +334,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
 
   chooseProfileButton: {

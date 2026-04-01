@@ -2,23 +2,29 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import colors from '../constants/colors'; 
+import colors from '../constants/colors';
 
-export default function CustomButton({ title, icon, color, onPress, style }) {
+export default function CustomButton({ title, icon, color, onPress, style, disabled = false }) {
   return (
-    <TouchableOpacity 
-      style={[styles.button, { backgroundColor: color || colors.primary }, style]} 
+    <TouchableOpacity
+      style={[
+        styles.button,
+        { backgroundColor: color || colors.primary },
+        disabled && styles.disabled,
+        style,
+      ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.82}
+      disabled={disabled}
     >
-      {icon && (
-        <Ionicons 
-          name={icon} 
-          size={20} 
-          color={colors.textLight} 
-          style={styles.icon} 
+      {icon ? (
+        <Ionicons
+          name={icon}
+          size={18}
+          color={colors.textLight}
+          style={styles.icon}
         />
-      )}
+      ) : null}
       <Text style={styles.buttonText}>{title}</Text>
     </TouchableOpacity>
   );
@@ -26,26 +32,30 @@ export default function CustomButton({ title, icon, color, onPress, style }) {
 
 const styles = StyleSheet.create({
   button: {
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: 16,
     marginVertical: 5,
-    // Sombra para parecer um botão moderno
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    elevation: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+  },
+  disabled: {
+    opacity: 0.65,
   },
   buttonText: {
     color: colors.textLight,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   icon: {
-    marginRight: 10,
+    marginRight: 8,
   },
 });

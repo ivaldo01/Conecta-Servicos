@@ -62,81 +62,92 @@ export default function ChooseProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F7F8',
+    backgroundColor: '#F0F3F8',
   },
 
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
-    paddingBottom: 40,
+    padding: 20,
+    paddingBottom: 36,
   },
 
   logoArea: {
     alignItems: 'center',
-    marginBottom: 36,
+    marginBottom: 20,
+    backgroundColor: colors.primary,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
 
   logo: {
-    width: 180,
-    height: 180,
+    width: 118,
+    height: 118,
     resizeMode: 'contain',
-    marginBottom: 18,
+    marginBottom: 14,
   },
 
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#333',
+    color: '#FFF',
     textAlign: 'center',
   },
 
   subtitle: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.84)',
     marginTop: 8,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
     paddingHorizontal: 10,
   },
 
   buttonsArea: {
-    marginTop: 8,
+    marginTop: 2,
   },
 
   buttonCliente: {
     backgroundColor: '#FFFFFF',
     padding: 22,
-    borderRadius: 18,
-    marginBottom: 18,
+    borderRadius: 20,
+    marginBottom: 14,
     elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
   },
 
   buttonProfissional: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#1E2535',
     padding: 22,
-    borderRadius: 18,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: colors.primary,
+    borderRadius: 20,
+    marginBottom: 14,
+    elevation: 4,
+    shadowColor: '#1E2535',
     shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
 
   buttonTitleDark: {
     fontSize: 19,
     fontWeight: '800',
-    color: '#222',
+    color: colors.textDark,
   },
 
   buttonSubtitleDark: {
     fontSize: 14,
-    color: '#666',
+    color: '#667085',
     marginTop: 6,
     lineHeight: 20,
   },
@@ -149,19 +160,20 @@ const styles = StyleSheet.create({
 
   buttonSubtitleLight: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.92)',
+    color: 'rgba(255,255,255,0.86)',
     marginTop: 6,
     lineHeight: 20,
   },
 
   backButton: {
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 8,
+    paddingVertical: 8,
   },
 
   backButtonText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.primary,
   },
 });

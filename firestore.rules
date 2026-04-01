@@ -6,42 +6,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function uidAtual() {
+      return request.auth.uid;
+    }
+
     function ehDono(userId) {
-      return estaLogado() && request.auth.uid == userId;
+      return estaLogado() && uidAtual() == userId;
     }
 
-    function ehProfissional(data) {
-      return data != null && (
-        data.tipo == "profissional" ||
-        data.perfil == "profissional" ||
-        data.tipoCadastroProfissional == "empresa" ||
-        data.tipoCadastroProfissional == "autonomo" ||
-        (data.cpfCnpj is string && data.cpfCnpj != "") ||
-        (data.cnpj is string && data.cnpj != "")
-      );
+    function ehAdmin() {
+      // Usando exists() para evitar erro caso o documento não exista
+      return estaLogado() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    function podeLerPerfilProfissional() {
-      return estaLogado() && resource.data != null && ehProfissional(resource.data);
-    }
-
-    function participaDoAgendamento() {
-      return estaLogado() && resource.data != null && (
-        resource.data.clienteId == request.auth.uid ||
-        resource.data.clinicaId == request.auth.uid ||
-        resource.data.colaboradorId == request.auth.uid ||
-        resource.data.profissionalId == request.auth.uid
+    function participaDoDocumentoFinanceiro(data) {
+      return estaLogado() && data != null && (
+        data.clienteId == uidAtual() ||
+        data.profissionalId == uidAtual() ||
+        data.clinicaId == uidAtual() ||
+        data.colaboradorId == uidAtual() ||
+        data.usuarioId == uidAtual() ||
+        data.ownerId == uidAtual() ||
+        ehAdmin()
       );
     }
 
     match /usuarios/{userId} {
-      allow read, write: if ehDono(userId);
-      allow read: if podeLerPerfilProfissional();
+      allow read: if estaLogado();
+      allow create: if estaLogado();
+      allow update: if ehDono(userId) || ehAdmin();
+      allow delete: if false;
 
       match /notificacoes/{notificacaoId} {
         allow read: if ehDono(userId);
         allow create: if estaLogado();
-        allow update, delete: if ehDono(userId);
+        allow update: if ehDono(userId);
+        allow delete: if ehDono(userId);
       }
 
       match /favoritos/{favoritoId} {
@@ -54,8 +55,8 @@ service cloud.firestore {
       }
 
       match /configuracoes/{configId} {
-        allow read, write: if ehDono(userId);
-        allow read: if estaLogado() && configId == "agenda";
+        allow read: if ehDono(userId) || (estaLogado() && configId == "agenda");
+        allow write: if ehDono(userId);
       }
 
       match /colaboradores/{colabId} {
@@ -63,9 +64,16 @@ service cloud.firestore {
         allow write: if ehDono(userId);
 
         match /configuracoes/{configId} {
-          allow read, write: if ehDono(userId);
-          allow read: if estaLogado() && configId == "agenda";
+          allow read: if ehDono(userId) || (estaLogado() && configId == "agenda");
+          allow write: if ehDono(userId);
         }
+      }
+
+      match /avaliacoes/{avaliacaoId} {
+        allow read: if true;
+        allow create: if estaLogado();
+        allow update: if ehDono(userId);
+        allow delete: if ehDono(userId);
       }
 
       match /menores/{menorId} {
@@ -75,57 +83,69 @@ service cloud.firestore {
 
     match /categorias/{categoriaId} {
       allow read: if true;
-      allow write: if estaLogado();
+      allow write: if ehAdmin();
     }
 
     match /agendamentos/{agendamentoId} {
       allow create: if estaLogado();
-      allow read: if estaLogado();
-      allow update: if participaDoAgendamento();
+      allow read: if participaDoDocumentoFinanceiro(resource.data);
+      allow update: if participaDoDocumentoFinanceiro(resource.data);
       allow delete: if false;
     }
 
     match /pagamentos/{pagamentoId} {
-      allow read: if estaLogado();
+      allow read: if participaDoDocumentoFinanceiro(resource.data);
+      allow create: if estaLogado();
+      allow update: if participaDoDocumentoFinanceiro(resource.data);
+      allow delete: if false;
+    }
 
-      allow create: if estaLogado() && (
-        request.resource.data.profissionalId == request.auth.uid ||
-        request.resource.data.clinicaId == request.auth.uid ||
-        request.resource.data.colaboradorId == request.auth.uid
-      );
-
-      allow update: if estaLogado() && resource.data != null && (
-        resource.data.profissionalId == request.auth.uid ||
-        resource.data.clinicaId == request.auth.uid ||
-        resource.data.colaboradorId == request.auth.uid ||
-        resource.data.clienteId == request.auth.uid
-      );
-
+    match /cobrancas/{cobrancaId} {
+      allow read: if participaDoDocumentoFinanceiro(resource.data);
+      allow create: if estaLogado();
+      allow update: if
+        participaDoDocumentoFinanceiro(resource.data) ||
+        participaDoDocumentoFinanceiro(request.resource.data);
       allow delete: if false;
     }
 
     match /saques/{saqueId} {
-      allow read: if estaLogado() && resource.data != null && (
-        resource.data.profissionalId == request.auth.uid ||
-        resource.data.clinicaId == request.auth.uid ||
-        resource.data.colaboradorId == request.auth.uid
-      );
-
-      allow create: if estaLogado() && request.resource.data != null && (
-        request.resource.data.profissionalId == request.auth.uid ||
-        request.resource.data.clinicaId == request.auth.uid ||
-        request.resource.data.colaboradorId == request.auth.uid
-      );
-
-      allow update: if false;
+      allow read: if participaDoDocumentoFinanceiro(resource.data);
+      allow create: if estaLogado();
+      allow update: if participaDoDocumentoFinanceiro(resource.data) || ehAdmin();
       allow delete: if false;
     }
 
-    match /avaliacoes/{avaliacaoId} {
-      allow read: if true;
+    match /saldos/{saldoId} {
+      allow read: if estaLogado();
       allow create: if estaLogado();
-      allow update: if false;
+      allow update: if
+        ehDono(saldoId) ||
+        participaDoDocumentoFinanceiro(resource.data) ||
+        participaDoDocumentoFinanceiro(request.resource.data) ||
+        ehAdmin();
       allow delete: if false;
+    }
+
+    match /suporte/{userId} {
+      // Simplificando para teste ou garantindo que o ehDono funcione
+      allow read, write: if estaLogado() && (request.auth.uid == userId || ehAdmin());
+      
+      match /mensagens/{msgId} {
+        allow read, write: if estaLogado() && (request.auth.uid == userId || ehAdmin());
+      }
+    }
+
+    // Bloqueio atômico de horários
+    match /agenda_ocupada/{slotId} {
+      allow read: if estaLogado();
+      allow create: if estaLogado();
+      allow delete: if estaLogado();
+      allow update: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

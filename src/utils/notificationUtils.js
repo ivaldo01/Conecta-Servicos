@@ -1,4 +1,4 @@
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 
 function getConteudoStatusAgendamento(status) {
@@ -23,25 +23,44 @@ function getConteudoStatusAgendamento(status) {
 }
 
 async function enviarPushExpo(expoPushToken, payload) {
-    if (!expoPushToken) return;
+    if (!expoPushToken || typeof expoPushToken !== 'string') {
+        console.log('Push: Token inválido ou ausente:', expoPushToken);
+        return;
+    }
+
+    if (!expoPushToken.startsWith('ExponentPushToken')) {
+        console.log('Push: O token fornecido não é um Expo Push Token padrão:', expoPushToken);
+    }
 
     try {
-        await fetch('https://exp.host/--/api/v2/push/send', {
+        const body = {
+            to: expoPushToken,
+            sound: 'default',
+            priority: 'high',
+            channelId: 'default',
+            ...payload,
+        };
+
+        console.log('Push: Tentando enviar para:', expoPushToken);
+        console.log('Push: Body final:', JSON.stringify(body));
+
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
             headers: {
-                Accept: 'application/json',
-                'Accept-encoding': 'gzip, deflate',
+                'Accept': 'application/json',
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                to: expoPushToken,
-                sound: 'default',
-                priority: 'high',
-                ...payload,
-            }),
+            body: JSON.stringify(body),
         });
+
+        const result = await response.json();
+        console.log("Push: Resposta do servidor Expo:", JSON.stringify(result));
+
+        if (result.errors) {
+            console.error("Push: Erros reportados pelo Expo:", result.errors);
+        }
     } catch (error) {
-        console.log('Erro ao enviar push:', error);
+        console.error('Push: Erro fatal ao chamar API do Expo:', error);
     }
 }
 
@@ -91,21 +110,21 @@ export async function salvarNotificacaoCliente({
 
 export async function enviarPushAoProfissional(
     expoPushToken,
-    {
-        titulo = 'Novo agendamento recebido',
-        mensagem = 'Você recebeu uma nova solicitação.',
-        screen = 'AgendaProfissional',
-        root = 'Main',
-        params = {},
-    } = {}
+    payload = {}
 ) {
+    const {
+        titulo, title,
+        mensagem, body,
+        screen, root, params
+    } = payload;
+
     await enviarPushExpo(expoPushToken, {
-        title: titulo,
-        body: mensagem,
+        title: title || titulo || 'Novo agendamento recebido',
+        body: body || mensagem || 'Você recebeu uma nova solicitação.',
         data: {
-            screen,
-            root,
-            params,
+            screen: screen || 'AgendaProfissional',
+            root: root || 'Main',
+            params: params || {},
         },
     });
 }
@@ -143,6 +162,39 @@ export async function salvarNotificacaoProfissional({
         });
     } catch (error) {
         console.log('Erro ao criar notificação para profissional:', error);
+    }
+}
+
+export async function enviarPushSuporte({
+    toUserId,
+    titulo = 'Suporte Conecta',
+    mensagem,
+    screen = 'Suporte',
+    params = {},
+    sound = 'default',
+    channelId = 'default'
+}) {
+    if (!toUserId) return;
+
+    try {
+        const userSnap = await getDoc(doc(db, 'usuarios', toUserId));
+        if (userSnap.exists()) {
+            const token = userSnap.data()?.expoPushToken || userSnap.data()?.pushToken;
+            if (token) {
+                await enviarPushExpo(token, {
+                    title: titulo,
+                    body: mensagem,
+                    sound: sound,
+                    channelId: channelId,
+                    data: {
+                        screen,
+                        params,
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.log('Erro ao enviar push de suporte:', error);
     }
 }
 
@@ -203,6 +255,30 @@ export async function salvarNotificacaoSistema({
             createdAt: serverTimestamp(),
             lida: false,
         });
+
+        // Enviar PUSH externo também para notificações de sistema
+        try {
+            const userSnap = await getDoc(doc(db, 'usuarios', userId));
+            if (userSnap.exists()) {
+                const token = userSnap.data()?.expoPushToken || userSnap.data()?.pushToken;
+                if (token) {
+                    await enviarPushExpo(token, {
+                        title: titulo,
+                        body: mensagem,
+                        data: {
+                            screen: screenFinal,
+                            root: rootFinal,
+                            params: {
+                                ...paramsFinal,
+                                ...(agendamentoId ? { agendamentoId } : {}),
+                            },
+                        }
+                    });
+                }
+            }
+        } catch (pushError) {
+            console.log('Erro ao tentar enviar push na notificacao de sistema:', pushError);
+        }
     } catch (error) {
         console.log('Erro ao criar notificação de sistema:', error);
     }

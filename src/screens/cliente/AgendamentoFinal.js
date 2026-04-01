@@ -7,6 +7,7 @@ import {
     Alert,
     ActivityIndicator,
     ScrollView,
+    TextInput,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
 import {
@@ -14,10 +15,11 @@ import {
     getDoc,
     getDocs,
     collection,
+    addDoc,
     serverTimestamp,
     query,
-    where,
     runTransaction,
+    where,
 } from "firebase/firestore";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +28,7 @@ import {
     enviarPushAoProfissional,
     salvarNotificacaoProfissional,
 } from "../../utils/notificationUtils";
+import { travarHorario, liberarHorario } from '../../utils/agendaDisponibilidade';
 
 async function enviarPushNotificacao(expoPushToken, clienteNome, data, horario) {
     await enviarPushAoProfissional(expoPushToken, {
@@ -162,6 +165,11 @@ export default function AgendamentoFinal({ route, navigation }) {
     const [colaboradorEscolhido, setColaboradorEscolhido] = useState(null);
     const [perfilCliente, setPerfilCliente] = useState(null);
 
+    const [tipoAtendimento, setTipoAtendimento] = useState('cliente');
+    const [menores, setMenores] = useState([]);
+    const [menorSelecionado, setMenorSelecionado] = useState(null);
+    const [observacoesMenor, setObservacoesMenor] = useState('');
+
     const [clinicaData, setClinicaData] = useState(
         origemAgendamento === 'perfil_publico' && profissionalRoute
             ? profissionalRoute
@@ -171,12 +179,12 @@ export default function AgendamentoFinal({ route, navigation }) {
     const [formaPagamento, setFormaPagamento] = useState('pix');
 
     const [equipe, setEquipe] = useState([]);
+    const [agendamentosExistentes, setAgendamentosExistentes] = useState([]);
     const [agendaClinica, setAgendaClinica] = useState({
         horarios: [],
         dias: [],
         agendaAtiva: true,
     });
-    const [ocupacaoGeral, setOcupacaoGeral] = useState([]);
 
     useEffect(() => {
         inicializarTela();
@@ -184,7 +192,6 @@ export default function AgendamentoFinal({ route, navigation }) {
 
     useEffect(() => {
         if (!loadingInicial && clinicaId) {
-            buscarOcupacaoNoBanco();
             setHorarioSelecionado(null);
             setColaboradorEscolhido(null);
         }
@@ -213,6 +220,8 @@ export default function AgendamentoFinal({ route, navigation }) {
             await Promise.all([
                 carregarDadosIniciais(),
                 carregarPerfilCliente(),
+                carregarMenores(),
+                carregarAgendamentosDoDia(),
             ]);
         } catch (e) {
             console.log("Erro ao inicializar tela:", e);
@@ -262,6 +271,51 @@ export default function AgendamentoFinal({ route, navigation }) {
             console.log("Erro ao carregar perfil:", e);
         }
     };
+
+    const carregarMenores = async () => {
+        try {
+            const user = auth.currentUser;
+            if (!user?.uid) return;
+
+            const snap = await getDocs(collection(db, "usuarios", user.uid, "menores"));
+            const lista = snap.docs.map((item) => ({
+                id: item.id,
+                ...item.data(),
+            }));
+
+            setMenores(lista);
+        } catch (e) {
+            console.log("Erro ao carregar menores:", e);
+            setMenores([]);
+        }
+    };
+
+    const carregarAgendamentosDoDia = async () => {
+        if (!clinicaId) return;
+        try {
+            const dataFiltro = formatarDataFiltro(date);
+            const q = query(
+                collection(db, "agendamentos"),
+                where("clinicaId", "==", clinicaId),
+                where("dataFiltro", "==", dataFiltro),
+                where("status", "in", ["pendente", "confirmado", "concluido"])
+            );
+            const snap = await getDocs(q);
+            const agendados = snap.docs.map(d => ({
+                horario: d.data().horario,
+                colaboradorId: d.data().colaboradorId
+            }));
+            setAgendamentosExistentes(agendados);
+        } catch (e) {
+            console.log("Erro ao carregar agendamentos do dia:", e);
+        }
+    };
+
+    useEffect(() => {
+        if (!loadingInicial) {
+            carregarAgendamentosDoDia();
+        }
+    }, [date]);
 
     const carregarDadosIniciais = async () => {
         try {
@@ -367,31 +421,6 @@ export default function AgendamentoFinal({ route, navigation }) {
         }
     };
 
-    const buscarOcupacaoNoBanco = async () => {
-        const dataFiltro = formatarDataFiltro(date);
-
-        try {
-            const q = query(
-                collection(db, "agendamentos"),
-                where("clinicaId", "==", clinicaId),
-                where("dataFiltro", "==", dataFiltro)
-            );
-
-            const snap = await getDocs(q);
-            const ocupados = snap.docs
-                .map((d) => ({ id: d.id, ...d.data() }))
-                .filter((item) => item.status !== "cancelado")
-                .map((item) => ({
-                    horario: item.horario,
-                    colabId: item.colaboradorId,
-                }));
-
-            setOcupacaoGeral(ocupados);
-        } catch (e) {
-            console.log("Erro ocupação:", e);
-        }
-    };
-
     const diaSemanaSelecionado = useMemo(() => date.getDay(), [date]);
 
     const agendaDoColaborador = (colab) => {
@@ -408,11 +437,12 @@ export default function AgendamentoFinal({ route, navigation }) {
         const fazServicos = servicos.every((s) =>
             colab.servicosHabilitados?.includes(s.id)
         );
-        const jaOcupado = ocupacaoGeral.some(
-            (o) => o.horario === horario && o.colabId === colab.id
+
+        const jaAgendado = agendamentosExistentes.some(
+            a => a.horario === horario && a.colaboradorId === colab.id
         );
 
-        return Boolean(trabalhaDia && trabalhaHora && fazServicos && !jaOcupado);
+        return Boolean(trabalhaDia && trabalhaHora && fazServicos && !jaAgendado);
     };
 
     const existeAlgumProfissionalDisponivelNoDia = useMemo(() => {
@@ -424,9 +454,16 @@ export default function AgendamentoFinal({ route, navigation }) {
                 colab.servicosHabilitados?.includes(s.id)
             );
 
-            return trabalhaDia && temHorarios && fazServicos;
+            const temHorarioLivre = (agenda?.horarios || []).some(h => {
+                const jaAgendado = agendamentosExistentes.some(
+                    a => a.horario === h && a.colaboradorId === colab.id
+                );
+                return !jaAgendado;
+            });
+
+            return trabalhaDia && temHorarios && fazServicos && temHorarioLivre;
         });
-    }, [equipe, agendaClinica, diaSemanaSelecionado, servicos]);
+    }, [equipe, agendaClinica, diaSemanaSelecionado, servicos, agendamentosExistentes]);
 
     const horariosDisponiveisGerais = useMemo(() => {
         const todosHorarios = new Set();
@@ -448,7 +485,41 @@ export default function AgendamentoFinal({ route, navigation }) {
         });
 
         return Array.from(todosHorarios).sort((a, b) => a.localeCompare(b));
-    }, [equipe, agendaClinica, diaSemanaSelecionado, ocupacaoGeral, servicos]);
+    }, [equipe, agendaClinica, diaSemanaSelecionado, servicos, agendamentosExistentes]);
+
+    // Horários configurados do profissional selecionado naquele dia
+    const todosHorariosDodia = useMemo(() => {
+        if (!colaboradorEscolhido) return [];
+
+        const agenda = agendaDoColaborador(colaboradorEscolhido);
+        const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
+
+        if (!trabalhaDia) return [];
+
+        return [...(agenda?.horarios || [])].sort((a, b) => a.localeCompare(b));
+    }, [colaboradorEscolhido, agendaClinica, diaSemanaSelecionado]);
+
+    // Estado de cada horário baseado EXCLUSIVAMENTE no profissional selecionado
+    const getEstadoHorario = (h) => {
+        if (horarioJaPassouHoje(h)) return 'passado';
+
+        if (!colaboradorEscolhido) return 'passado';
+
+        const livre = colaboradorPodeAtenderNoHorario(colaboradorEscolhido, h);
+        return livre ? 'livre' : 'ocupado';
+    };
+
+    // Profissionais que atendem os serviços selecionados neste dia (sem filtro de horário)
+    const colaboradoresDisponivelNoDia = useMemo(() => {
+        return equipe.filter((colab) => {
+            const agenda = agendaDoColaborador(colab);
+            const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
+            const fazServicos = servicos.every((s) =>
+                colab.servicosHabilitados?.includes(s.id)
+            );
+            return trabalhaDia && fazServicos;
+        });
+    }, [equipe, agendaClinica, diaSemanaSelecionado, servicos]);
 
     const verificarDisponibilidadeColab = (colab) => {
         if (!horarioSelecionado) {
@@ -461,11 +532,7 @@ export default function AgendamentoFinal({ route, navigation }) {
         const fazServicos = servicos.every((s) =>
             colab.servicosHabilitados?.includes(s.id)
         );
-        const jaOcupado = ocupacaoGeral.some(
-            (o) => o.horario === horarioSelecionado && o.colabId === colab.id
-        );
 
-        if (jaOcupado) return { ok: false, msg: "Já ocupado" };
         if (!trabalhaDia) return { ok: false, msg: "Não atende neste dia" };
         if (!trabalhaHora) return { ok: false, msg: "Horário indisponível" };
         if (!fazServicos) return { ok: false, msg: "Não realiza este serviço" };
@@ -511,8 +578,56 @@ export default function AgendamentoFinal({ route, navigation }) {
             clienteNome,
             screen: 'AgendaProfissional',
             root: 'Main',
-            params: {},
+            params: {
+                agendamentoId,
+            },
         });
+    };
+
+    const salvarNotificacaoInternaCliente = async ({
+        clienteId,
+        clienteNome,
+        dataExibicao,
+        horarioSelecionadoAtual,
+        agendamentoId,
+        profissionalNome,
+    }) => {
+        try {
+            await addDoc(collection(db, 'usuarios', clienteId, 'notificacoes'), {
+                tipo: 'novo_agendamento',
+                titulo: '✅ Agendamento solicitado!',
+                mensagem: `Sua solicitação para ${profissionalNome} no dia ${dataExibicao} às ${horarioSelecionadoAtual} foi enviada. Aguarde a confirmação.`,
+                agendamentoId,
+                profissionalNome,
+                screen: 'MeusAgendamentosCliente',
+                root: 'Main',
+                params: { agendamentoId },
+                createdAt: serverTimestamp(),
+                lida: false,
+            });
+        } catch (error) {
+            console.log('Erro ao criar notificação para cliente:', error);
+        }
+    };
+
+    const enviarPushClienteSeTiverToken = async ({
+        token,
+        profissionalNome,
+        dataExibicao,
+        horarioSelecionadoAtual,
+    }) => {
+        if (!token) return;
+        try {
+            await enviarPushAoProfissional(token, {
+                titulo: '✅ Agendamento solicitado!',
+                mensagem: `Sua solicitação para ${profissionalNome} no dia ${dataExibicao} às ${horarioSelecionadoAtual} foi enviada.`,
+                screen: 'MeusAgendamentosCliente',
+                root: 'Main',
+                params: {},
+            });
+        } catch (error) {
+            console.log("Erro ao enviar push para cliente:", error);
+        }
     };
 
     const enviarPushProfissionalSeTiverToken = async ({
@@ -566,12 +681,19 @@ export default function AgendamentoFinal({ route, navigation }) {
             return Alert.alert("Erro", "Usuário não autenticado.");
         }
 
+        if (tipoAtendimento === 'menor' && !menorSelecionado) {
+            return Alert.alert("Atenção", "Selecione o dependente para este agendamento.");
+        }
+
         setLoading(true);
 
-        try {
-            const dataFiltro = formatarDataFiltro(date);
-            const dataExibicao = formatarDataExibicao(date);
+        const dataFiltro = formatarDataFiltro(date);
+        const dataExibicao = formatarDataExibicao(date);
+        const novoAgendamentoRef = doc(collection(db, "agendamentos"));
 
+        let horarioTravado = false;
+
+        try {
             const nomeCliente =
                 perfilCliente?.nome ||
                 perfilCliente?.nomeCompleto ||
@@ -582,26 +704,21 @@ export default function AgendamentoFinal({ route, navigation }) {
                 perfilCliente?.pushToken ||
                 '';
 
-            const novoAgendamentoRef = doc(collection(db, "agendamentos"));
+            // 1. Trava o horário atomicamente ANTES de salvar o agendamento.
+            //    travarHorario usa runTransaction internamente na coleção
+            //    'agenda_ocupada', garantindo que apenas um cliente consiga
+            //    reservar o slot mesmo em requisições simultâneas.
+            await travarHorario({
+                clinicaId,
+                data: dataFiltro,
+                horario: horarioSelecionado,
+                colaboradorId: colaboradorEscolhido.id,
+                agendamentoId: novoAgendamentoRef.id,
+            });
+            horarioTravado = true;
 
+            // 2. Salva o agendamento no Firestore
             await runTransaction(db, async (transaction) => {
-                const slotQuery = query(
-                    collection(db, "agendamentos"),
-                    where("clinicaId", "==", clinicaId),
-                    where("dataFiltro", "==", dataFiltro),
-                    where("colaboradorId", "==", colaboradorEscolhido.id),
-                    where("horario", "==", horarioSelecionado)
-                );
-
-                const slotSnap = await getDocs(slotQuery);
-                const slotOcupado = slotSnap.docs.some(
-                    (d) => d.data().status !== "cancelado"
-                );
-
-                if (slotOcupado) {
-                    throw new Error("HORARIO_OCUPADO");
-                }
-
                 transaction.set(novoAgendamentoRef, {
                     clinicaId,
                     clinicaNome: getNomeClinica(clinicaData),
@@ -635,6 +752,14 @@ export default function AgendamentoFinal({ route, navigation }) {
                         perfilCliente?.telefone ||
                         "Não informado",
                     clientePushToken,
+
+                    profissionalId: colaboradorEscolhido?.id || clinicaId || null,
+                    tipoAtendimento,
+                    menorId: tipoAtendimento === 'menor' ? menorSelecionado?.id || null : null,
+                    menorNome: tipoAtendimento === 'menor' ? menorSelecionado?.nome || null : null,
+                    menorIdade: tipoAtendimento === 'menor' ? menorSelecionado?.idade || null : null,
+                    menorParentesco: tipoAtendimento === 'menor' ? menorSelecionado?.parentesco || null : null,
+                    observacoesMenor: tipoAtendimento === 'menor' ? observacoesMenor.trim() || null : null,
 
                     data: dataExibicao,
                     dataFiltro,
@@ -688,6 +813,22 @@ export default function AgendamentoFinal({ route, navigation }) {
                 horarioSelecionadoAtual: horarioSelecionado,
             });
 
+            await salvarNotificacaoInternaCliente({
+                clienteId: auth.currentUser.uid,
+                clienteNome: nomeCliente,
+                dataExibicao,
+                horarioSelecionadoAtual: horarioSelecionado,
+                agendamentoId: novoAgendamentoRef.id,
+                profissionalNome: colaboradorEscolhido.nome || "Profissional",
+            });
+
+            await enviarPushClienteSeTiverToken({
+                token: clientePushToken,
+                profissionalNome: colaboradorEscolhido.nome || "Profissional",
+                dataExibicao,
+                horarioSelecionadoAtual: horarioSelecionado,
+            });
+
             if (clinicaId !== colaboradorEscolhido.id) {
                 await salvarNotificacaoInternaProfissional({
                     profissionalId: clinicaId,
@@ -706,7 +847,11 @@ export default function AgendamentoFinal({ route, navigation }) {
                 });
             }
 
-            Alert.alert("Sucesso!", "Agendamento realizado com sucesso!");
+            Alert.alert(
+                "Sucesso!",
+                "Agendamento enviado com sucesso. O profissional irá confirmar a disponibilidade."
+            );
+
             navigation.navigate("Main", {
                 screen: "MeusAgendamentosCliente",
             });
@@ -714,10 +859,29 @@ export default function AgendamentoFinal({ route, navigation }) {
             console.log("Erro ao finalizar agendamento:", e);
 
             if (e.message === "HORARIO_OCUPADO") {
-                await buscarOcupacaoNoBanco();
-                Alert.alert("Horário Ocupado", "Alguém acabou de reservar este horário.");
+                Alert.alert(
+                    "Horário Indisponível",
+                    "Este horário acabou de ser preenchido por outra pessoa. Por favor, escolha outro horário."
+                );
+                carregarAgendamentosDoDia();
             } else {
-                Alert.alert("Erro", "Falha ao agendar.");
+                // Se o horário foi travado mas o agendamento falhou, libera o slot
+                if (horarioTravado) {
+                    try {
+                        await liberarHorario({
+                            clinicaId,
+                            data: dataFiltro,
+                            horario: horarioSelecionado,
+                            colaboradorId: colaboradorEscolhido.id,
+                        });
+                    } catch (erroLiberar) {
+                        console.log('Aviso: erro ao liberar horário após falha:', erroLiberar);
+                    }
+                }
+                Alert.alert(
+                    "Erro",
+                    "Não foi possível concluir o agendamento. Verifique as regras do Firestore e tente novamente."
+                );
             }
         } finally {
             setLoading(false);
@@ -752,6 +916,132 @@ export default function AgendamentoFinal({ route, navigation }) {
                     <Text style={styles.resumeLabel}>VALOR TOTAL</Text>
                     <Text style={styles.resumeValue}>{formatarMoeda(valorTotalAgendamento)}</Text>
                 </View>
+
+                <Text style={styles.sectionLabel}>Quem será atendido?</Text>
+
+                <View style={styles.tipoAtendimentoRow}>
+                    <TouchableOpacity
+                        style={[
+                            styles.tipoAtendimentoCard,
+                            tipoAtendimento === 'cliente' && styles.tipoAtendimentoCardSelected,
+                        ]}
+                        onPress={() => {
+                            setTipoAtendimento('cliente');
+                            setMenorSelecionado(null);
+                        }}
+                    >
+                        <Ionicons
+                            name="person-outline"
+                            size={20}
+                            color={tipoAtendimento === 'cliente' ? '#FFF' : colors.primary}
+                        />
+                        <Text
+                            style={[
+                                styles.tipoAtendimentoText,
+                                tipoAtendimento === 'cliente' && styles.tipoAtendimentoTextSelected,
+                            ]}
+                        >
+                            Para mim
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.tipoAtendimentoCard,
+                            tipoAtendimento === 'menor' && styles.tipoAtendimentoCardSelected,
+                        ]}
+                        onPress={() => setTipoAtendimento('menor')}
+                    >
+                        <Ionicons
+                            name="people-outline"
+                            size={20}
+                            color={tipoAtendimento === 'menor' ? '#FFF' : colors.primary}
+                        />
+                        <Text
+                            style={[
+                                styles.tipoAtendimentoText,
+                                tipoAtendimento === 'menor' && styles.tipoAtendimentoTextSelected,
+                            ]}
+                        >
+                            Para menor
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {tipoAtendimento === 'menor' && (
+                    <>
+                        <Text style={styles.sectionLabel}>Selecione o dependente</Text>
+
+                        {menores.length === 0 ? (
+                            <View style={styles.emptyBox}>
+                                <Text style={styles.emptyBoxText}>
+                                    Você ainda não tem dependentes cadastrados.
+                                </Text>
+
+                                <TouchableOpacity
+                                    style={styles.linkButton}
+                                    onPress={() => navigation.navigate('CadastroMenor')}
+                                >
+                                    <Text style={styles.linkButtonText}>Cadastrar dependente</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            menores.map((menor) => {
+                                const selecionado = menorSelecionado?.id === menor.id;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={menor.id}
+                                        style={[
+                                            styles.menorCard,
+                                            selecionado && styles.menorCardSelected,
+                                        ]}
+                                        onPress={() => setMenorSelecionado(menor)}
+                                        activeOpacity={0.88}
+                                    >
+                                        <View style={styles.menorAvatar}>
+                                            <Text style={styles.menorAvatarText}>
+                                                {menor?.nome?.charAt(0)?.toUpperCase() || 'M'}
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.menorNome}>
+                                                {menor.nome || 'Dependente'}
+                                            </Text>
+                                            <Text style={styles.menorInfo}>
+                                                Idade: {menor.idade || '-'}
+                                            </Text>
+                                        </View>
+
+                                        <Ionicons
+                                            name={selecionado ? 'radio-button-on' : 'radio-button-off'}
+                                            size={22}
+                                            color={selecionado ? colors.primary : colors.border}
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+
+                        <Text style={styles.sectionLabel}>Necessidades Especiais / Observações</Text>
+                        <View style={styles.obsContainer}>
+                            <TextInput
+                                style={styles.obsInput}
+                                placeholder="Ex: Possui autismo, alergia a algum produto, dificuldade de locomoção, etc."
+                                placeholderTextColor="#A0A0A0"
+                                multiline
+                                numberOfLines={4}
+                                value={observacoesMenor}
+                                onChangeText={setObservacoesMenor}
+                                textAlignVertical="top"
+                            />
+                            <Text style={styles.obsHint}>
+                                Informe detalhes que ajudem o profissional a oferecer o melhor atendimento.
+                            </Text>
+                        </View>
+                    </>
+                )}
 
                 <Text style={styles.sectionLabel}>Selecione a Data</Text>
                 <TouchableOpacity
@@ -842,7 +1132,8 @@ export default function AgendamentoFinal({ route, navigation }) {
                     </Text>
                 </View>
 
-                <Text style={styles.sectionLabel}>Horários Disponíveis</Text>
+                {/* ── 1. ESCOLHA DO PROFISSIONAL ── */}
+                <Text style={styles.sectionLabel}>Escolha o Profissional</Text>
 
                 {!servicos.length ? (
                     <View style={styles.emptyBox}>
@@ -850,408 +1141,639 @@ export default function AgendamentoFinal({ route, navigation }) {
                             Nenhum serviço foi enviado para o agendamento.
                         </Text>
                     </View>
-                ) : !existeAlgumProfissionalDisponivelNoDia ? (
+                ) : colaboradoresDisponivelNoDia.length === 0 ? (
                     <View style={styles.emptyBox}>
                         <Text style={styles.emptyBoxText}>
                             Nenhum profissional disponível para este serviço nesta data.
                         </Text>
                     </View>
                 ) : (
-                    <View style={styles.horariosGrid}>
-                        {horariosDisponiveisGerais.length > 0 ? (
-                            horariosDisponiveisGerais.map((h) => {
+                    <View style={styles.colabSection}>
+                        {colaboradoresDisponivelNoDia.map((colab) => {
+                            const selecionado = colaboradorEscolhido?.id === colab.id;
+
+                            return (
+                                <TouchableOpacity
+                                    key={colab.id}
+                                    style={[
+                                        styles.colabCard,
+                                        selecionado && styles.colabSelected,
+                                    ]}
+                                    onPress={() => {
+                                        setColaboradorEscolhido(colab);
+                                        setHorarioSelecionado(null);
+                                    }}
+                                >
+                                    <View
+                                        style={[
+                                            styles.colabAvatar,
+                                            selecionado && styles.colabAvatarSelected,
+                                        ]}
+                                    >
+                                        <Text style={styles.colabAvatarText}>
+                                            {(colab.nome || 'P').charAt(0).toUpperCase()}
+                                        </Text>
+                                    </View>
+
+                                    <View style={styles.colabInfo}>
+                                        <Text style={styles.colabNome}>{colab.nome}</Text>
+                                    </View>
+
+                                    <Ionicons
+                                        name={selecionado ? 'radio-button-on' : 'radio-button-off'}
+                                        size={22}
+                                        color={selecionado ? colors.primary : colors.border}
+                                    />
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                )}
+
+                {/* ── 2. HORÁRIOS DO PROFISSIONAL SELECIONADO ── */}
+                <Text style={styles.sectionLabel}>Horários</Text>
+
+                {!colaboradorEscolhido ? (
+                    <View style={styles.emptyBox}>
+                        <Text style={styles.emptyBoxText}>
+                            Selecione um profissional acima para ver os horários disponíveis.
+                        </Text>
+                    </View>
+                ) : todosHorariosDodia.length === 0 ? (
+                    <View style={styles.emptyBox}>
+                        <Text style={styles.emptyBoxText}>
+                            Este profissional não possui horários configurados para esta data.
+                        </Text>
+                    </View>
+                ) : (
+                    <>
+                        <View style={styles.horariosLegenda}>
+                            <View style={styles.legendaItem}>
+                                <View style={[styles.legendaDot, { backgroundColor: '#E8F5E9' }]} />
+                                <Text style={styles.legendaText}>Disponível</Text>
+                            </View>
+                            <View style={styles.legendaItem}>
+                                <View style={[styles.legendaDot, { backgroundColor: '#FFEBEE' }]} />
+                                <Text style={styles.legendaText}>Ocupado</Text>
+                            </View>
+                            <View style={styles.legendaItem}>
+                                <View style={[styles.legendaDot, { backgroundColor: '#F5F5F5' }]} />
+                                <Text style={styles.legendaText}>Passado</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.horariosGrid}>
+                            {todosHorariosDodia.map((h) => {
+                                const estado = getEstadoHorario(h);
                                 const selecionado = horarioSelecionado === h;
-                                const horarioPassado = horarioJaPassouHoje(h);
-                                const disponivel = !horarioPassado;
+                                const clicavel = estado === 'livre';
 
                                 return (
                                     <TouchableOpacity
                                         key={h}
-                                        disabled={!disponivel}
+                                        disabled={!clicavel}
+                                        activeOpacity={clicavel ? 0.7 : 1}
                                         style={[
                                             styles.horaChip,
-                                            disponivel ? styles.horaChipLivre : styles.horaChipIndisponivel,
+                                            estado === 'livre' && styles.horaChipLivre,
+                                            estado === 'ocupado' && styles.horaChipOcupado,
+                                            estado === 'passado' && styles.horaChipIndisponivel,
                                             selecionado && styles.horaChipSelected,
                                         ]}
-                                        onPress={() => {
-                                            setHorarioSelecionado(h);
-                                            setColaboradorEscolhido(null);
-                                        }}
+                                        onPress={() => setHorarioSelecionado(h)}
                                     >
                                         <Text
                                             style={[
                                                 styles.horaChipText,
-                                                selecionado
-                                                    ? styles.horaChipTextSelected
-                                                    : disponivel
-                                                        ? styles.horaChipTextLivre
-                                                        : styles.horaChipTextIndisponivel,
+                                                estado === 'livre' && styles.horaChipTextLivre,
+                                                estado === 'ocupado' && styles.horaChipTextOcupado,
+                                                estado === 'passado' && styles.horaChipTextIndisponivel,
+                                                selecionado && styles.horaChipTextSelected,
                                             ]}
                                         >
                                             {h}
                                         </Text>
-                                    </TouchableOpacity>
-                                );
-                            })
-                        ) : (
-                            <View style={styles.emptyBox}>
-                                <Text style={styles.emptyBoxText}>
-                                    Não há horários livres nessa data.
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                )}
-
-                {horarioSelecionado && (
-                    <View style={styles.colabSection}>
-                        <Text style={styles.sectionLabel}>Escolha o Profissional</Text>
-
-                        {equipe.filter((colab) => verificarDisponibilidadeColab(colab).ok).length === 0 ? (
-                            <View style={styles.emptyBox}>
-                                <Text style={styles.emptyBoxText}>
-                                    Nenhum profissional disponível para este horário.
-                                </Text>
-                            </View>
-                        ) : (
-                            equipe.map((colab) => {
-                                const status = verificarDisponibilidadeColab(colab);
-                                const selecionado = colaboradorEscolhido?.id === colab.id;
-
-                                return (
-                                    <TouchableOpacity
-                                        key={colab.id}
-                                        disabled={!status.ok}
-                                        style={[
-                                            styles.colabCard,
-                                            selecionado && styles.colabSelected,
-                                            !status.ok && styles.colabDisabled,
-                                        ]}
-                                        onPress={() => setColaboradorEscolhido(colab)}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.colabAvatar,
-                                                !status.ok && { backgroundColor: '#EEE' },
-                                            ]}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.colabAvatarText,
-                                                    !status.ok && { color: '#999' },
-                                                ]}
-                                            >
-                                                {colab.nome?.charAt(0) || "P"}
-                                            </Text>
-                                        </View>
-
-                                        <View style={{ flex: 1, marginLeft: 15 }}>
-                                            <Text
-                                                style={[
-                                                    styles.nomeColab,
-                                                    !status.ok && { color: '#999' },
-                                                ]}
-                                            >
-                                                {colab.nome}
-                                            </Text>
-                                            {!status.ok && (
-                                                <Text style={styles.txtErro}>{status.msg}</Text>
-                                            )}
-                                        </View>
-
-                                        {status.ok && (
-                                            <Ionicons
-                                                name={selecionado ? "radio-button-on" : "radio-button-off"}
-                                                size={24}
-                                                color={selecionado ? colors.primary : colors.border}
-                                            />
+                                        {estado === 'ocupado' && (
+                                            <Text style={styles.horaChipOcupadoLabel}>Ocupado</Text>
                                         )}
                                     </TouchableOpacity>
                                 );
-                            })
-                        )}
-                    </View>
+                            })}
+                        </View>
+                    </>
                 )}
 
-                <View style={styles.bottomSummaryCard}>
-                    <Text style={styles.bottomSummaryLabel}>Pagamento escolhido</Text>
-                    <Text style={styles.bottomSummaryValue}>{formaPagamentoSelecionada?.titulo}</Text>
-                    <Text style={styles.bottomSummarySubtext}>
-                        Status inicial: aguardando cobrança do profissional
-                    </Text>
-                </View>
-
-                <View style={{ height: 120 }} />
-            </ScrollView>
-
-            <View style={styles.footer}>
                 <TouchableOpacity
-                    style={[
-                        styles.btnFinal,
-                        (!colaboradorEscolhido || loading || !servicos.length) && styles.btnDisabled,
-                    ]}
+                    style={[styles.confirmButton, loading && styles.confirmButtonDisabled]}
                     onPress={finalizar}
-                    disabled={!colaboradorEscolhido || loading || !servicos.length}
+                    disabled={loading}
+                    activeOpacity={0.9}
                 >
                     {loading ? (
-                        <ActivityIndicator color="#fff" />
+                        <ActivityIndicator color="#FFF" />
                     ) : (
-                        <Text style={styles.btnText}>CONFIRMAR AGENDAMENTO</Text>
+                        <>
+                            <Ionicons name="checkmark-circle-outline" size={22} color="#FFF" />
+                            <Text style={styles.confirmButtonText}>CONFIRMAR AGENDAMENTO</Text>
+                        </>
                     )}
                 </TouchableOpacity>
-            </View>
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    mainContainer: { flex: 1, backgroundColor: colors.background },
-    container: { flex: 1, padding: 20 },
+    mainContainer: {
+        flex: 1,
+        backgroundColor: '#F7F8FA',
+    },
+
+    container: {
+        flex: 1,
+    },
+
     centerLoading: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: colors.background,
+        backgroundColor: '#F7F8FA',
     },
-    loadingText: { marginTop: 12, color: colors.secondary, fontSize: 14 },
-    headerInfo: { marginBottom: 20, marginTop: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', color: colors.textDark },
-    subtitle: { fontSize: 14, color: colors.secondary },
-    subtitleClinic: { fontSize: 14, color: colors.primary, marginTop: 6, fontWeight: '600' },
-    resumeCard: {
+
+    loadingText: {
+        marginTop: 12,
+        color: '#666',
+        fontSize: 14,
+    },
+
+    headerInfo: {
+        padding: 24,
         backgroundColor: '#FFF',
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: colors.border,
-        elevation: 2,
+        borderBottomWidth: 1,
+        borderColor: '#EEE',
     },
+
+    title: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#1A1A2E',
+    },
+
+    subtitle: {
+        marginTop: 4,
+        fontSize: 14,
+        color: '#666',
+    },
+
+    subtitleClinic: {
+        marginTop: 2,
+        fontSize: 13,
+        color: colors.primary,
+        fontWeight: '700',
+    },
+
+    resumeCard: {
+        marginHorizontal: 20,
+        marginTop: 16,
+        backgroundColor: colors.primary,
+        borderRadius: 18,
+        padding: 20,
+        alignItems: 'center',
+    },
+
     resumeLabel: {
+        color: 'rgba(255,255,255,0.8)',
         fontSize: 12,
         fontWeight: '700',
-        color: colors.secondary,
-        marginBottom: 6,
-        letterSpacing: 0.8,
+        letterSpacing: 1,
     },
+
     resumeValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
+        color: '#FFF',
+        fontSize: 30,
+        fontWeight: '800',
+        marginTop: 4,
+    },
+
+    sectionLabel: {
+        marginHorizontal: 20,
+        marginTop: 20,
+        marginBottom: 10,
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#333',
+    },
+
+    tipoAtendimentoRow: {
+        flexDirection: 'row',
+        marginHorizontal: 20,
+        gap: 12,
+    },
+
+    tipoAtendimentoCard: {
+        flex: 1,
+        borderWidth: 2,
+        borderColor: colors.primary,
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+    },
+
+    tipoAtendimentoCardSelected: {
+        backgroundColor: colors.primary,
+    },
+
+    tipoAtendimentoText: {
+        fontSize: 14,
+        fontWeight: '700',
         color: colors.primary,
     },
-    sectionLabel: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 15,
-        color: colors.textDark,
-        marginTop: 10,
+
+    tipoAtendimentoTextSelected: {
+        color: '#FFF',
     },
-    dateSelector: {
+
+    emptyBox: {
+        marginHorizontal: 20,
+        backgroundColor: '#F0F4FF',
+        borderRadius: 14,
+        padding: 18,
+        alignItems: 'center',
+    },
+
+    emptyBoxText: {
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+
+    linkButton: {
+        marginTop: 12,
+        backgroundColor: colors.primary,
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 10,
+    },
+
+    linkButtonText: {
+        color: '#FFF',
+        fontWeight: '700',
+    },
+
+    menorCard: {
+        marginHorizontal: 20,
+        marginBottom: 10,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        padding: 18,
-        borderRadius: 15,
-        elevation: 2,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: colors.border,
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 2,
+        borderColor: '#EEF1F4',
+        elevation: 1,
     },
+
+    menorCardSelected: {
+        borderColor: colors.primary,
+        backgroundColor: `${colors.primary}08`,
+    },
+
+    menorAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: `${colors.primary}20`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    menorAvatarText: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+
+    menorNome: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#1A1A2E',
+    },
+
+    menorInfo: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 2,
+    },
+
+    obsContainer: {
+        marginHorizontal: 20,
+    },
+
+    obsInput: {
+        backgroundColor: '#FFF',
+        borderRadius: 14,
+        padding: 14,
+        minHeight: 100,
+        borderWidth: 1,
+        borderColor: '#E4EAF1',
+        fontSize: 14,
+        color: '#333',
+    },
+
+    obsHint: {
+        marginTop: 6,
+        fontSize: 12,
+        color: '#999',
+        lineHeight: 16,
+    },
+
+    dateSelector: {
+        marginHorizontal: 20,
+        backgroundColor: '#FFF',
+        borderRadius: 14,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E4EAF1',
+        elevation: 1,
+    },
+
     dateSelectorText: {
         flex: 1,
-        marginLeft: 12,
-        fontSize: 16,
+        marginLeft: 10,
+        fontSize: 15,
+        color: '#333',
         fontWeight: '600',
-        color: colors.textDark,
         textTransform: 'capitalize',
     },
+
     paymentList: {
-        marginBottom: 12,
+        marginHorizontal: 20,
     },
+
     paymentCard: {
-        backgroundColor: '#FFF',
-        borderRadius: 15,
-        padding: 16,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
         flexDirection: 'row',
         alignItems: 'center',
-        elevation: 2,
+        backgroundColor: '#FFF',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        borderWidth: 2,
+        borderColor: '#EEF1F4',
+        elevation: 1,
     },
+
     paymentCardSelected: {
         borderColor: colors.primary,
-        backgroundColor: '#F0F7FF',
+        backgroundColor: `${colors.primary}08`,
     },
+
     paymentIconArea: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        backgroundColor: colors.inputFill,
-        justifyContent: 'center',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: `${colors.primary}15`,
         alignItems: 'center',
-        marginRight: 14,
+        justifyContent: 'center',
+        marginRight: 12,
     },
+
     paymentTextArea: {
         flex: 1,
     },
+
     paymentTitle: {
         fontSize: 15,
-        fontWeight: '700',
-        color: colors.textDark,
+        fontWeight: '800',
+        color: '#1A1A2E',
     },
+
     paymentTitleSelected: {
         color: colors.primary,
     },
+
     paymentDescription: {
-        fontSize: 13,
-        color: colors.secondary,
-        marginTop: 4,
+        fontSize: 12,
+        color: '#888',
+        marginTop: 2,
     },
+
     paymentDescriptionSelected: {
-        color: colors.primary,
+        color: `${colors.primary}AA`,
     },
+
     paymentInfoBox: {
-        backgroundColor: '#FFF4E5',
-        borderWidth: 1,
-        borderColor: '#FFE0B2',
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 18,
+        marginHorizontal: 20,
+        marginTop: 8,
         flexDirection: 'row',
         alignItems: 'flex-start',
+        backgroundColor: '#FFFBEB',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#FEF3C7',
     },
+
     paymentInfoText: {
         flex: 1,
-        color: '#8A6D3B',
-        fontSize: 13,
         marginLeft: 8,
+        fontSize: 12,
+        color: '#8A6D3B',
         lineHeight: 18,
     },
+
     horariosGrid: {
+        marginHorizontal: 20,
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'flex-start',
+        gap: 10,
     },
+
     horaChip: {
-        paddingVertical: 12,
         paddingHorizontal: 18,
+        paddingVertical: 10,
         borderRadius: 12,
-        marginRight: 10,
-        marginBottom: 10,
-        borderWidth: 1.5,
-        alignItems: 'center',
-        minWidth: 80,
+        borderWidth: 2,
     },
-    horaChipLivre: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
-    horaChipTextLivre: { color: '#2E7D32', fontWeight: 'bold' },
-    horaChipIndisponivel: { backgroundColor: '#FFEBEE', borderColor: '#FFCDD2', opacity: 0.6 },
-    horaChipTextIndisponivel: { color: '#C62828' },
-    horaChipSelected: { backgroundColor: '#918a8a', borderColor: '#212121', elevation: 4 },
-    horaChipTextSelected: { color: '#FFF', fontWeight: 'bold' },
-    horaChipText: { fontSize: 14 },
-    colabSection: { marginTop: 10 },
+
+    horaChipLivre: {
+        borderColor: colors.primary,
+        backgroundColor: '#FFF',
+    },
+
+    horaChipIndisponivel: {
+        borderColor: '#DDD',
+        backgroundColor: '#F5F5F5',
+        opacity: 0.6,
+    },
+
+    horaChipOcupado: {
+        borderColor: '#FFCDD2',
+        backgroundColor: '#FFEBEE',
+    },
+
+    horaChipSelected: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+
+    horaChipText: {
+        fontWeight: '700',
+        fontSize: 14,
+    },
+
+    horaChipTextLivre: {
+        color: colors.primary,
+    },
+
+    horaChipTextIndisponivel: {
+        color: '#BBB',
+    },
+
+    horaChipTextOcupado: {
+        color: '#E57373',
+        textDecorationLine: 'line-through',
+    },
+
+    horaChipTextSelected: {
+        color: '#FFF',
+    },
+
+    horaChipOcupadoLabel: {
+        fontSize: 9,
+        color: '#E57373',
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 2,
+        letterSpacing: 0.3,
+    },
+
+    horariosLegenda: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        marginHorizontal: 20,
+        marginBottom: 10,
+    },
+
+    legendaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+
+    legendaDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#DDD',
+    },
+
+    legendaText: {
+        fontSize: 11,
+        color: '#888',
+        fontWeight: '500',
+    },
+
+    colabSection: {
+        marginTop: 4,
+    },
+
     colabCard: {
+        marginHorizontal: 20,
+        marginBottom: 10,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        padding: 15,
-        borderRadius: 15,
-        borderWidth: 1,
-        borderColor: colors.border,
-        marginBottom: 12,
-        elevation: 2,
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 2,
+        borderColor: '#EEF1F4',
+        elevation: 1,
     },
+
     colabSelected: {
         borderColor: colors.primary,
-        backgroundColor: '#F0F7FF',
+        backgroundColor: `${colors.primary}08`,
     },
+
     colabDisabled: {
-        opacity: 0.7,
-    },
-    colabAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    colabAvatarText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 18,
-    },
-    nomeColab: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.textDark,
-    },
-    txtErro: {
-        fontSize: 12,
-        color: colors.danger,
-        marginTop: 4,
-    },
-    emptyBox: {
-        backgroundColor: '#FFF',
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 14,
-        padding: 18,
-        marginBottom: 10,
-    },
-    emptyBoxText: {
-        color: colors.secondary,
-        fontSize: 14,
-        textAlign: 'center',
-    },
-    bottomSummaryCard: {
-        backgroundColor: '#FFF',
-        borderRadius: 16,
-        padding: 16,
-        marginTop: 16,
-        borderWidth: 1,
-        borderColor: colors.border,
-        elevation: 2,
-    },
-    bottomSummaryLabel: {
-        fontSize: 13,
-        color: colors.secondary,
-        marginBottom: 6,
-    },
-    bottomSummaryValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: colors.textDark,
-    },
-    bottomSummarySubtext: {
-        marginTop: 6,
-        fontSize: 12,
-        color: colors.secondary,
-    },
-    footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 16,
-        backgroundColor: '#FFF',
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-    },
-    btnFinal: {
-        backgroundColor: colors.primary,
-        paddingVertical: 16,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    btnDisabled: {
+        borderColor: '#EEE',
+        backgroundColor: '#FAFAFA',
         opacity: 0.6,
     },
-    btnText: {
-        color: '#FFF',
+
+    colabAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: `${colors.primary}20`,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+
+    colabAvatarSelected: {
+        backgroundColor: `${colors.primary}30`,
+    },
+
+    colabAvatarText: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+
+    colabInfo: {
+        flex: 1,
+    },
+
+    colabNome: {
         fontSize: 15,
-        fontWeight: 'bold',
+        fontWeight: '800',
+        color: '#1A1A2E',
+    },
+
+    colabNomeDisabled: {
+        color: '#999',
+    },
+
+    colabMsg: {
+        fontSize: 12,
+        color: '#E67E22',
+        marginTop: 2,
+    },
+
+    confirmButton: {
+        marginHorizontal: 20,
+        marginTop: 24,
+        backgroundColor: colors.primary,
+        borderRadius: 16,
+        paddingVertical: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 3,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+    },
+
+    confirmButtonDisabled: {
+        opacity: 0.7,
+    },
+
+    confirmButtonText: {
+        color: '#FFF',
+        fontWeight: '800',
+        fontSize: 15,
+        marginLeft: 8,
     },
 });
