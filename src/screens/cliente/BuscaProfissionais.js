@@ -216,38 +216,54 @@ export default function BuscaProfissionais({ navigation, route }) {
     try {
       const user = auth.currentUser;
 
-      const [profissionaisBase, avaliacoesSnap, favoritosSnap] = await Promise.all([
-        carregarProfissionaisBase(),
-        getDocs(collection(db, "avaliacoes")),
-        user ? getDocs(collection(db, "usuarios", user.uid, "favoritos")) : Promise.resolve(null),
-      ]);
+      // Carregar profissionais base
+      const profissionaisBase = await carregarProfissionaisBase();
+
+      console.log('[BuscaProfissionais] Profissionais carregados:', profissionaisBase.length);
+
+      // Carregar favoritos (com tratamento de erro)
+      let favoritosSnap = null;
+      if (user) {
+        try {
+          favoritosSnap = await getDocs(collection(db, "usuarios", user.uid, "favoritos"));
+        } catch (favError) {
+          console.log('[BuscaProfissionais] Erro ao carregar favoritos (continuando):', favError.message);
+          favoritosSnap = { forEach: () => { } }; // Mock empty snapshot
+        }
+      }
+
+      // Carregar avaliacoes de cada profissional (estão em usuarios/{userId}/avaliacoes)
+      const avaliacoesAgrupadas = {};
+
+      for (const profissional of profissionaisBase) {
+        try {
+          const avaliacoesRef = collection(db, "usuarios", profissional.id, "avaliacoes");
+          const avaliacoesSnap = await getDocs(avaliacoesRef);
+
+          avaliacoesSnap.forEach((docSnap) => {
+            const dados = docSnap.data();
+            const nota = Number(dados?.nota || dados?.estrelas || 0);
+
+            if (!avaliacoesAgrupadas[profissional.id]) {
+              avaliacoesAgrupadas[profissional.id] = {
+                soma: 0,
+                quantidade: 0,
+              };
+            }
+
+            avaliacoesAgrupadas[profissional.id].soma += nota;
+            avaliacoesAgrupadas[profissional.id].quantidade += 1;
+          });
+        } catch (error) {
+          console.log(`[BuscaProfissionais] Erro ao carregar avaliacoes de ${profissional.id}:`, error.message);
+          // Continua sem avaliacoes para este profissional
+        }
+      }
 
       console.log('[BuscaProfissionais] Dados carregados:', {
         profissionaisCount: profissionaisBase.length,
-        avaliacoesCount: avaliacoesSnap.size,
         favoritosCount: favoritosSnap?.size || 0,
-      });
-
-      const avaliacoesAgrupadas = {};
-
-      avaliacoesSnap.forEach((docSnap) => {
-        const dados = docSnap.data();
-        const profissionalId =
-          dados?.profissionalId ||
-          dados?.clinicaId ||
-          dados?.colaboradorId;
-
-        if (!profissionalId) return;
-
-        if (!avaliacoesAgrupadas[profissionalId]) {
-          avaliacoesAgrupadas[profissionalId] = {
-            soma: 0,
-            quantidade: 0,
-          };
-        }
-
-        avaliacoesAgrupadas[profissionalId].soma += Number(dados?.nota || dados?.estrelas || 0);
-        avaliacoesAgrupadas[profissionalId].quantidade += 1;
+        avaliacoesProfs: Object.keys(avaliacoesAgrupadas).length,
       });
 
       const favoritosObj = {};

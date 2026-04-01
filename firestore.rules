@@ -88,15 +88,15 @@ service cloud.firestore {
 
     match /agendamentos/{agendamentoId} {
       allow create: if estaLogado();
-      allow read: if participaDoDocumentoFinanceiro(resource.data);
-      allow update: if participaDoDocumentoFinanceiro(resource.data);
+      allow read: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
+      allow update: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
       allow delete: if false;
     }
 
     match /pagamentos/{pagamentoId} {
-      allow read: if participaDoDocumentoFinanceiro(resource.data);
+      allow read: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
       allow create: if estaLogado();
-      allow update: if participaDoDocumentoFinanceiro(resource.data);
+      allow update: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
       allow delete: if false;
     }
 
