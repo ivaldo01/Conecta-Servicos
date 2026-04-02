@@ -1,7 +1,8 @@
+
 const axios = require('axios');
 const { db } = require('../lib/firebaseAdmin');
 
-const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
+const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 
 const FORMA_PAGAMENTO_MAPPING = {
@@ -26,8 +27,17 @@ function normalizarFormaPagamento(formaPagamento) {
 }
 
 module.exports = async (req, res) => {
+    // ✅ Garante que toda resposta de erro seja sempre JSON, nunca HTML
+    res.setHeader('Content-Type', 'application/json');
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
+    }
+
+    // ✅ Verifica variáveis de ambiente antes de qualquer operação
+    if (!ASAAS_API_KEY) {
+        console.error('[createPayment] ASAAS_API_KEY não configurada.');
+        return res.status(500).json({ error: 'Configuração do servidor incompleta. Contate o suporte.' });
     }
 
     const { agendamentoId, valor, formaPagamento, descricao, cliente } = req.body;
@@ -51,15 +61,12 @@ module.exports = async (req, res) => {
             clienteNome: cliente?.nome,
         });
 
-        // Resolve o ID do cliente no Asaas
         let customerId;
 
         if (cliente?.idAsaas) {
-            // Já tem ID do Asaas: usa direto
             customerId = cliente.idAsaas;
             console.log('[createPayment] Usando customerId do Asaas fornecido:', customerId);
         } else if (cliente?.cpfCnpj || cliente?.email) {
-            // Tem CPF/CNPJ ou e-mail: busca ou cria no Asaas
             console.log('[createPayment] Buscando ou criando cliente no Asaas');
             customerId = await buscarOuCriarClienteAsaas(cliente);
             console.log('[createPayment] customerId obtido/criado:', customerId);
@@ -68,7 +75,6 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: 'Cliente precisa ter idAsaas, cpfCnpj ou email' });
         }
 
-        // Validade da cobrança: 2 dias a partir de hoje
         const dueDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
             .toISOString()
             .split('T')[0];
@@ -77,11 +83,11 @@ module.exports = async (req, res) => {
 
         const bodyRequest = {
             customer: customerId,
-            billingType: billingTypeAsaas, // PIX | BOLETO | CREDIT_CARD
+            billingType: billingTypeAsaas,
             value: valor,
             dueDate,
             description: descricao || `Agendamento #${agendamentoId}`,
-            externalReference: agendamentoId, // chave para o webhook
+            externalReference: agendamentoId,
         };
 
         const response = await axios.post(
@@ -99,7 +105,6 @@ module.exports = async (req, res) => {
 
         let qrCodeData = null;
 
-        // Para Pix: busca QR Code imediatamente
         if (billingTypeAsaas === 'PIX') {
             try {
                 console.log('[createPayment] Buscando QR Code do Pix para paymentId:', paymentData.id);
@@ -111,7 +116,6 @@ module.exports = async (req, res) => {
                 console.log('[createPayment] QR Code obtido com sucesso');
             } catch (qrError) {
                 console.warn('[createPayment] Erro ao buscar QR Code:', qrError.message);
-                // Não falha o pagamento se não conseguir o QR Code
             }
         }
 
@@ -136,7 +140,7 @@ module.exports = async (req, res) => {
         });
 
         const errorData = error.response?.data;
-        const errorMessage = 
+        const errorMessage =
             errorData?.errors?.[0]?.description ||
             errorData?.message ||
             error.message ||

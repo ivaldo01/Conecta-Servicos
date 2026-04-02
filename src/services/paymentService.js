@@ -1,3 +1,4 @@
+
 import {
     doc,
     getDoc,
@@ -257,7 +258,6 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
         await setDoc(doc(db, 'pagamentos', agendamento.id), pagamento, { merge: true });
     } catch (err) {
         console.error('[salvarPagamentoFirestore] Erro ao salvar pagamento:', err.message);
-        // Continua sem lançar erro para não quebrar fluxo do usuário
     }
 
     try {
@@ -277,10 +277,27 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
         );
     } catch (err) {
         console.error('[salvarPagamentoFirestore] Erro ao atualizar agendamento:', err.message);
-        // Não propaga erro para manter UX estável em caso de regras restritivas
     }
 
     return pagamento;
+}
+
+// ✅ Função auxiliar: lê a resposta do fetch de forma segura.
+// Se o servidor retornar HTML ou texto puro (ex: erro do Vercel),
+// evita o crash "JSON Parse error: Unexpected character: T"
+async function lerRespostaSegura(response) {
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+        return response.json();
+    }
+
+    // Resposta não é JSON (HTML de erro, texto puro, etc.)
+    const texto = await response.text();
+    console.error('[paymentService] Resposta não-JSON do servidor:', texto.slice(0, 300));
+
+    // Tenta extrair uma mensagem legível do texto
+    throw new Error('Servidor retornou resposta inválida. Tente novamente mais tarde.');
 }
 
 export async function gerarCobrancaAgendamento({ agendamento }) {
@@ -339,21 +356,28 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
         temCpf: !!cliente.cpfCnpj,
     });
 
-    const response = await fetch(`${BACKEND_URL}/api/createPayment`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bodyRequest),
-    });
+    let response;
 
-    const data = await response.json();
+    try {
+        response = await fetch(`${BACKEND_URL}/api/createPayment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bodyRequest),
+        });
+    } catch (networkError) {
+        console.error('[gerarCobrancaAgendamento] Erro de rede:', networkError.message);
+        throw new Error('Não foi possível conectar ao servidor. Verifique sua internet.');
+    }
+
+    // ✅ Leitura segura: evita crash se servidor retornar HTML/texto
+    const data = await lerRespostaSegura(response);
 
     if (!response.ok) {
         console.error('[gerarCobrancaAgendamento] Erro na resposta:', {
             status: response.status,
             error: data?.error,
-            errorMessage: data?.error?.errors?.[0]?.description || data?.error?.message,
         });
         throw new Error(
             data?.error?.errors?.[0]?.description ||
@@ -382,43 +406,43 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
 }
 
 export async function consultarStatusPagamento(agendamentoId) {
-    if (!agendamentoId) {
-        throw new Error('AGENDAMENTO_INVALIDO');
+    if (!agendamentoId) return null;
+
+    let response;
+
+    try {
+        response = await fetch(`${BACKEND_URL}/api/createPayment?agendamentoId=${agendamentoId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } catch (networkError) {
+        console.error('[consultarStatusPagamento] Erro de rede:', networkError.message);
+        throw new Error('Não foi possível conectar ao servidor.');
     }
 
-    const pagamentoRef = doc(db, 'pagamentos', agendamentoId);
-    const pagamentoSnap = await getDoc(pagamentoRef);
-
-    if (!pagamentoSnap.exists()) {
-        throw new Error('PAGAMENTO_NAO_ENCONTRADO');
-    }
-
-    return {
-        id: pagamentoSnap.id,
-        ...pagamentoSnap.data(),
-    };
-}
-
-export async function solicitarSaqueProfissional({ valor, pixAddressKey }) {
-    const response = await fetch(`${BACKEND_URL}/api/withdraw`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            valor,
-            pixKey: pixAddressKey,
-        }),
-    });
-
-    const data = await response.json();
+    const data = await lerRespostaSegura(response);
 
     if (!response.ok) {
-        throw new Error(
-            data?.error?.errors?.[0]?.description ||
-            data?.error ||
-            'Erro ao solicitar saque'
-        );
+        throw new Error(data?.error || 'Erro ao consultar status do pagamento');
+    }
+
+    if (data?.status) {
+        try {
+            await setDoc(
+                doc(db, 'pagamentos', agendamentoId),
+                {
+                    gatewayStatus: data.status,
+                    status:
+                        data.status === 'RECEIVED' || data.status === 'CONFIRMED'
+                            ? STATUS_PAGAMENTO.PAGO
+                            : undefined,
+                    atualizadoEm: serverTimestamp(),
+                },
+                { merge: true }
+            );
+        } catch (err) {
+            console.error('[consultarStatusPagamento] Erro ao atualizar Firestore:', err.message);
+        }
     }
 
     return data;
