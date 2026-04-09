@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
+import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
 import { getHojeStr as getHojeFiltroStr } from '../../utils/agendamentoUtils';
@@ -154,6 +155,7 @@ export default function HomeProfissional({ navigation }) {
     const [proximos, setProximos] = useState([]);
     const [heroIndex, setHeroIndex] = useState(0);
     const [totalNotificacoesNaoLidas, setTotalNotificacoesNaoLidas] = useState(0);
+    const [showTutorial, setShowTutorial] = useState(false);
 
     const heroRef = useRef(null);
     const hojeStr = useMemo(() => getHojeExibicaoStr(), []);
@@ -172,6 +174,33 @@ export default function HomeProfissional({ navigation }) {
         );
 
         return () => unsubscribe();
+    }, []);
+
+    // Verifica se deve mostrar o tutorial para novos profissionais
+    useEffect(() => {
+        const verificarTutorial = async () => {
+            try {
+                const user = auth.currentUser;
+                if (!user?.uid) return;
+
+                const userRef = doc(db, 'usuarios', user.uid);
+                const userSnap = await getDoc(userRef);
+
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    // Se nunca viu o tutorial e é profissional, mostra o tutorial
+                    if (!userData.tutorialVisto && (userData.tipo === 'profissional' || userData.tipo === 'clinica')) {
+                        setTimeout(() => {
+                            setShowTutorial(true);
+                        }, 1000);
+                    }
+                }
+            } catch (error) {
+                console.log('Erro ao verificar tutorial:', error);
+            }
+        };
+
+        verificarTutorial();
     }, []);
 
     useEffect(() => {
@@ -327,6 +356,15 @@ export default function HomeProfissional({ navigation }) {
                 cor: '#D97706',
                 bg: '#FFF6E8',
                 onPress: () => navigation.navigate('Perfil'),
+            },
+            {
+                id: 'planosRecorrentes',
+                titulo: 'Planos Recorrentes',
+                subtitulo: 'Assinaturas mensais',
+                icon: 'repeat-outline',
+                cor: '#10B981',
+                bg: '#ECFDF5',
+                onPress: () => navigation.navigate('MeusPlanosRecorrentes'),
             },
         ];
 
@@ -581,6 +619,13 @@ export default function HomeProfissional({ navigation }) {
 
                 <View style={{ height: 20 }} />
             </ScrollView>
+
+            <TutorialOnboarding
+                userId={auth.currentUser?.uid}
+                userType="profissional"
+                visible={showTutorial}
+                onComplete={() => setShowTutorial(false)}
+            />
         </SafeAreaView>
     );
 }

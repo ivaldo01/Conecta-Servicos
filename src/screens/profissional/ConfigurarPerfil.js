@@ -31,6 +31,8 @@ export default function ConfigurarPerfil() {
     const [nome, setNome] = useState('');
     const [bio, setBio] = useState('');
     const [telefone, setTelefone] = useState('');
+    const [cpf, setCpf] = useState('');
+    const [cnpj, setCnpj] = useState('');
     const [fotoPerfil, setFotoPerfil] = useState(null);
 
     const [especialidade, setEspecialidade] = useState('');
@@ -69,6 +71,8 @@ export default function ConfigurarPerfil() {
                 setNome(dados.nome || dados.nomeCompleto || dados.nomeNegocio || '');
                 setBio(dados.bio || '');
                 setTelefone(dados.telefone || dados.whatsapp || '');
+                setCpf(dados.cpf || '');
+                setCnpj(dados.cnpj || '');
                 setFotoPerfil(dados.fotoPerfil || null);
                 setEspecialidade(dados.especialidade || '');
                 setEndereco(dados.endereco || '');
@@ -228,6 +232,8 @@ export default function ConfigurarPerfil() {
                 bio: bio.trim(),
                 telefone: telefone.trim(),
                 whatsapp: telefone.trim(),
+                cpf: cpf.replace(/\D/g, '').trim(),
+                cnpj: cnpj.replace(/\D/g, '').trim(),
 
                 ...dadosCategoria,
 
@@ -309,7 +315,7 @@ export default function ConfigurarPerfil() {
                             onSubmitEditing={() => telefoneRef.current?.focus()}
                         />
 
-                        <Text style={styles.label}>Telefone</Text>
+                        <Text style={styles.label}>Telefone/WhatsApp</Text>
                         <TextInput
                             ref={telefoneRef}
                             style={styles.input}
@@ -319,6 +325,24 @@ export default function ConfigurarPerfil() {
                             keyboardType="phone-pad"
                             returnKeyType="next"
                             onSubmitEditing={() => especialidadeRef.current?.focus()}
+                        />
+
+                        <Text style={styles.label}>CPF (Obrigatório para Saques/Planos)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={cpf}
+                            onChangeText={setCpf}
+                            placeholder="000.000.000-00"
+                            keyboardType="numeric"
+                        />
+
+                        <Text style={styles.label}>CNPJ (Opcional)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={cnpj}
+                            onChangeText={setCnpj}
+                            placeholder="00.000.000/0000-00"
+                            keyboardType="numeric"
                         />
 
                         <Text style={styles.label}>Especialidade</Text>

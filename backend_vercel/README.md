@@ -13,7 +13,7 @@ Você precisa adicionar as seguintes Variáveis de Ambiente (Environment Variabl
 
 1. `FIREBASE_SERVICE_ACCOUNT`: O conteúdo JSON do seu arquivo de conta de serviço do Firebase (gerado no console do Firebase -> Configurações -> Contas de Serviço).
 2. `ASAAS_API_KEY`: Sua chave de API do Asaas (Produção ou Sandbox).
-3. `ASAAS_API_URL`: `https://sandbox.asaas.com/api/v3` (para testes) ou `https://www.asaas.com/api/v3` (para produção).
+3. `ASAAS_API_URL`: `https://www.asaas.com/api/v3` (para produção) ou `https://sandbox.asaas.com/api/v3` (para testes).
 4. `ASAAS_WEBHOOK_TOKEN`: Uma senha criada por você para o webhook.
 
 ## Como implantar

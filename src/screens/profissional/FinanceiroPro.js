@@ -30,6 +30,7 @@ import { db } from '../../services/firebaseConfig';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsuario } from '../../hooks/useUsuario';
 import { solicitarSaqueProfissional } from '../../services/paymentService';
+import { getTaxaSaque } from '../../constants/plans';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -102,14 +103,18 @@ function getStatusPagamento(item) {
 function getSaqueStatusLabel(status) {
   switch (status) {
     case 'pago':
-      return 'Pago';
+    case 'concluido':
+    case 'finalizado':
+      return 'Concluído';
+    case 'pendente':
+    case 'solicitado':
     case 'processando':
     case 'processing':
     case 'pending':
       return 'Processando';
     case 'cancelado':
+    case 'recusado':
       return 'Cancelado';
-    case 'solicitado':
     default:
       return 'Solicitado';
   }
@@ -118,14 +123,18 @@ function getSaqueStatusLabel(status) {
 function getSaqueStatusColor(status) {
   switch (status) {
     case 'pago':
+    case 'concluido':
+    case 'finalizado':
       return '#1E8E3E';
+    case 'pendente':
+    case 'solicitado':
     case 'processando':
     case 'processing':
     case 'pending':
-      return '#1565C0';
+      return '#E67E22';
     case 'cancelado':
+    case 'recusado':
       return '#6C757D';
-    case 'solicitado':
     default:
       return '#E67E22';
   }
@@ -345,7 +354,7 @@ export default function FinanceiroPro() {
     );
 
     const unsubSaques = onSnapshot(
-      query(collection(db, 'saques'), where('profissionalId', '==', usuario.uid)),
+      query(collection(db, 'saques'), where('userId', '==', usuario.uid)),
       (snap) => {
         saquesAtuais = snap.docs.map((item) => ({ id: item.id, ...item.data() }));
         setSaques(saquesAtuais);
@@ -580,7 +589,10 @@ export default function FinanceiroPro() {
     const saldoBloqueado = saldoConta ? saldoBloqueadoFirestore : 0;
 
     const totalSacado = saques
-      .filter((item) => String(item?.status || '').toLowerCase() === 'pago')
+      .filter((item) => {
+        const status = String(item?.status || '').toLowerCase();
+        return status === 'pago' || status === 'concluido' || status === 'finalizado';
+      })
       .reduce(
         (acc, item) =>
           acc +
@@ -591,7 +603,7 @@ export default function FinanceiroPro() {
     const saquesSolicitados = saques
       .filter((item) => {
         const status = String(item?.status || '').toLowerCase();
-        return status === 'solicitado' || status === 'processando' || status === 'pending';
+        return status === 'solicitado' || status === 'processando' || status === 'pending' || status === 'pendente';
       })
       .reduce(
         (acc, item) =>
@@ -688,6 +700,11 @@ export default function FinanceiroPro() {
       .slice(0, 6);
   }, [saques]);
 
+  // Obter taxa de saque baseada no plano do usuário
+  const planoId = usuario?.planoAtivo || 'pro_iniciante';
+  const taxaSaque = getTaxaSaque(planoId);
+  const isTaxaZero = taxaSaque === 0;
+
   async function solicitarSaque() {
     const valor = Number(String(valorSaque).replace(',', '.'));
 
@@ -701,44 +718,69 @@ export default function FinanceiroPro() {
       return;
     }
 
-    if (valor > resumo.saldoDisponivel) {
+    if (!chavePix.trim()) {
+      Alert.alert('Chave Pix obrigatória', 'Informe uma chave Pix válida (CPF, CNPJ, e-mail, celular ou chave aleatória).');
+      return;
+    }
+
+    const saldoDisponivel = saldoConta?.disponivel || 0;
+
+    // Calcular valor líquido após taxa
+    const valorTaxa = isTaxaZero ? 0 : taxaSaque;
+    const valorTotalNecessario = valor + valorTaxa;
+
+    if (valorTotalNecessario > saldoDisponivel) {
       Alert.alert(
         'Saldo insuficiente',
-        'O valor solicitado é maior do que o seu saldo disponível.'
+        `Você possui ${formatCurrency(saldoDisponivel)} disponível.\n\n` +
+        `Valor do saque: ${formatCurrency(valor)}\n` +
+        `Taxa de saque: ${isTaxaZero ? 'GRÁTIS' : formatCurrency(taxaSaque)}\n` +
+        `Total necessário: ${formatCurrency(valorTotalNecessario)}`
       );
       return;
     }
 
-    if (!chavePix || String(chavePix).trim().length < 5) {
-      Alert.alert('Chave Pix inválida', 'Informe uma chave Pix válida.');
-      return;
-    }
+    // Confirmar saque com informações da taxa
+    Alert.alert(
+      'Confirmar Saque',
+      `Valor a receber: ${formatCurrency(valor)}\n` +
+      `Taxa de saque: ${isTaxaZero ? 'GRÁTIS' : formatCurrency(taxaSaque)}\n` +
+      `Total debitado: ${formatCurrency(valorTotalNecessario)}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: async () => {
+            try {
+              setLoadingSaque(true);
 
-    try {
-      setLoadingSaque(true);
+              await solicitarSaqueProfissional({
+                valor,
+                pixKey: chavePix.trim(),
+                userId: authUser?.uid,
+              });
 
-      await solicitarSaqueProfissional({
-        valor,
-        pixAddressKey: chavePix.trim(),
-      });
+              setModalVisible(false);
+              setValorSaque('');
+              setChavePix('');
 
-      setModalVisible(false);
-      setValorSaque('');
-      setChavePix('');
-
-      Alert.alert(
-        'Saque solicitado',
-        'Solicitação enviada com sucesso. O valor foi reservado para saque.'
-      );
-    } catch (error) {
-      console.log('Erro ao solicitar saque:', error);
-      Alert.alert(
-        'Erro',
-        error?.message || 'Não foi possível registrar a solicitação de saque.'
-      );
-    } finally {
-      setLoadingSaque(false);
-    }
+              Alert.alert(
+                'Saque solicitado',
+                `Solicitação de ${formatCurrency(valor)} enviada com sucesso!${isTaxaZero ? '\nVocê economizou a taxa de saque com seu plano!' : ''}`
+              );
+            } catch (error) {
+              console.log('Erro ao solicitar saque:', error);
+              Alert.alert(
+                'Erro',
+                error?.message || 'Não foi possível registrar a solicitação de saque.'
+              );
+            } finally {
+              setLoadingSaque(false);
+            }
+          }
+        }
+      ]
+    );
   }
 
   async function salvarDadosBancarios() {
@@ -794,16 +836,21 @@ export default function FinanceiroPro() {
           const dataB = b?.confirmadoEm?.toDate?.() || new Date(0);
           return dataB - dataA;
         })
-        .map(p => `
-          <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 10px; font-size: 11px;">${formatDateBR(p.confirmadoEm || p.pagoEm)}</td>
-            <td style="padding: 10px; font-size: 11px;">${p.clienteNome || 'Cliente'}</td>
-            <td style="padding: 10px; font-size: 11px;">${p.colaboradorNome || 'Eu'}</td>
-            <td style="padding: 10px; font-size: 11px; text-align: right;">${formatCurrency(getValorBruto(p))}</td>
-            <td style="padding: 10px; font-size: 11px; text-align: right; color: #d32f2f;">-${formatCurrency(getValorBruto(p) - getValorLiquido(p))}</td>
-            <td style="padding: 10px; font-size: 11px; text-align: right; font-weight: bold; color: #2e7d32;">${formatCurrency(getValorLiquido(p))}</td>
-          </tr>
-        `).join('');
+        .map(p => {
+          const vBruto = p.valorPago || p.valorCobrado || getValorBruto(p) || 0;
+          const vLiquido = p.valorLiquidoProfissional || p.valorLiquidoRecebido || getValorLiquido(p) || 0;
+          const vTaxa = p.taxaPlataforma || (vBruto - vLiquido) || 0;
+
+          return `
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="padding: 10px; font-size: 11px;">${formatDateBR(p.confirmadoEm || p.pagoEm)}</td>
+              <td style="padding: 10px; font-size: 11px;">${p.clienteNome || 'Cliente'}</td>
+              <td style="padding: 10px; font-size: 11px; text-align: right;">${formatCurrency(vBruto)}</td>
+              <td style="padding: 10px; font-size: 11px; text-align: right; color: #d32f2f;">-${formatCurrency(vTaxa)}</td>
+              <td style="padding: 10px; font-size: 11px; text-align: right; font-weight: bold; color: #2e7d32;">${formatCurrency(vLiquido)}</td>
+            </tr>
+          `;
+        }).join('');
 
       const equipeHTML = rendimentosPorColaborador.map(c => `
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ccc;">
@@ -887,10 +934,9 @@ export default function FinanceiroPro() {
               <tr>
                 <th>Data</th>
                 <th>Cliente</th>
-                <th>Profissional</th>
-                <th style="text-align: right;">Bruto</th>
-                <th style="text-align: right;">Taxas</th>
-                <th style="text-align: right;">Líquido</th>
+                <th style="text-align: right;">Valor Bruto</th>
+                <th style="text-align: right;">Taxa Plataforma</th>
+                <th style="text-align: right;">Valor Líquido</th>
               </tr>
             </thead>
             <tbody>
@@ -899,18 +945,29 @@ export default function FinanceiroPro() {
           </table>
 
           ${saques.length > 0 ? `
-            <div class="section-title">SOLICITAÇÕES DE SAQUE</div>
+            <div class="section-title">HISTÓRICO DE SAQUES</div>
             <table>
               <thead>
                 <tr>
                   <th>Data/Hora</th>
                   <th>Chave Pix</th>
                   <th style="text-align: center;">Status</th>
-                  <th style="text-align: right;">Valor</th>
+                  <th style="text-align: right;">Taxa de Saque</th>
+                  <th style="text-align: right;">Valor Recebido</th>
                 </tr>
               </thead>
               <tbody>
-                ${saquesHTML}
+                ${saques
+            .sort((a, b) => (b?.criadoEm?.toDate?.() || 0) - (a?.criadoEm?.toDate?.() || 0))
+            .map(s => `
+                    <tr style="border-bottom: 1px solid #eee;">
+                      <td style="padding: 10px; font-size: 11px;">${formatDateBR(s.criadoEm || s.solicitadoEm)}</td>
+                      <td style="padding: 10px; font-size: 11px;">${s.pixKey || s.pixAddressKey || '---'}</td>
+                      <td style="padding: 10px; font-size: 11px; text-align: center;">${String(s.status || 'pendente').toUpperCase()}</td>
+                      <td style="padding: 10px; font-size: 11px; text-align: right; color: #d32f2f;">-${formatCurrency(s.taxaAplicada || 0)}</td>
+                      <td style="padding: 10px; font-size: 11px; text-align: right; font-weight: bold;">${formatCurrency(s.valor || 0)}</td>
+                    </tr>
+                  `).join('')}
               </tbody>
             </table>
           ` : ''}
@@ -978,6 +1035,9 @@ export default function FinanceiroPro() {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.refreshButton}>
                 <Ionicons name="cash-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('Premium')} style={[styles.refreshButton, { backgroundColor: '#F1C40F20' }]}>
+                <Ionicons name="star" size={20} color="#F1C40F" />
               </TouchableOpacity>
             </View>
           )}
@@ -1246,6 +1306,32 @@ export default function FinanceiroPro() {
             <Text style={styles.modalHint}>
               Saldo disponível: {formatCurrency(resumo.saldoDisponivel)}
             </Text>
+
+            {/* Info da taxa de saque baseada no plano */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isTaxaZero ? '#E8F5E9' : '#FFF3E0',
+              padding: 10,
+              borderRadius: 8,
+              marginBottom: 12,
+            }}>
+              <Ionicons
+                name={isTaxaZero ? "checkmark-circle" : "information-circle"}
+                size={20}
+                color={isTaxaZero ? '#4CAF50' : '#FF9800'}
+              />
+              <Text style={{
+                marginLeft: 8,
+                fontSize: 13,
+                color: isTaxaZero ? '#2E7D32' : '#E65100',
+                fontWeight: '500',
+              }}>
+                {isTaxaZero
+                  ? 'Saque GRÁTIS - Seu plano não cobra taxa!'
+                  : `Taxa de saque: ${formatCurrency(taxaSaque)} (valor será debitado do saldo)`}
+              </Text>
+            </View>
 
             <Text style={styles.inputLabel}>Valor do saque</Text>
             <TextInput

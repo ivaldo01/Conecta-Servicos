@@ -1,5 +1,6 @@
 import { doc, setDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from './firebaseConfig';
+import { Platform } from 'react-native';
 
 // CONFIGURAÇÃO CLOUDINARY
 const CLOUDINARY_CLOUD_NAME = 'dctnkaktn';
@@ -9,11 +10,19 @@ async function enviarImagemParaCloudinary(uri, pasta = 'usuarios') {
     try {
         const formData = new FormData();
 
-        formData.append('file', {
-            uri,
-            type: 'image/jpeg',
-            name: `imagem_${Date.now()}.jpg`,
-        });
+        if (Platform.OS === 'web') {
+            // No Web, precisamos converter a URI em Blob/File
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            formData.append('file', blob);
+        } else {
+            // No Native, usamos o formato de objeto esperado pelo React Native
+            formData.append('file', {
+                uri,
+                type: 'image/jpeg',
+                name: `imagem_${Date.now()}.jpg`,
+            });
+        }
 
         formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
         formData.append('folder', pasta);

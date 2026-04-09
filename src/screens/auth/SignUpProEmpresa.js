@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,18 @@ import {
   Image,
   TouchableWithoutFeedback,
   Keyboard,
+  useWindowDimensions,
 } from 'react-native';
+import Animated, {
+  FadeInLeft,
+  FadeInRight,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  withSpring
+} from 'react-native-reanimated';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from "../../services/firebaseConfig";
@@ -23,10 +34,13 @@ import colors from "../../constants/colors";
 import PrimaryButton from "../../components/PrimaryButton";
 import { prepararDadosCategoriaParaProfissional } from "../../utils/categoriaUtils";
 import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
+import DesktopWrapper from '../../components/DesktopWrapper';
 
 import logo from '../../../assets/logo.png';
 
-export default function SignUpProEmpresa({ navigation }) {
+export default function SignUpProEmpresa({ navigation, route }) {
+  const { width: screenWidth } = useWindowDimensions();
+  const isWebLarge = Platform.OS === 'web' && screenWidth > 800;
   const [tipoCadastro, setTipoCadastro] = useState('autonomo');
 
   const [nomeCompleto, setNomeCompleto] = useState('');
@@ -50,6 +64,36 @@ export default function SignUpProEmpresa({ navigation }) {
 
   const [aceitaTermos, setAceitaTermos] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Monitora se voltou da tela de Termos com aceite
+  useEffect(() => {
+    if (route.params?.termosAceitos) {
+      setAceitaTermos(true);
+    }
+  }, [route.params?.termosAceitos]);
+
+  // Animação para os círculos flutuantes
+  const floatValue = useSharedValue(0);
+
+  useEffect(() => {
+    floatValue.value = withRepeat(
+      withTiming(1, { duration: 3000 }),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle0 = useAnimatedStyle(() => ({
+    transform: [{ translateY: withSpring(floatValue.value * 20) }]
+  }));
+
+  const animatedStyle20 = useAnimatedStyle(() => ({
+    transform: [{ translateY: withSpring(floatValue.value * 20 + 20) }]
+  }));
+
+  const animatedStyleM10 = useAnimatedStyle(() => ({
+    transform: [{ translateY: withSpring(floatValue.value * 20 - 10) }]
+  }));
 
   const nomeNegocioRef = useRef(null);
   const telefoneRef = useRef(null);
@@ -110,8 +154,8 @@ export default function SignUpProEmpresa({ navigation }) {
 
   const subtituloPrincipal =
     tipoCadastro === 'empresa'
-      ? 'Cadastre sua empresa para oferecer serviços no Conecta Serviços'
-      : 'Cadastre seu perfil para atender clientes no Conecta Serviços';
+      ? 'Cadastre sua empresa para oferecer serviços no Coneta Solutions'
+      : 'Cadastre seu perfil para atender clientes no Coneta Solutions';
 
   const validarCampos = () => {
     if (!aceitaTermos) {
@@ -283,6 +327,341 @@ export default function SignUpProEmpresa({ navigation }) {
     }
   };
 
+  const renderSignUpForm = (isSplit = false) => (
+    <View style={[styles.card, isSplit && styles.cardSplit]}>
+      <View style={styles.cardHeader}>
+        <Image source={logo} style={styles.cardLogo} />
+        <Text style={styles.cardBrandName}>Coneta Solutions</Text>
+      </View>
+
+      <Text style={styles.sectionTitle}>{tituloPrincipal}</Text>
+
+      <View style={styles.segmentWrapper}>
+        <TouchableOpacity
+          style={[
+            styles.segmentButton,
+            tipoCadastro === 'autonomo' && styles.segmentButtonActive,
+          ]}
+          onPress={() => setTipoCadastro('autonomo')}
+          activeOpacity={0.85}
+        >
+          <Text
+            style={[
+              styles.segmentText,
+              tipoCadastro === 'autonomo' && styles.segmentTextActive,
+            ]}
+          >
+            Autônomo
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.segmentButton,
+            tipoCadastro === 'empresa' && styles.segmentButtonActive,
+          ]}
+          onPress={() => setTipoCadastro('empresa')}
+          activeOpacity={0.85}
+        >
+          <Text
+            style={[
+              styles.segmentText,
+              tipoCadastro === 'empresa' && styles.segmentTextActive,
+            ]}
+          >
+            Empresa
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.tipBox}>
+        <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+        <Text style={styles.tipText}>
+          {tipoCadastro === 'empresa'
+            ? 'Ideal para negócios com marca própria, equipe ou estabelecimento.'
+            : 'Ideal para profissionais que trabalham por conta própria.'}
+        </Text>
+      </View>
+
+      <View style={styles.formDivider} />
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>
+          {tipoCadastro === 'empresa' ? 'Nome do Responsável *' : 'Nome Completo *'}
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder={
+            tipoCadastro === 'empresa'
+              ? 'Ex: João da Silva'
+              : 'Ex: Maria Oliveira Santos'
+          }
+          placeholderTextColor="#999"
+          value={nomeCompleto}
+          onChangeText={setNomeCompleto}
+          returnKeyType="next"
+          onSubmitEditing={() => {
+            if (tipoCadastro === 'empresa') {
+              nomeNegocioRef.current?.focus();
+            } else {
+              telefoneRef.current?.focus();
+            }
+          }}
+        />
+      </View>
+
+      {tipoCadastro === 'empresa' && (
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Nome da Empresa / Negócio *</Text>
+          <TextInput
+            ref={nomeNegocioRef}
+            style={styles.input}
+            placeholder="Ex: Tech Soluções Elétricas"
+            placeholderTextColor="#999"
+            value={nomeNegocio}
+            onChangeText={setNomeNegocio}
+            returnKeyType="next"
+            onSubmitEditing={() => telefoneRef.current?.focus()}
+          />
+        </View>
+      )}
+
+      <View style={styles.row}>
+        <View style={styles.halfInputLeft}>
+          <Text style={styles.label}>WhatsApp / Celular *</Text>
+          <TextInput
+            ref={telefoneRef}
+            style={styles.input}
+            placeholder="(11) 99999-9999"
+            placeholderTextColor="#999"
+            keyboardType="phone-pad"
+            value={telefone}
+            onChangeText={setTelefone}
+            returnKeyType="next"
+            onSubmitEditing={() => cpfCnpjRef.current?.focus()}
+          />
+        </View>
+
+        <View style={styles.halfInputRight}>
+          <Text style={styles.label}>{tituloDocumento} *</Text>
+          <TextInput
+            ref={cpfCnpjRef}
+            style={styles.input}
+            placeholder={placeholderDocumento}
+            placeholderTextColor="#999"
+            value={cpfCnpj}
+            onChangeText={setCpfCnpj}
+            returnKeyType="next"
+            onSubmitEditing={() => especialidadeRef.current?.focus()}
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Especialidade Principal *</Text>
+        <TextInput
+          ref={especialidadeRef}
+          style={styles.input}
+          placeholder="Ex: Eletricista, Cabeleireiro, Pintor..."
+          placeholderTextColor="#999"
+          value={especialidade}
+          onChangeText={setEspecialidade}
+          returnKeyType="next"
+          onSubmitEditing={() => bioRef.current?.focus()}
+        />
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>E-mail de Acesso *</Text>
+        <TextInput
+          ref={emailRef}
+          style={styles.input}
+          placeholder="seu@email.com"
+          placeholderTextColor="#999"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={email}
+          onChangeText={setEmail}
+          returnKeyType="next"
+          onSubmitEditing={() => senhaRef.current?.focus()}
+        />
+      </View>
+
+      <View style={styles.row}>
+        <View style={styles.halfInputLeft}>
+          <Text style={styles.label}>Senha *</Text>
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              ref={senhaRef}
+              style={styles.passwordInput}
+              placeholder="6+ dígitos"
+              placeholderTextColor="#999"
+              secureTextEntry={!mostrarSenha}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={senha}
+              onChangeText={setSenha}
+              returnKeyType="next"
+              onSubmitEditing={() => confirmarSenhaRef.current?.focus()}
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setMostrarSenha((prev) => !prev)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
+                size={22}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.halfInputRight}>
+          <Text style={styles.label}>Confirmar Senha *</Text>
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              ref={confirmarSenhaRef}
+              style={styles.passwordInput}
+              placeholder="Repita a senha"
+              placeholderTextColor="#999"
+              secureTextEntry={!mostrarConfirmarSenha}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={confirmarSenha}
+              onChangeText={setConfirmarSenha}
+              returnKeyType="done"
+              onSubmitEditing={handleCadastro}
+            />
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setMostrarConfirmarSenha((prev) => !prev)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={mostrarConfirmarSenha ? 'eye-off-outline' : 'eye-outline'}
+                size={22}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.termsContainer}>
+        <Switch
+          value={aceitaTermos}
+          onValueChange={setAceitaTermos}
+          trackColor={{ false: "#CCC", true: colors.primary }}
+          thumbColor="#FFF"
+        />
+        <TouchableOpacity
+          onPress={() => navigation.navigate("TermosUso")}
+          style={styles.termsTextBox}
+        >
+          <Text style={styles.termsText}>
+            Li e aceito os <Text style={styles.link}>Termos de Uso</Text> *
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <PrimaryButton
+        title={tipoCadastro === 'empresa' ? 'CRIAR CONTA DA EMPRESA' : 'CRIAR PERFIL PROFISSIONAL'}
+        onPress={handleCadastro}
+        loading={loading}
+      />
+
+      <TouchableOpacity
+        style={styles.loginLink}
+        onPress={() => navigation.navigate('Login')}
+      >
+        <Text style={styles.loginLinkText}>
+          Já tem uma conta? <Text style={styles.loginLinkHighlight}>Fazer login</Text>
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderWebSplitLayout = () => (
+    <View style={styles.splitWrapper}>
+      <View style={styles.brandingSection}>
+        <View style={styles.brandingContent}>
+          <Animated.Text
+            entering={FadeInLeft.delay(200).duration(800)}
+            style={styles.brandingTitle}
+          >
+            Sua vitrine profissional no <Text style={styles.highlightText}>Coneta Solutions</Text>.
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeInLeft.delay(400).duration(800)}
+            style={styles.brandingSubtitle}
+          >
+            Cadastre sua empresa ou perfil autônomo para alcançar mais clientes e gerenciar sua agenda com eficiência.
+          </Animated.Text>
+
+          <View style={styles.featuresList}>
+            <Animated.View entering={FadeInUp.delay(600).duration(600)} style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: '#E8F0FE' }]}>
+                <Ionicons name="trending-up" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.featureText}>Aumente sua visibilidade</Text>
+            </Animated.View>
+            <Animated.View entering={FadeInUp.delay(800).duration(600)} style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: '#E6F4EA' }]}>
+                <Ionicons name="calendar" size={20} color="#34A853" />
+              </View>
+              <Text style={styles.featureText}>Gestão completa de agenda</Text>
+            </Animated.View>
+            <Animated.View entering={FadeInUp.delay(1000).duration(600)} style={styles.featureItem}>
+              <View style={[styles.featureIcon, { backgroundColor: '#FEF7E0' }]}>
+                <Ionicons name="stats-chart" size={20} color="#FBBC04" />
+              </View>
+              <Text style={styles.featureText}>Relatórios de desempenho</Text>
+            </Animated.View>
+          </View>
+        </View>
+
+        <Animated.View style={[styles.floatingCircle, animatedStyle0, { top: '15%', left: '10%', width: 60, height: 60, opacity: 0.1 }]} />
+        <Animated.View style={[styles.floatingCircle, animatedStyle20, { bottom: '20%', right: '15%', width: 100, height: 100, opacity: 0.05 }]} />
+        <Animated.View style={[styles.floatingCircle, animatedStyleM10, { top: '40%', right: '10%', width: 40, height: 40, opacity: 0.1, backgroundColor: colors.warning }]} />
+      </View>
+
+      <View style={styles.formSection}>
+        <Animated.View
+          entering={FadeInRight.delay(200).duration(800)}
+          style={styles.formContainer}
+        >
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingVertical: 40 }}
+          >
+            {renderSignUpForm(true)}
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </View>
+  );
+
+  const renderMobileLayout = () => (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.mobileHeaderArea}>
+        <Text style={styles.mobileSubtitle}>
+          {subtituloPrincipal}
+        </Text>
+      </View>
+      {renderSignUpForm()}
+    </ScrollView>
+  );
+
   return (
     <View style={styles.screen}>
       <KeyboardAvoidingView
@@ -290,381 +669,19 @@ export default function SignUpProEmpresa({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            style={styles.container}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.topBanner}>
-              <Image source={logo} style={styles.logo} />
-              <Text style={styles.headerTitle}>{tituloPrincipal}</Text>
-              <Text style={styles.headerSubtitle}>{subtituloPrincipal}</Text>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>1. Tipo de Cadastro</Text>
-
-              <View style={styles.segmentWrapper}>
-                <TouchableOpacity
-                  style={[
-                    styles.segmentButton,
-                    tipoCadastro === 'autonomo' && styles.segmentButtonActive,
-                  ]}
-                  onPress={() => setTipoCadastro('autonomo')}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      tipoCadastro === 'autonomo' && styles.segmentTextActive,
-                    ]}
-                  >
-                    Autônomo
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.segmentButton,
-                    tipoCadastro === 'empresa' && styles.segmentButtonActive,
-                  ]}
-                  onPress={() => setTipoCadastro('empresa')}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      tipoCadastro === 'empresa' && styles.segmentTextActive,
-                    ]}
-                  >
-                    Empresa
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.tipBox}>
-                <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-                <Text style={styles.tipText}>
-                  {tipoCadastro === 'empresa'
-                    ? 'Ideal para negócios com marca própria, equipe ou estabelecimento.'
-                    : 'Ideal para profissionais que trabalham por conta própria.'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>2. Dados Profissionais</Text>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  {tipoCadastro === 'empresa' ? 'Nome do Responsável *' : 'Nome Completo *'}
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={
-                    tipoCadastro === 'empresa'
-                      ? 'Ex: João da Silva'
-                      : 'Ex: Maria Oliveira Santos'
-                  }
-                  placeholderTextColor="#999"
-                  value={nomeCompleto}
-                  onChangeText={setNomeCompleto}
-                  returnKeyType={tipoCadastro === 'empresa' ? 'next' : 'next'}
-                  onSubmitEditing={() => {
-                    if (tipoCadastro === 'empresa') {
-                      nomeNegocioRef.current?.focus();
-                    } else {
-                      telefoneRef.current?.focus();
-                    }
-                  }}
-                />
-              </View>
-
-              {tipoCadastro === 'empresa' && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Nome da Empresa / Negócio *</Text>
-                  <TextInput
-                    ref={nomeNegocioRef}
-                    style={styles.input}
-                    placeholder="Ex: Tech Soluções Elétricas"
-                    placeholderTextColor="#999"
-                    value={nomeNegocio}
-                    onChangeText={setNomeNegocio}
-                    returnKeyType="next"
-                    onSubmitEditing={() => telefoneRef.current?.focus()}
-                  />
-                </View>
-              )}
-
-              <View style={styles.row}>
-                <View style={styles.halfInputLeft}>
-                  <Text style={styles.label}>WhatsApp / Celular *</Text>
-                  <TextInput
-                    ref={telefoneRef}
-                    style={styles.input}
-                    placeholder="(11) 99999-9999"
-                    placeholderTextColor="#999"
-                    keyboardType="phone-pad"
-                    value={telefone}
-                    onChangeText={setTelefone}
-                    returnKeyType="next"
-                    onSubmitEditing={() => cpfCnpjRef.current?.focus()}
-                  />
-                </View>
-
-                <View style={styles.halfInputRight}>
-                  <Text style={styles.label}>{tituloDocumento} *</Text>
-                  <TextInput
-                    ref={cpfCnpjRef}
-                    style={styles.input}
-                    placeholder={placeholderDocumento}
-                    placeholderTextColor="#999"
-                    value={cpfCnpj}
-                    onChangeText={setCpfCnpj}
-                    returnKeyType="next"
-                    onSubmitEditing={() => especialidadeRef.current?.focus()}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Especialidade Principal *</Text>
-                <TextInput
-                  ref={especialidadeRef}
-                  style={styles.input}
-                  placeholder="Ex: Eletricista, Cabeleireiro, Pintor..."
-                  placeholderTextColor="#999"
-                  value={especialidade}
-                  onChangeText={setEspecialidade}
-                  returnKeyType="next"
-                  onSubmitEditing={() => bioRef.current?.focus()}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Descrição Profissional</Text>
-                <TextInput
-                  ref={bioRef}
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Descreva seus serviços, experiência ou diferencial..."
-                  placeholderTextColor="#999"
-                  value={bio}
-                  onChangeText={setBio}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                  returnKeyType="next"
-                  onSubmitEditing={() => cidadeRef.current?.focus()}
-                />
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>3. Localização</Text>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>País *</Text>
-                <View style={styles.pickerOuter}>
-                  <Picker
-                    selectedValue={pais}
-                    onValueChange={(v) => {
-                      setPais(v);
-                      setEstado('');
-                    }}
-                    style={styles.picker}
-                    dropdownIconColor={colors.textDark}
-                    itemStyle={styles.pickerItem}
-                  >
-                    {paises.map((item) => (
-                      <Picker.Item
-                        key={item}
-                        label={item}
-                        value={item}
-                        color={Platform.OS === 'android' ? '#222' : undefined}
-                      />
-                    ))}
-                  </Picker>
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>
-                  {pais === 'Brasil' ? 'Estado (UF) *' : 'Região / Estado *'}
-                </Text>
-                <View style={styles.pickerOuter}>
-                  <Picker
-                    selectedValue={estado}
-                    onValueChange={(v) => setEstado(v)}
-                    style={styles.picker}
-                    dropdownIconColor={colors.textDark}
-                    itemStyle={styles.pickerItem}
-                  >
-                    {estadosParaMostrar.map((item) => (
-                      <Picker.Item
-                        key={`${item.label}-${item.value}`}
-                        label={item.label}
-                        value={item.value}
-                        color={Platform.OS === 'android' ? '#222' : undefined}
-                      />
-                    ))}
-                  </Picker>
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Cidade *</Text>
-                <TextInput
-                  ref={cidadeRef}
-                  style={styles.input}
-                  placeholder="Digite sua cidade"
-                  placeholderTextColor="#999"
-                  value={cidade}
-                  onChangeText={setCidade}
-                  returnKeyType="next"
-                  onSubmitEditing={() => cepRef.current?.focus()}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>CEP *</Text>
-                <TextInput
-                  ref={cepRef}
-                  style={styles.input}
-                  placeholder="00000-000"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  value={cep}
-                  onChangeText={setCep}
-                  returnKeyType="next"
-                  onSubmitEditing={() => enderecoRef.current?.focus()}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Endereço / Bairro *</Text>
-                <TextInput
-                  ref={enderecoRef}
-                  style={styles.input}
-                  placeholder="Rua, número, bairro..."
-                  placeholderTextColor="#999"
-                  value={endereco}
-                  onChangeText={setEndereco}
-                  returnKeyType="next"
-                  onSubmitEditing={() => emailRef.current?.focus()}
-                />
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>4. Dados de Acesso</Text>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>E-mail *</Text>
-                <TextInput
-                  ref={emailRef}
-                  style={styles.input}
-                  placeholder="seu@email.com"
-                  placeholderTextColor="#999"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={email}
-                  onChangeText={setEmail}
-                  returnKeyType="next"
-                  onSubmitEditing={() => senhaRef.current?.focus()}
-                />
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfInputLeft}>
-                  <Text style={styles.label}>Senha *</Text>
-                  <View style={styles.passwordWrapper}>
-                    <TextInput
-                      ref={senhaRef}
-                      style={styles.passwordInput}
-                      placeholder="6+ dígitos"
-                      placeholderTextColor="#999"
-                      secureTextEntry={!mostrarSenha}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      value={senha}
-                      onChangeText={setSenha}
-                      returnKeyType="next"
-                      onSubmitEditing={() => confirmarSenhaRef.current?.focus()}
-                    />
-                    <TouchableOpacity
-                      style={styles.eyeButton}
-                      onPress={() => setMostrarSenha((prev) => !prev)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
-                        size={22}
-                        color="#666"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.halfInputRight}>
-                  <Text style={styles.label}>Confirmar Senha *</Text>
-                  <View style={styles.passwordWrapper}>
-                    <TextInput
-                      ref={confirmarSenhaRef}
-                      style={styles.passwordInput}
-                      placeholder="Repita a senha"
-                      placeholderTextColor="#999"
-                      secureTextEntry={!mostrarConfirmarSenha}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      value={confirmarSenha}
-                      onChangeText={setConfirmarSenha}
-                      returnKeyType="done"
-                      onSubmitEditing={handleCadastro}
-                    />
-                    <TouchableOpacity
-                      style={styles.eyeButton}
-                      onPress={() => setMostrarConfirmarSenha((prev) => !prev)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={mostrarConfirmarSenha ? 'eye-off-outline' : 'eye-outline'}
-                        size={22}
-                        color="#666"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.termsContainer}>
-              <Switch
-                value={aceitaTermos}
-                onValueChange={setAceitaTermos}
-                trackColor={{ false: "#CCC", true: colors.primary }}
-                thumbColor="#FFF"
-              />
-              <TouchableOpacity
-                onPress={() => navigation.navigate("TermosUso")}
-                style={styles.termsTextBox}
-              >
-                <Text style={styles.termsText}>
-                  Li e aceito os <Text style={styles.link}>Termos de Uso</Text> *
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <PrimaryButton
-              title={tipoCadastro === 'empresa' ? 'CRIAR CONTA DA EMPRESA' : 'CRIAR PERFIL PROFISSIONAL'}
-              onPress={handleCadastro}
-              loading={loading}
-            />
-          </ScrollView>
-        </TouchableWithoutFeedback>
+        {isWebLarge ? (
+          renderWebSplitLayout()
+        ) : (
+          <DesktopWrapper style={styles.flex}>
+            {Platform.OS === 'web' ? (
+              renderMobileLayout()
+            ) : (
+              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                {renderMobileLayout()}
+              </TouchableWithoutFeedback>
+            )}
+          </DesktopWrapper>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -684,69 +701,162 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    padding: 16,
+    padding: 24,
     paddingBottom: 80,
   },
 
-  topBanner: {
-    marginTop: 12,
-    marginBottom: 16,
+  mobileHeaderArea: {
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 22,
+    marginBottom: 24,
+  },
+
+  mobileSubtitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.secondary,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+
+  // Layout Web Split
+  splitWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    height: Platform.OS === 'web' ? '100vh' : '100%',
+  },
+
+  brandingSection: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    paddingHorizontal: '8%',
+    position: 'relative',
+    overflow: 'hidden',
+    height: '100%',
+    paddingTop: '10%', // Sobe o conteúdo
+  },
+
+  brandingContent: {
+    maxWidth: 600,
+    zIndex: 2,
+  },
+
+  brandingTitle: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: colors.textDark,
+    lineHeight: 56,
+    marginBottom: 24,
+    letterSpacing: -1,
+  },
+
+  highlightText: {
+    color: colors.primary,
+  },
+
+  brandingSubtitle: {
+    fontSize: 20,
+    color: colors.secondary,
+    lineHeight: 30,
+    marginBottom: 40,
+  },
+
+  featuresList: {
+    gap: 16,
+  },
+
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  featureIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+
+  featureText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textDark,
+  },
+
+  floatingCircle: {
+    position: 'absolute',
+    borderRadius: 999,
     backgroundColor: colors.primary,
-    borderRadius: 24,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
   },
 
-  logo: {
-    width: 108,
-    height: 108,
-    resizeMode: 'contain',
-    marginBottom: 10,
+  formSection: {
+    flex: 1,
+    backgroundColor: '#F0F2F5',
+    padding: 24,
+    height: Platform.OS === 'web' ? '100vh' : '100%',
+    overflow: 'hidden',
   },
 
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFF',
-    textAlign: 'center',
+  formContainer: {
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
+    flex: 1,
   },
 
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.86)',
-    marginTop: 8,
-    textAlign: 'center',
-    lineHeight: 21,
-  },
-
+  // Card
   card: {
     backgroundColor: '#FFF',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 20,
     elevation: 4,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     borderWidth: 1,
-    borderColor: '#E8EDF5',
+    borderColor: '#dddfe2',
+  },
+
+  cardSplit: {
+    padding: 24,
+  },
+
+  cardHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F2F5',
+  },
+
+  cardLogo: {
+    width: 60,
+    height: 60,
+    resizeMode: 'contain',
+    marginBottom: 8,
+  },
+
+  cardBrandName: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.primary,
+    letterSpacing: -0.5,
   },
 
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: colors.textDark,
-    marginBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF1F4',
-    paddingBottom: 8,
+    marginBottom: 18,
+    textAlign: 'center',
+  },
+
+  formDivider: {
+    height: 1,
+    backgroundColor: '#EEF1F4',
+    marginVertical: 20,
   },
 
   inputGroup: {

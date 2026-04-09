@@ -5,25 +5,15 @@ const { db } = require('../lib/firebaseAdmin');
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 
-const FORMA_PAGAMENTO_MAPPING = {
-    'pix': 'PIX',
-    'boleto': 'BOLETO',
-    'cartao_credito': 'CREDIT_CARD',
-    'cartao_debito': 'DEBIT_CARD',
-    'credit_card': 'CREDIT_CARD',
-    'debit_card': 'DEBIT_CARD',
-};
-
-function normalizarFormaPagamento(formaPagamento) {
-    const forma = String(formaPagamento || 'pix').toLowerCase().trim();
-    const mapped = FORMA_PAGAMENTO_MAPPING[forma];
-
-    if (!mapped) {
-        console.warn(`[createPayment] Forma de pagamento desconhecida: ${forma}. Usando PIX como padrão.`);
-        return 'PIX';
+function normalizarFormaPagamento(forma) {
+    switch (forma?.toLowerCase()) {
+        case 'pix': return 'PIX';
+        case 'cartao_credito':
+        case 'credit_card': return 'CREDIT_CARD';
+        case 'cartao_debito':
+        case 'debit_card': return 'DEBIT_CARD';
+        default: return 'PIX'; // Fallback para PIX se não reconhecer ou se for Boleto (removido)
     }
-
-    return mapped;
 }
 
 module.exports = async (req, res) => {
@@ -40,7 +30,15 @@ module.exports = async (req, res) => {
         return res.status(500).json({ error: 'Configuração do servidor incompleta. Contate o suporte.' });
     }
 
-    const { agendamentoId, valor, formaPagamento, descricao, cliente } = req.body;
+    const {
+        agendamentoId,
+        valor,
+        formaPagamento,
+        descricao,
+        cliente,
+        creditCard,
+        creditCardHolderInfo
+    } = req.body;
 
     if (!agendamentoId || !valor || !formaPagamento) {
         return res.status(400).json({ error: 'Campos obrigatórios: agendamentoId, valor, formaPagamento' });
@@ -79,7 +77,15 @@ module.exports = async (req, res) => {
             .toISOString()
             .split('T')[0];
 
-        const billingTypeAsaas = normalizarFormaPagamento(formaPagamento);
+        let billingTypeAsaas = normalizarFormaPagamento(formaPagamento);
+
+        // Se for cartão mas não tiver dados do cartão (ex: o profissional clicando em Gerar), 
+        // fazemos o fallback para PIX para gerar a cobrança inicial sem erro 400.
+        // O cliente poderá pagar com cartão depois na tela dele, fornecendo os dados.
+        if ((billingTypeAsaas === 'CREDIT_CARD' || billingTypeAsaas === 'DEBIT_CARD') && !creditCard) {
+            console.log(`[createPayment] Cartão selecionado mas dados ausentes. Usando PIX para geração inicial.`);
+            billingTypeAsaas = 'PIX';
+        }
 
         const bodyRequest = {
             customer: customerId,
@@ -89,6 +95,17 @@ module.exports = async (req, res) => {
             description: descricao || `Agendamento #${agendamentoId}`,
             externalReference: agendamentoId,
         };
+
+        // Se for cartão (com dados presentes), processa a captura imediata
+        if ((billingTypeAsaas === 'CREDIT_CARD' || billingTypeAsaas === 'DEBIT_CARD') && creditCard) {
+            if (!creditCardHolderInfo) {
+                return res.status(400).json({ error: 'Dados do titular do cartão ausentes' });
+            }
+            bodyRequest.creditCard = creditCard;
+            bodyRequest.creditCardHolderInfo = creditCardHolderInfo;
+            // Para cartão/débito direto, o vencimento deve ser hoje
+            bodyRequest.dueDate = new Date().toISOString().split('T')[0];
+        }
 
         const response = await axios.post(
             `${ASAAS_API_URL}/payments`,

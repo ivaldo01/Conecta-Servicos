@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
+import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { Ionicons } from '@expo/vector-icons';
 import NetInfo from "@react-native-community/netinfo";
 import {
@@ -41,7 +42,7 @@ const FALLBACK_STATS_CLIENTE = [
   {
     id: '1',
     label: 'Explorar',
-    value: 'Serviços',
+    value: 'Serviço',
     icon: 'search-outline',
     color: colors.primary,
     action: 'buscar',
@@ -200,8 +201,8 @@ function QuickStatCard({ label, value, icon, color, onPress }) {
       activeOpacity={0.9}
       onPress={onPress}
     >
-      <View style={[styles.statIconBox, { backgroundColor: `${color}18` }]}>
-        <Ionicons name={icon} size={18} color={color} />
+      <View style={[styles.statIconBox, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon} size={22} color={color} />
       </View>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -250,6 +251,7 @@ export default function HomeScreen({ navigation }) {
   const [totalNotificacoesNaoLidas, setTotalNotificacoesNaoLidas] = useState(0);
   const [slideIndex, setSlideIndex] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const slidesRef = useRef(null);
   const primeiroNome = getPrimeiroNome(usuario?.nome);
@@ -348,6 +350,33 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     carregarTudo();
   }, [carregarTudo]);
+
+  useEffect(() => {
+    const verificarTutorial = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user?.uid) return;
+
+        const userRef = doc(db, 'usuarios', user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          // Se nunca viu o tutorial e é cliente, mostra o tutorial
+          if (!userData.tutorialVisto && userData.tipo === 'cliente') {
+            // Aguarda 1 segundo para não mostrar imediatamente
+            setTimeout(() => {
+              setShowTutorial(true);
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.log('Erro ao verificar tutorial:', error);
+      }
+    };
+
+    verificarTutorial();
+  }, []);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -495,6 +524,10 @@ export default function HomeScreen({ navigation }) {
 
   const renderProfissionalCard = (profissional) => {
     const favorito = favoritosIds.includes(profissional.id);
+    const fotoPerfil = profissional?.fotoPerfil || profissional?.foto || null;
+    const banner = profissional?.banner || profissional?.capa || profissional?.bannerPerfil || profissional?.capaPerfil || profissional?.bannerUrl || profissional?.imagemBanner || null;
+    const avaliacao = parseNumero(profissional?.avaliacaoMedia);
+    const totalAvaliacoes = parseNumero(profissional?.totalAvaliacoes);
 
     return (
       <TouchableOpacity
@@ -503,56 +536,85 @@ export default function HomeScreen({ navigation }) {
         activeOpacity={0.92}
         onPress={() => abrirPerfilProfissional(profissional)}
       >
-        <View style={styles.profTopRow}>
-          <View style={styles.profAvatar}>
-            <Ionicons name="person-outline" size={24} color={colors.primary} />
+        {/* Banner/Capa */}
+        <View style={styles.profBannerContainer}>
+          {banner ? (
+            <Image source={{ uri: banner }} style={styles.profBanner} resizeMode="cover" />
+          ) : (
+            <View style={styles.profBannerPlaceholder}>
+              <Ionicons name="image-outline" size={24} color={colors.secondary} />
+            </View>
+          )}
+          {/* Badge Online no banner */}
+          {profissional?.online && (
+            <View style={styles.onlineBadge}>
+              <View style={styles.onlineBadgeDot} />
+              <Text style={styles.onlineBadgeText}>Online</Text>
+            </View>
+          )}
+          {/* Foto de perfil sobreposta */}
+          <View style={styles.profAvatarOverlay}>
+            {fotoPerfil ? (
+              <Image source={{ uri: fotoPerfil }} style={styles.profAvatarImage} />
+            ) : (
+              <View style={styles.profAvatarPlaceholder}>
+                <Ionicons name="person-outline" size={22} color="#FFF" />
+              </View>
+            )}
+            {profissional?.online && (
+              <View style={styles.profOnlineIndicator} />
+            )}
           </View>
-
+          {/* Botão favorito */}
           <TouchableOpacity
-            style={styles.favoriteButton}
+            style={styles.profFavoriteButton}
             activeOpacity={0.9}
             onPress={() => toggleFavorito(profissional)}
           >
             <Ionicons
               name={favorito ? 'heart' : 'heart-outline'}
-              size={20}
-              color={favorito ? '#EF4444' : colors.secondary}
+              size={18}
+              color={favorito ? '#EF4444' : '#FFF'}
             />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.profName} numberOfLines={1}>
-          {profissional?.nome || profissional?.nomeFantasia || 'Profissional'}
-        </Text>
-
-        <Text style={styles.profCategory} numberOfLines={1}>
-          {profissional?.especialidade || 'Serviços gerais'}
-        </Text>
-
-        <View style={styles.profMetaRow}>
-          <Ionicons name="star" size={14} color="#F59E0B" />
-          <Text style={styles.profMetaText}>
-            {parseNumero(profissional?.avaliacaoMedia).toFixed(1)} ({parseNumero(profissional?.totalAvaliacoes)})
+        {/* Conteúdo do card */}
+        <View style={styles.profContent}>
+          <Text style={styles.profName} numberOfLines={1}>
+            {profissional?.nome || profissional?.nomeFantasia || 'Profissional'}
           </Text>
-        </View>
 
-        {profissional?.distanciaKm != null && (
-          <View style={styles.profMetaRow}>
-            <Ionicons name="location-outline" size={14} color={colors.secondary} />
-            <Text style={styles.profMetaText}>{profissional.distanciaKm} km</Text>
+          <Text style={styles.profCategory} numberOfLines={1}>
+            {profissional?.especialidade || 'Serviços gerais'}
+          </Text>
+
+          {/* Avaliações destacadas */}
+          <View style={styles.profRatingRow}>
+            <View style={styles.profRatingBadge}>
+              <Ionicons name="star" size={12} color="#FFF" />
+              <Text style={styles.profRatingText}>
+                {avaliacao > 0 ? avaliacao.toFixed(1) : 'Novo'}
+              </Text>
+            </View>
+            {totalAvaliacoes > 0 && (
+              <Text style={styles.profRatingCount}>
+                ({totalAvaliacoes} avaliações)
+              </Text>
+            )}
           </View>
-        )}
 
-        {profissional?.online && (
-          <View style={styles.onlineRow}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Online agora</Text>
+          {profissional?.distanciaKm != null && (
+            <View style={styles.profLocationRow}>
+              <Ionicons name="location-outline" size={14} color={colors.secondary} />
+              <Text style={styles.profMetaText}>{profissional.distanciaKm} km de distância</Text>
+            </View>
+          )}
+
+          <View style={styles.profActionRow}>
+            <Text style={styles.profActionText}>Ver perfil</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.primary} />
           </View>
-        )}
-
-        <View style={styles.profActionRow}>
-          <Text style={styles.profActionText}>Ver perfil público</Text>
-          <Ionicons name="arrow-forward" size={15} color={colors.primary} />
         </View>
       </TouchableOpacity>
     );
@@ -840,9 +902,16 @@ export default function HomeScreen({ navigation }) {
           {montarCarrosselProfissionais()}
         </ScrollView>
       </ScrollView>
+
+      <TutorialOnboarding
+        userId={auth.currentUser?.uid}
+        userType="cliente"
+        visible={showTutorial}
+        onComplete={() => setShowTutorial(false)}
+      />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -1191,56 +1260,63 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 4,
   },
 
   statCard: {
     flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 18,
+    alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 10,
-    marginHorizontal: 4,
+    paddingHorizontal: 8,
+    marginHorizontal: 6,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
 
   statIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
 
   statValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: colors.textDark,
+    textAlign: 'center',
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
   },
 
   statLabel: {
     fontSize: 12,
     color: colors.secondary,
-    marginTop: 4,
-  },
-
-  sectionHeader: {
-    marginBottom: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-
-  sectionEyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primary,
-    marginBottom: 4,
+    marginTop: 2,
   },
 
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: colors.textDark,
+  },
+
+  sectionEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 
   seeAll: {
@@ -1273,7 +1349,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  categoryIconBox: {
+  categoryIconCircle: {
     width: 54,
     height: 54,
     borderRadius: 18,
@@ -1306,42 +1382,53 @@ const styles = StyleSheet.create({
   },
 
   featuresRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     marginBottom: 24,
+    paddingHorizontal: 4,
   },
 
   featureCard: {
+    width: '31%',
+    backgroundColor: '#FFF',
     borderRadius: 20,
-    padding: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    alignItems: 'center',
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.05)',
+    borderColor: '#E8EDF5',
     shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   featureIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   featureTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
     color: colors.textDark,
-    marginBottom: 4,
+    marginBottom: 6,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   featureText: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.secondary,
-    lineHeight: 18,
+    lineHeight: 16,
+    textAlign: 'center',
   },
 
   horizontalListContent: {
@@ -1360,62 +1447,162 @@ const styles = StyleSheet.create({
 
   profCard: {
     width: CLIENT_PRO_CARD_WIDTH,
-    height: CLIENT_PRO_CARD_HEIGHT,
     backgroundColor: '#FFF',
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
     marginRight: 12,
-    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#E8EDF5',
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
-  profTopRow: {
+  profBannerContainer: {
+    height: 100,
+    position: 'relative',
+    backgroundColor: '#F0F3F8',
+  },
+
+  profBanner: {
+    width: '100%',
+    height: '100%',
+  },
+
+  profBannerPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E8EDF5',
+  },
+
+  onlineBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 14,
+    alignItems: 'center',
+    backgroundColor: '#22C55E',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+    zIndex: 10,
   },
 
-  profAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: '#EEF4FF',
+  profAvatarOverlay: {
+    position: 'absolute',
+    bottom: -20,
+    left: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: '#FFF',
+    backgroundColor: colors.primary,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    zIndex: 20,
+  },
+
+  profAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  profAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+  },
+
+  profOnlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+
+  profFavoriteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  favoriteButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    backgroundColor: '#F8FAFD',
-    justifyContent: 'center',
-    alignItems: 'center',
+  profContent: {
+    padding: 12,
+    paddingTop: 36,
   },
 
   profName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: colors.textDark,
   },
 
   profCategory: {
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 12,
     color: colors.secondary,
     marginBottom: 10,
   },
 
-  profMetaRow: {
+  profRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+
+  profRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+
+  profRatingText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFF',
+    marginLeft: 4,
+  },
+
+  profRatingCount: {
+    fontSize: 11,
+    color: colors.secondary,
+    marginLeft: 6,
+  },
+
+  profLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
 
   profMetaText: {
@@ -1424,41 +1611,16 @@ const styles = StyleSheet.create({
     color: colors.secondary,
   },
 
-  onlineRow: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF9F1',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22C55E',
-    marginRight: 6,
-  },
-
-  onlineText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#15803D',
-  },
-
   profActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 'auto',
   },
-
   profActionText: {
     marginRight: 6,
     fontSize: 13,
     fontWeight: '700',
     color: colors.primary,
   },
+
 });

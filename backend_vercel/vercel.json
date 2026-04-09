@@ -4,6 +4,14 @@
     { "src": "/api/webhook",       "dest": "/api/webhook.js"       },
     { "src": "/api/createPayment", "dest": "/api/createPayment.js" },
     { "src": "/api/withdraw",      "dest": "/api/withdraw.js"      },
+    { "src": "/api/createSubscription", "dest": "/api/createSubscription.js" },
+    { "src": "/api/gerarAgendamentosRecorrentes", "dest": "/api/gerarAgendamentosRecorrentes.js" },
     { "src": "/api/(.*)",          "dest": "/api/index.js"         }
+  ],
+  "crons": [
+    {
+      "path": "/api/gerarAgendamentosRecorrentes",
+      "schedule": "0 1 * * *"
+    }
   ]
 }

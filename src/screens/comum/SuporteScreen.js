@@ -9,7 +9,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-    Alert
+    Alert,
+    useWindowDimensions
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +31,7 @@ import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
 import { useUsuario } from '../../hooks/useUsuario';
 import { enviarPushSuporte } from '../../utils/notificationUtils';
+import Sidebar from '../../components/Sidebar';
 
 export default function SuporteScreen({ navigation }) {
     const insets = useSafeAreaInsets();
@@ -235,126 +237,201 @@ export default function SuporteScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+    flex: {
+        flex: 1,
+    },
+    screenContainer: {
+        flex: 1,
+        backgroundColor: '#F8FAFD',
+    },
+    webLayout: {
+        flex: 1,
+        flexDirection: 'row',
+        height: '100vh',
+        overflow: 'hidden',
+    },
+    webContentArea: {
+        flex: 1,
+        backgroundColor: '#F8FAFD',
+        height: '100%',
+        display: 'flex',
+        overflow: Platform.OS === 'web' ? 'auto' : 'hidden',
+    },
     container: {
         flex: 1,
-        backgroundColor: '#F5F7FA',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        backgroundColor: colors.primary,
+        height: Platform.OS === 'web' ? '100%' : 'auto',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderBottomColor: '#E1E8F0',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        backgroundColor: colors.primary,
+    },
+    headerLarge: {
+        paddingVertical: 30,
+        paddingHorizontal: 40,
     },
     backButton: {
-        padding: 4,
+        padding: 5,
     },
     headerInfo: {
-        marginLeft: 12,
+        flex: 1,
+        marginLeft: 15,
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A1A',
+        fontWeight: '800',
+        color: '#FFF',
     },
-    headerStatus: {
-        fontSize: 12,
-        color: '#16A34A',
-        fontWeight: '600',
-    },
-    listContent: {
-        padding: 16,
-    },
-    messageContainer: {
+    statusRow: {
         flexDirection: 'row',
-        marginBottom: 16,
-        maxWidth: '80%',
+        alignItems: 'center',
+        marginTop: 2,
     },
-    myMessage: {
-        alignSelf: 'flex-end',
-        flexDirection: 'row-reverse',
+    statusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#2ECC71',
+        marginRight: 6,
     },
-    supportMessage: {
-        alignSelf: 'flex-start',
+    statusText: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.8)',
     },
-    supportAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: colors.primary,
+    whatsappButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#25D366',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 8,
+        elevation: 3,
+    },
+    chatArea: {
+        flex: 1,
+        backgroundColor: '#F8FAFD',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        marginTop: 0,
+    },
+    chatAreaLarge: {
+        maxWidth: 900,
+        alignSelf: 'center',
+        width: '100%',
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+    },
+    listContent: {
+        padding: 20,
+        paddingBottom: 10,
+    },
+    messageRow: {
+        flexDirection: 'row',
+        marginBottom: 15,
+        maxWidth: '85%',
+    },
+    myMessageRow: {
+        alignSelf: 'flex-end',
+    },
+    otherMessageRow: {
+        alignSelf: 'flex-start',
     },
     messageBubble: {
         padding: 12,
-        borderRadius: 18,
-    },
-    myBubble: {
-        backgroundColor: colors.primary,
-        borderBottomRightRadius: 4,
-        shadowColor: colors.primary,
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 3,
-    },
-    supportBubble: {
-        backgroundColor: '#FFF',
-        borderBottomLeftRadius: 4,
-        borderWidth: 1,
-        borderColor: '#E1E8F0',
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        shadowOffset: { width: 0, height: 2 },
+        borderRadius: 20,
         elevation: 1,
     },
+    myMessageBubble: {
+        backgroundColor: colors.primary,
+        borderBottomRightRadius: 4,
+    },
+    otherMessageBubble: {
+        backgroundColor: '#FFF',
+        borderBottomLeftRadius: 4,
+    },
     messageText: {
-        fontSize: 15,
+        fontSize: 14,
         lineHeight: 20,
     },
     myMessageText: {
         color: '#FFF',
     },
-    supportMessageText: {
-        color: '#1A1A1A',
+    otherMessageText: {
+        color: '#333',
+    },
+    messageTime: {
+        fontSize: 10,
+        marginTop: 4,
+        alignSelf: 'flex-end',
+    },
+    myMessageTime: {
+        color: 'rgba(255,255,255,0.7)',
+    },
+    otherMessageTime: {
+        color: '#999',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 100,
+        paddingHorizontal: 40,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: colors.textDark,
+        marginTop: 15,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+        marginTop: 8,
+        lineHeight: 20,
     },
     inputContainer: {
         flexDirection: 'row',
-        padding: 12,
+        alignItems: 'flex-end',
+        paddingHorizontal: 15,
+        paddingVertical: 12,
         backgroundColor: '#FFF',
         borderTopWidth: 1,
-        borderTopColor: '#E1E8F0',
-        alignItems: 'flex-end',
+        borderTopColor: '#F1F5F9',
+    },
+    inputContainerLarge: {
+        marginBottom: 20,
+        borderRadius: 20,
+        marginHorizontal: 20,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
     },
     input: {
         flex: 1,
-        backgroundColor: '#F0F3F8',
+        backgroundColor: '#F1F5F9',
         borderRadius: 20,
         paddingHorizontal: 16,
-        paddingVertical: 8,
-        paddingTop: 8,
-        maxHeight: 100,
+        paddingVertical: 10,
+        paddingTop: 10,
         fontSize: 15,
-        color: '#1A1A1A',
+        maxHeight: 100,
+        color: '#1E293B',
     },
     sendButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 8,
+        marginLeft: 10,
     },
     sendButtonDisabled: {
-        backgroundColor: '#CCC',
+        backgroundColor: '#CBD5E1',
     },
 });

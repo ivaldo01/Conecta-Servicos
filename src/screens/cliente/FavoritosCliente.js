@@ -8,6 +8,9 @@ import {
     FlatList,
     Alert,
     Image,
+    Platform,
+    useWindowDimensions,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +24,7 @@ import {
 
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
+import Sidebar from '../../components/Sidebar';
 
 function getNomeProfissional(item) {
     return (
@@ -77,6 +81,9 @@ export default function FavoritosCliente({ navigation }) {
     const [favoritos, setFavoritos] = useState([]);
     const [removendoId, setRemovendoId] = useState(null);
 
+    const { width: windowWidth } = useWindowDimensions();
+    const isLargeScreen = Platform.OS === 'web' && windowWidth > 768;
+
     const carregarFavoritos = useCallback(async () => {
         const user = auth.currentUser;
 
@@ -130,82 +137,25 @@ export default function FavoritosCliente({ navigation }) {
                             '',
                     };
 
-                    if (!profissionalId) {
-                        return baseSegura;
-                    }
+                    if (!profissionalId) return baseSegura;
 
                     try {
                         const profissionalRef = doc(db, 'usuarios', profissionalId);
                         const profissionalSnap = await getDoc(profissionalRef);
 
-                        if (!profissionalSnap.exists()) {
-                            return baseSegura;
-                        }
+                        if (!profissionalSnap.exists()) return baseSegura;
 
                         const dados = profissionalSnap.data();
 
                         return {
                             ...baseSegura,
-                            nome:
-                                dados?.nome ||
-                                dados?.nomeCompleto ||
-                                dados?.nomeFantasia ||
-                                dados?.nomeNegocio ||
-                                baseSegura.nome,
-                            nomeCompleto:
-                                dados?.nomeCompleto ||
-                                baseSegura?.nomeCompleto ||
-                                '',
-                            nomeFantasia:
-                                dados?.nomeFantasia ||
-                                baseSegura?.nomeFantasia ||
-                                '',
-                            nomeNegocio:
-                                dados?.nomeNegocio ||
-                                baseSegura?.nomeNegocio ||
-                                '',
-                            especialidade:
-                                dados?.especialidade ||
-                                dados?.categoriaNome ||
-                                dados?.categoria ||
-                                baseSegura.especialidade,
-                            categoriaNome:
-                                dados?.categoriaNome ||
-                                baseSegura?.categoriaNome ||
-                                '',
-                            cidade:
-                                dados?.cidade ||
-                                dados?.localizacao?.cidade ||
-                                baseSegura.cidade,
-                            localizacao:
-                                dados?.localizacao ||
-                                baseSegura?.localizacao ||
-                                null,
-                            fotoPerfil:
-                                dados?.fotoPerfil ||
-                                dados?.foto ||
-                                dados?.avatar ||
-                                dados?.photoURL ||
-                                dados?.photoUrl ||
-                                baseSegura.fotoPerfil,
-                            bannerPerfil:
-                                dados?.bannerPerfil ||
-                                dados?.banner ||
-                                dados?.capaPerfil ||
-                                dados?.capa ||
-                                dados?.bannerUrl ||
-                                dados?.imagemBanner ||
-                                baseSegura.bannerPerfil,
+                            nome: dados?.nome || dados?.nomeCompleto || dados?.nomeFantasia || dados?.nomeNegocio || baseSegura.nome,
+                            especialidade: dados?.especialidade || dados?.categoriaNome || dados?.categoria || baseSegura.especialidade,
+                            cidade: dados?.cidade || dados?.localizacao?.cidade || baseSegura.cidade,
+                            fotoPerfil: dados?.fotoPerfil || dados?.foto || dados?.avatar || dados?.photoURL || dados?.photoUrl || baseSegura.fotoPerfil,
+                            bannerPerfil: dados?.bannerPerfil || dados?.banner || dados?.capaPerfil || dados?.capa || dados?.bannerUrl || dados?.imagemBanner || baseSegura.bannerPerfil,
                         };
                     } catch (error) {
-                        if (error?.code === 'permission-denied') {
-                            console.log(
-                                `Sem permissão para ler perfil completo do favorito ${profissionalId}. Usando dados salvos do favorito.`
-                            );
-                        } else {
-                            console.log('Erro ao carregar dados do profissional favorito:', error);
-                        }
-
                         return baseSegura;
                     }
                 })
@@ -224,38 +174,23 @@ export default function FavoritosCliente({ navigation }) {
         carregarFavoritos();
     }, [carregarFavoritos]);
 
-    const abrirPerfil = useCallback(
-        (item) => {
-            const profissionalId = item?.profissionalId || item?.id;
+    const abrirPerfil = useCallback((item) => {
+        const profissionalId = item?.profissionalId || item?.id;
+        if (!profissionalId) return;
 
-            if (!profissionalId) {
-                Alert.alert('Erro', 'Profissional não encontrado.');
-                return;
-            }
-
-            navigation.navigate('PerfilPublicoProfissional', {
-                profissionalId,
-                proId: profissionalId,
-                clinicaId: profissionalId,
-                perfilInicial: item,
-            });
-        },
-        [navigation]
-    );
+        navigation.navigate('PerfilPublicoProfissional', {
+            profissionalId,
+            perfilInicial: item,
+        });
+    }, [navigation]);
 
     const removerFavorito = useCallback(async (item) => {
         const user = auth.currentUser;
-
-        if (!user?.uid) {
-            Alert.alert('Erro', 'Usuário não encontrado.');
-            return;
-        }
+        if (!user?.uid) return;
 
         try {
             setRemovendoId(item.id);
-
             await deleteDoc(doc(db, 'usuarios', user.uid, 'favoritos', item.id));
-
             setFavoritos((prev) => prev.filter((fav) => fav.id !== item.id));
         } catch (error) {
             console.log('Erro ao remover favorito:', error);
@@ -265,31 +200,19 @@ export default function FavoritosCliente({ navigation }) {
         }
     }, []);
 
-    const confirmarRemocao = useCallback(
-        (item) => {
-            Alert.alert(
-                'Remover favorito',
-                `Deseja remover ${getNomeProfissional(item)} dos favoritos?`,
-                [
-                    { text: 'Cancelar', style: 'cancel' },
-                    {
-                        text: 'Remover',
-                        style: 'destructive',
-                        onPress: () => removerFavorito(item),
-                    },
-                ]
-            );
-        },
-        [removerFavorito]
-    );
+    const confirmarRemocao = useCallback((item) => {
+        Alert.alert(
+            'Remover favorito',
+            `Deseja remover ${getNomeProfissional(item)} dos favoritos?`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Remover', style: 'destructive', onPress: () => removerFavorito(item) },
+            ]
+        );
+    }, [removerFavorito]);
 
     const irParaBusca = useCallback(() => {
-        navigation.navigate('Main', {
-            screen: 'ClienteTabs',
-            params: {
-                screen: 'BuscaProfissionaisTab',
-            },
-        });
+        navigation.navigate('BuscaProfissionais');
     }, [navigation]);
 
     const renderItem = ({ item }) => {
@@ -298,7 +221,7 @@ export default function FavoritosCliente({ navigation }) {
 
         return (
             <TouchableOpacity
-                style={styles.card}
+                style={[styles.card, isLargeScreen && styles.cardLarge]}
                 activeOpacity={0.92}
                 onPress={() => abrirPerfil(item)}
             >
@@ -326,44 +249,23 @@ export default function FavoritosCliente({ navigation }) {
                     </View>
 
                     <View style={styles.content}>
-                        <Text style={styles.nome} numberOfLines={1}>
-                            {getNomeProfissional(item)}
-                        </Text>
-
-                        <Text style={styles.especialidade} numberOfLines={1}>
-                            {getEspecialidade(item)}
-                        </Text>
-
+                        <Text style={styles.nome} numberOfLines={1}>{getNomeProfissional(item)}</Text>
+                        <Text style={styles.especialidade} numberOfLines={1}>{getEspecialidade(item)}</Text>
                         <View style={styles.metaRow}>
                             <Ionicons name="location-outline" size={14} color={colors.secondary} />
-                            <Text style={styles.metaText} numberOfLines={1}>
-                                {getCidade(item)}
-                            </Text>
-                        </View>
-
-                        <View style={styles.metaRow}>
-                            <Ionicons name="heart" size={14} color="#E63946" />
-                            <Text style={styles.metaText}>Favoritado por você</Text>
+                            <Text style={styles.metaText} numberOfLines={1}>{getCidade(item)}</Text>
                         </View>
                     </View>
 
                     <View style={styles.actions}>
-                        <TouchableOpacity
-                            style={styles.viewBtn}
-                            onPress={() => abrirPerfil(item)}
-                        >
-                            <Ionicons name="eye-outline" size={18} color={colors.primary} />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.removeBtn}
-                            onPress={() => confirmarRemocao(item)}
-                            disabled={removendoId === item.id}
-                        >
+                        <TouchableOpacity style={styles.removeBtn} onPress={() => confirmarRemocao(item)}>
                             {removendoId === item.id ? (
                                 <ActivityIndicator size="small" color="#E63946" />
                             ) : (
-                                <Ionicons name="trash-outline" size={18} color="#E63946" />
+                                <>
+                                    <Ionicons name="trash-outline" size={18} color="#E63946" />
+                                    <Text style={styles.removeBtnText}>Remover</Text>
+                                </>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -374,23 +276,29 @@ export default function FavoritosCliente({ navigation }) {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.centered}>
+            <View style={styles.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Carregando favoritos...</Text>
-            </SafeAreaView>
+            </View>
         );
     }
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Meus Favoritos</Text>
-                <Text style={styles.subtitle}>
-                    Profissionais que você salvou para consultar depois
-                </Text>
+    const MainContent = (
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={[styles.content, isLargeScreen && styles.contentLarge]}
+            showsVerticalScrollIndicator={false}
+        >
+            <View style={[styles.header, isLargeScreen && styles.headerLarge]}>
+                <View style={styles.headerCircle} />
+                <View style={styles.headerCircleTwo} />
+                <View style={[styles.headerContent, isLargeScreen && styles.headerContentLarge]}>
+                    <Text style={styles.title}>Meus Favoritos</Text>
+                    <Text style={styles.subtitle}>Profissionais que você salvou para consultar depois</Text>
+                </View>
             </View>
 
-            <View style={styles.summaryCard}>
+            <View style={[styles.summaryCard, isLargeScreen && styles.summaryCardLarge]}>
                 <Text style={styles.summaryNumber}>{favoritos.length}</Text>
                 <Text style={styles.summaryText}>profissional(is) salvo(s) na sua lista</Text>
             </View>
@@ -401,50 +309,84 @@ export default function FavoritosCliente({ navigation }) {
                         <Ionicons name="heart-outline" size={30} color={colors.primary} />
                     </View>
                     <Text style={styles.emptyTitle}>Nenhum favorito ainda</Text>
-                    <Text style={styles.emptySubtitle}>
-                        Quando você favoritar profissionais, eles aparecerão aqui.
-                    </Text>
-
-                    <TouchableOpacity
-                        style={styles.emptyButton}
-                        onPress={irParaBusca}
-                    >
+                    <Text style={styles.emptySubtitle}>Quando você favoritar profissionais, eles aparecerão aqui.</Text>
+                    <TouchableOpacity style={styles.emptyButton} onPress={irParaBusca}>
                         <Ionicons name="search-outline" size={18} color="#FFF" />
                         <Text style={styles.emptyButtonText}>Buscar profissionais</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
-                <FlatList
-                    data={favoritos}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderItem}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
+                <View style={isLargeScreen ? styles.gridDesktop : null}>
+                    {favoritos.map((item) => (
+                        <View key={item.id} style={isLargeScreen ? styles.gridItemDesktop : null}>
+                            {renderItem({ item })}
+                        </View>
+                    ))}
+                </View>
             )}
-        </SafeAreaView>
+        </ScrollView>
+    );
+
+    return (
+        <View style={styles.screenContainer}>
+            {isLargeScreen ? (
+                <View style={styles.webLayout}>
+                    <Sidebar navigation={navigation} activeRoute="FavoritosCliente" />
+                    <View style={styles.webContentArea}>
+                        {MainContent}
+                    </View>
+                </View>
+            ) : (
+                <SafeAreaView style={styles.container}>
+                    {MainContent}
+                </SafeAreaView>
+            )}
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    screenContainer: {
+        flex: 1,
+        backgroundColor: '#F0F3F8',
+    },
+    webLayout: {
+        flex: 1,
+        flexDirection: 'row',
+        height: '100vh',
+        overflow: 'hidden',
+    },
+    webContentArea: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        height: '100%',
+        display: 'flex',
+        overflow: Platform.OS === 'web' ? 'auto' : 'hidden',
+    },
     container: {
         flex: 1,
-        backgroundColor: '#F0F3F8',
     },
-
+    content: {
+        paddingBottom: 40,
+    },
+    contentLarge: {
+        maxWidth: 1200,
+        alignSelf: 'center',
+        width: '100%',
+        paddingHorizontal: 40,
+        paddingTop: 32,
+    },
     centered: {
         flex: 1,
-        backgroundColor: '#F0F3F8',
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#F0F3F8',
     },
-
     loadingText: {
         marginTop: 12,
         fontSize: 14,
         color: colors.secondary,
     },
-
     header: {
         paddingHorizontal: 18,
         paddingTop: 12,
@@ -452,20 +394,62 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primary,
         borderBottomLeftRadius: 24,
         borderBottomRightRadius: 24,
+        overflow: 'hidden',
     },
-
+    headerLarge: {
+        paddingTop: 48,
+        paddingBottom: 48,
+        borderRadius: 0,
+    },
+    headerCircle: {
+        position: 'absolute',
+        width: 130,
+        height: 130,
+        borderRadius: 65,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: -34,
+        right: -18,
+    },
+    headerCircleTwo: {
+        position: 'absolute',
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        bottom: -18,
+        left: -10,
+    },
+    headerContent: {
+        zIndex: 2,
+    },
+    headerContentLarge: {
+        alignItems: 'center',
+        width: '100%',
+    },
     title: {
         fontSize: 24,
         fontWeight: '800',
         color: '#FFF',
+        textAlign: 'center',
     },
-
     subtitle: {
         marginTop: 4,
         fontSize: 13,
         color: 'rgba(255,255,255,0.84)',
+        textAlign: 'center',
     },
-
+    scrollContent: {
+        flex: 1,
+    },
+    scrollContentContainer: {
+        paddingBottom: 28,
+    },
+    scrollContentContainerLarge: {
+        maxWidth: 1200,
+        alignSelf: 'center',
+        paddingHorizontal: 40,
+        paddingTop: 32,
+    },
     summaryCard: {
         marginHorizontal: 16,
         marginTop: 12,
@@ -476,162 +460,152 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderWidth: 1,
         borderColor: '#E8EDF5',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
     },
-
+    summaryCardLarge: {
+        marginHorizontal: 0,
+        marginBottom: 24,
+    },
     summaryNumber: {
         fontSize: 26,
         fontWeight: '800',
         color: colors.primary,
     },
-
     summaryText: {
         marginTop: 4,
         fontSize: 13,
         color: colors.secondary,
     },
-
-    listContent: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 28,
+    gridDesktop: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 20,
+        justifyContent: 'flex-start',
     },
-
+    gridItemDesktop: {
+        width: '25%',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
     card: {
         backgroundColor: '#FFF',
         borderRadius: 20,
         marginBottom: 14,
         borderWidth: 1,
-        borderColor: '#E8EDF5',
+        borderColor: '#E2E8F0',
         overflow: 'hidden',
-        elevation: 3,
         shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
     },
-
+    cardLarge: {
+        marginBottom: 0,
+        width: 240,
+        minWidth: 240,
+    },
     bannerArea: {
         width: '100%',
-        height: 84,
+        height: 100,
         backgroundColor: '#F3F6FA',
     },
-
     bannerImage: {
         width: '100%',
         height: '100%',
     },
-
     bannerFallback: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#EEF2F7',
     },
-
     cardContent: {
-        flexDirection: 'row',
+        padding: 16,
         alignItems: 'center',
-        padding: 14,
     },
-
     avatarWrap: {
-        marginRight: 12,
+        marginBottom: 12,
     },
-
     avatar: {
-        width: 62,
-        height: 62,
-        borderRadius: 31,
-        marginTop: -18,
-        borderWidth: 3,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        marginTop: -50,
+        borderWidth: 4,
         borderColor: '#FFF',
         backgroundColor: '#FFF',
     },
-
     avatarFallback: {
-        width: 62,
-        height: 62,
-        borderRadius: 31,
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         backgroundColor: `${colors.primary}18`,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: -18,
-        borderWidth: 3,
+        marginTop: -50,
+        borderWidth: 4,
         borderColor: '#FFF',
     },
-
     avatarLetter: {
-        fontSize: 24,
+        fontSize: 32,
         fontWeight: '800',
         color: colors.primary,
     },
-
     content: {
-        flex: 1,
-        paddingRight: 10,
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: 16,
     },
-
     nome: {
         fontSize: 16,
         fontWeight: '800',
         color: colors.textDark,
+        textAlign: 'center',
     },
-
     especialidade: {
-        marginTop: 3,
+        marginTop: 4,
         fontSize: 13,
         color: colors.secondary,
+        textAlign: 'center',
     },
-
     metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 6,
+        justifyContent: 'center',
+        marginTop: 8,
     },
-
     metaText: {
         marginLeft: 6,
         fontSize: 12,
         color: colors.secondary,
-        flex: 1,
     },
-
     actions: {
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: '100%',
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        paddingTop: 12,
     },
-
-    viewBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: `${colors.primary}12`,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-
     removeBtn: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: '#FDEBEC',
-        justifyContent: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-    },
-
-    emptyState: {
-        flex: 1,
         justifyContent: 'center',
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: '#FFF',
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
+    },
+    removeBtnText: {
+        marginLeft: 8,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#E63946',
+    },
+    emptyState: {
+        paddingTop: 40,
         alignItems: 'center',
         paddingHorizontal: 26,
     },
-
     emptyIconWrap: {
         width: 68,
         height: 68,
@@ -640,15 +614,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-
     emptyTitle: {
         marginTop: 16,
         fontSize: 18,
         fontWeight: '800',
         color: colors.textDark,
-        textAlign: 'center',
     },
-
     emptySubtitle: {
         marginTop: 8,
         fontSize: 14,
@@ -656,7 +627,6 @@ const styles = StyleSheet.create({
         color: colors.secondary,
         textAlign: 'center',
     },
-
     emptyButton: {
         marginTop: 18,
         height: 48,
@@ -667,7 +637,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-
     emptyButtonText: {
         marginLeft: 8,
         color: '#FFF',

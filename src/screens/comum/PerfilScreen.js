@@ -9,10 +9,12 @@ import {
   Image,
   Alert,
   useWindowDimensions,
+  Linking,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from "../../services/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import {
@@ -21,6 +23,7 @@ import {
   uploadFotoGaleriaProfissional,
 } from "../../services/uploadService";
 import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
+import { getPlanoProfissional, temSeloVerificado } from "../../constants/plans";
 
 function getImagemValida(imagem) {
   if (!imagem) return null;
@@ -107,6 +110,7 @@ export default function PerfilScreen({ navigation }) {
   const [perfil, setPerfil] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [temSelo, setTemSelo] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingGaleria, setUploadingGaleria] = useState(false);
   const [imagensComErro, setImagensComErro] = useState({});
@@ -144,6 +148,11 @@ export default function PerfilScreen({ navigation }) {
           };
 
           setPerfil(dados);
+
+          // Verificar se tem selo verificado baseado no plano
+          const planoId = dados?.planoAtivo || 'pro_iniciante';
+          const temSeloPlano = temSeloVerificado(planoId);
+          setTemSelo(temSeloPlano);
         }
       } catch (error) {
         Alert.alert("Erro", "Erro ao carregar perfil: " + error.message);
@@ -322,40 +331,75 @@ export default function PerfilScreen({ navigation }) {
     }
   };
 
+  const abrirEnderecoNoMapa = async () => {
+    const endereco = perfil?.endereco;
+    if (!endereco || endereco === "Não informado") {
+      Alert.alert("Endereço não disponível", "Cadastre seu endereço completo nas configurações do perfil.");
+      return;
+    }
+
+    const encodedAddress = encodeURIComponent(endereco);
+    const url = Platform.OS === 'ios'
+      ? `maps:0,0?q=${encodedAddress}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        // Fallback para web
+        await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`);
+      }
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível abrir o mapa.");
+    }
+  };
+
   const deletarConta = async () => {
     Alert.alert(
       "Excluir Minha Conta",
-      "Tem certeza que deseja excluir sua conta permanentemente? Esta ação não pode ser desfeita e todos os seus dados serão apagados.",
+      "Tem certeza que deseja excluir sua conta?\n\n⚠️ Após a confirmação, sua conta será desativada imediatamente e permanentemente excluída em 30 dias.\n\n❌ Durante esse período você não poderá acessar o aplicativo.\n\n✅ Após 30 dias, todos os seus dados serão permanentemente apagados e não poderão ser recuperados.",
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Excluir Permanentemente",
+          text: "Confirmar Exclusão",
           style: "destructive",
           onPress: async () => {
             try {
               setLoading(true);
               const user = auth.currentUser;
 
-              if (user) {
-                // Em um cenário real, você deve deletar os dados do Firestore antes do Auth
-                // ou usar uma Cloud Function para garantir a limpeza total.
-                // Como estamos no plano Spark, vamos apenas deslogar após um alerta de solicitação.
-                Alert.alert(
-                  "Solicitação Enviada",
-                  "Sua solicitação de exclusão de conta foi recebida e será processada em até 48 horas conforme as diretrizes de privacidade.",
-                  [
-                    {
-                      text: "OK",
-                      onPress: async () => {
-                        await auth.signOut();
-                      }
-                    }
-                  ]
-                );
+              if (!user) {
+                Alert.alert("Erro", "Usuário não encontrado.");
+                return;
               }
+
+              // Calcula data de exclusão (30 dias a partir de agora)
+              const dataExclusao = new Date();
+              dataExclusao.setDate(dataExclusao.getDate() + 30);
+
+              // Marca conta para exclusão no Firestore
+              const perfilRef = doc(db, "usuarios", user.uid);
+              await updateDoc(perfilRef, {
+                excluirEm: Timestamp.fromDate(dataExclusao),
+                ativo: false,
+                dataDesativacao: Timestamp.now(),
+                motivoExclusao: "Solicitação do usuário",
+              });
+
+              // Desloga o usuário
+              await auth.signOut();
+
+              // Navega para tela de confirmação (ou mostra alerta)
+              Alert.alert(
+                "Conta Marcada para Exclusão",
+                `Sua conta foi desativada e será permanentemente excluída em 30 dias (${dataExclusao.toLocaleDateString('pt-BR')}).\n\nDurante esse período você não poderá acessar o aplicativo.`,
+                [{ text: "OK" }]
+              );
             } catch (error) {
-              console.log("Erro ao solicitar exclusão de conta:", error);
-              Alert.alert("Erro", "Não foi possível processar sua solicitação.");
+              console.log("Erro ao marcar conta para exclusão:", error);
+              Alert.alert("Erro", "Não foi possível processar sua solicitação. Tente novamente.");
             } finally {
               setLoading(false);
             }
@@ -472,8 +516,30 @@ export default function PerfilScreen({ navigation }) {
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.userName}>{getNomePerfil(perfil)}</Text>
-        <Text style={styles.userEmail}>{perfil?.email || "E-mail não informado"}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={styles.userName}>{getNomePerfil(perfil)}</Text>
+          {temSelo && (
+            <View style={{
+              marginLeft: 8,
+              backgroundColor: '#FFD700',
+              borderRadius: 12,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+              <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+              <Text style={{
+                color: '#FFF',
+                fontSize: 11,
+                fontWeight: 'bold',
+                marginLeft: 2,
+              }}>
+                Verificado
+              </Text>
+            </View>
+          )}
+        </View>
 
         <View style={styles.userTypeBadge}>
           <Ionicons
@@ -510,6 +576,48 @@ export default function PerfilScreen({ navigation }) {
             {uploadingFoto ? "Enviando foto..." : "Trocar foto de perfil"}
           </Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Card de Dados de Registro */}
+      <View style={styles.dadosRegistroCard}>
+        <View style={styles.dadosRegistroHeader}>
+          <Text style={styles.dadosRegistroTitle}>Dados de Registro</Text>
+          <TouchableOpacity
+            style={styles.editarDadosBtn}
+            onPress={() => navigation.navigate("EditarPerfil")}
+          >
+            <Ionicons name="create-outline" size={16} color={colors.primary} />
+            <Text style={styles.editarDadosText}>Editar</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.dadosRegistroContent}>
+          <View style={styles.dadoItem}>
+            <Ionicons name="call-outline" size={18} color={colors.secondary} />
+            <Text style={styles.dadoLabel}>WhatsApp</Text>
+            <Text style={styles.dadoValor}>
+              {perfil?.whatsapp || perfil?.telefone || "Não informado"}
+            </Text>
+          </View>
+
+          <View style={styles.dadoItem}>
+            <Ionicons name="card-outline" size={18} color={colors.secondary} />
+            <Text style={styles.dadoLabel}>
+              {ehProfissional ? "CPF/CNPJ" : "CPF"}
+            </Text>
+            <Text style={styles.dadoValor}>
+              {perfil?.cpfCnpj || perfil?.cpf || perfil?.cnpj || "Não informado"}
+            </Text>
+          </View>
+
+          <View style={styles.dadoItem}>
+            <Ionicons name="location-outline" size={18} color={colors.secondary} />
+            <Text style={styles.dadoLabel}>Endereço</Text>
+            <Text style={styles.dadoValor} numberOfLines={2}>
+              {perfil?.endereco || "Não informado"}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.menuContainer}>
@@ -553,14 +661,14 @@ export default function PerfilScreen({ navigation }) {
               <Ionicons name="chevron-forward" size={20} color="#CCC" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={abrirEnderecoNoMapa}>
               <View style={[styles.iconBox, { backgroundColor: '#FFF3E0' }]}>
                 <Ionicons name="location" size={22} color="#FF9800" />
               </View>
 
               <View style={styles.menuTextWrap}>
                 <Text style={styles.menuText}>Endereço do Local</Text>
-                <Text style={styles.menuSubText}>Dados do seu atendimento</Text>
+                <Text style={styles.menuSubText}>{perfil?.endereco || "Ver no mapa"}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={20} color="#CCC" />
@@ -659,6 +767,19 @@ export default function PerfilScreen({ navigation }) {
           <Ionicons name="chevron-forward" size={20} color="#CCC" />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Premium')}>
+          <View style={[styles.iconBox, { backgroundColor: '#FFF8E1' }]}>
+            <Ionicons name="diamond-outline" size={22} color="#F1C40F" />
+          </View>
+
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuText}>Conecta VIP</Text>
+            <Text style={styles.menuSubText}>Ver planos e assinatura</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color="#CCC" />
+        </TouchableOpacity>
+
         {/* Painel de Admin - Visível apenas para o dono (pode-se adicionar um check de UID aqui) */}
         {perfil?.isAdmin && (
           <TouchableOpacity style={styles.menuItem} onPress={abrirPainelAdminSuporte}>
@@ -684,12 +805,7 @@ export default function PerfilScreen({ navigation }) {
             <Text style={styles.menuText}>Sair</Text>
             <Text style={styles.menuSubText}>Encerrar sessão</Text>
           </View>
-
           <Ionicons name="chevron-forward" size={20} color="#CCC" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.deleteAccountItem} onPress={deletarConta}>
-          <Text style={styles.deleteAccountText}>Excluir minha conta</Text>
         </TouchableOpacity>
       </View>
 
@@ -775,30 +891,11 @@ export default function PerfilScreen({ navigation }) {
         </View>
       )}
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Dados de Registro</Text>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{ehProfissional ? 'CPF/CNPJ' : 'CPF'}</Text>
-          <Text style={styles.infoValue}>
-            {perfil?.cpf || perfil?.cnpj || 'Não informado'}
-          </Text>
-        </View>
-
-        <View style={styles.infoDivider} />
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Telefone</Text>
-          <Text style={styles.infoValue}>{perfil?.telefone || 'Não informado'}</Text>
-        </View>
-
-        <View style={styles.infoDivider} />
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Tipo de conta</Text>
-          <Text style={styles.infoValue}>{ehProfissional ? 'Profissional' : 'Cliente'}</Text>
-        </View>
-      </View>
+      {/* Botão Excluir Conta - destacado em vermelho */}
+      <TouchableOpacity style={styles.deleteAccountButton} onPress={deletarConta}>
+        <Ionicons name="trash-outline" size={20} color="#DC2626" />
+        <Text style={styles.deleteAccountButtonText}>Excluir minha conta</Text>
+      </TouchableOpacity>
 
       <View style={styles.tipCard}>
         <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
@@ -806,7 +903,7 @@ export default function PerfilScreen({ navigation }) {
           Agora o cliente e o profissional já podem usar foto de perfil, o profissional já pode trocar o banner e também montar sua galeria de trabalhos.
         </Text>
       </View>
-    </ScrollView>
+    </ScrollView >
   );
 }
 
@@ -1021,6 +1118,80 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  dadosRegistroCard: {
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E8EDF5',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+
+  dadosRegistroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8EDF5',
+  },
+
+  dadosRegistroTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.textDark,
+  },
+
+  editarDadosBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF4FF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#D1E0FF',
+  },
+
+  editarDadosText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+
+  dadosRegistroContent: {
+    gap: 12,
+  },
+
+  dadoItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+
+  dadoLabel: {
+    fontSize: 13,
+    color: colors.secondary,
+    marginLeft: 10,
+    width: 80,
+  },
+
+  dadoValor: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textDark,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+
   menuContainer: {
     padding: 16,
   },
@@ -1193,83 +1364,37 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  infoCard: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E8EDF5',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-  },
-
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.secondary,
-    marginBottom: 12,
-  },
-
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  infoDivider: {
-    height: 1,
-    backgroundColor: '#EEF1F4',
-    marginVertical: 10,
-  },
-
-  infoLabel: {
-    fontSize: 13,
-    color: '#7B8794',
-    fontWeight: '600',
-  },
-
-  infoValue: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '700',
-    maxWidth: '58%',
-    textAlign: 'right',
-  },
-
   tipCard: {
     marginHorizontal: 16,
-    marginTop: 16,
-    backgroundColor: '#FFF',
+    marginTop: 20,
+    marginBottom: 24,
+    padding: 16,
+    backgroundColor: '#E3F2FD',
     borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E8EDF3',
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    gap: 12,
   },
 
-  tipText: {
-    flex: 1,
-    marginLeft: 10,
-    color: colors.secondary,
-    fontSize: 12,
-    lineHeight: 19,
-  },
-  deleteAccountItem: {
-    marginTop: 20,
-    paddingVertical: 10,
+  deleteAccountButton: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  deleteAccountText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
+
+  deleteAccountButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

@@ -15,13 +15,14 @@ import {
     Modal,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
-import { collection, getDocs, doc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, writeBatch, serverTimestamp, getDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { app } from "../../services/firebaseConfig";
 import { initializeApp, getApps } from "firebase/app";
 import { MultiSelect } from 'react-native-element-dropdown';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
+import { getMaxFuncionarios, podeCadastrarFuncionario, getPlanoProfissional } from "../../constants/plans";
 
 export default function GerenciarColaboradores({ navigation }) {
     const [nome, setNome] = useState('');
@@ -36,6 +37,8 @@ export default function GerenciarColaboradores({ navigation }) {
     const [colaboradorEditando, setColaboradorEditando] = useState(null);
     const [servicosEdicao, setServicosEdicao] = useState([]);
     const [salvandoServicos, setSalvandoServicos] = useState(false);
+    const [planoUsuario, setPlanoUsuario] = useState(null);
+    const [carregandoPlano, setCarregandoPlano] = useState(true);
 
     const emailRef = useRef(null);
     const senhaRef = useRef(null);
@@ -59,7 +62,14 @@ export default function GerenciarColaboradores({ navigation }) {
         if (!user) return;
 
         setLoading(true);
+        setCarregandoPlano(true);
         try {
+            // Carregar plano do usuário
+            const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+            const planoId = userDoc.data()?.planoAtivo || 'pro_iniciante';
+            const plano = getPlanoProfissional(planoId);
+            setPlanoUsuario(plano);
+
             const snapServ = await getDocs(collection(db, "usuarios", user.uid, "servicos"));
             const listaServicos = snapServ.docs.map(d => ({
                 label: d.data().nome,
@@ -74,7 +84,28 @@ export default function GerenciarColaboradores({ navigation }) {
             Alert.alert("Erro", "Falha ao carregar dados da equipe.");
         } finally {
             setLoading(false);
+            setCarregandoPlano(false);
         }
+    };
+
+    const getLimiteFuncionarios = () => {
+        if (!planoUsuario) return 0;
+        return planoUsuario.maxEmployees || 0;
+    };
+
+    const podeAdicionarFuncionario = () => {
+        if (!planoUsuario) return false;
+        return podeCadastrarFuncionario(planoUsuario.id, equipe.length);
+    };
+
+    const getInfoLimite = () => {
+        const max = getLimiteFuncionarios();
+        if (max === Infinity) return { texto: 'Ilimitado', atingiuLimite: false };
+        const atingiuLimite = equipe.length >= max;
+        return {
+            texto: `${equipe.length} de ${max} funcionários`,
+            atingiuLimite
+        };
     };
 
     const abrirEditorServicos = (colaborador) => {
@@ -125,6 +156,26 @@ export default function GerenciarColaboradores({ navigation }) {
 
     const salvarColaborador = async () => {
         Keyboard.dismiss();
+
+        // Verificar se pode adicionar mais colaboradores
+        if (!podeAdicionarFuncionario()) {
+            const limite = getLimiteFuncionarios();
+            const info = getInfoLimite();
+            Alert.alert(
+                "Limite atingido",
+                `Seu plano ${planoUsuario?.name || 'Iniciante'} permite até ${limite === 0 ? '0' : limite === Infinity ? 'ilimitados' : limite} funcionários.\n\n` +
+                `Você já tem ${equipe.length} funcionário(s).\n\n` +
+                (limite === 0
+                    ? "Faça upgrade para um plano pago para adicionar funcionários."
+                    : "Faça upgrade para o plano Franquia para ter funcionários ilimitados."
+                ),
+                [
+                    { text: "OK", style: "cancel" },
+                    { text: "Ver Planos", onPress: () => navigation.navigate("PremiumScreen") }
+                ]
+            );
+            return;
+        }
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -275,6 +326,41 @@ export default function GerenciarColaboradores({ navigation }) {
                 >
                     <Text style={styles.headerTitle}>Minha Equipe</Text>
 
+                    {/* Card mostrando limite de funcionários do plano */}
+                    {!carregandoPlano && planoUsuario && (
+                        <View style={{
+                            backgroundColor: getInfoLimite().atingiuLimite ? '#FFEBEE' : '#E3F2FD',
+                            padding: 12,
+                            borderRadius: 8,
+                            marginBottom: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons
+                                    name={getInfoLimite().atingiuLimite ? "warning" : "information-circle"}
+                                    size={20}
+                                    color={getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2'}
+                                />
+                                <Text style={{
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                    color: getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2',
+                                    fontWeight: '600',
+                                }}>
+                                    {getInfoLimite().texto}
+                                </Text>
+                            </View>
+                            <Text style={{
+                                fontSize: 12,
+                                color: getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2',
+                            }}>
+                                {planoUsuario.name}
+                            </Text>
+                        </View>
+                    )}
+
                     <View style={styles.helperCard}>
                         <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
                         <Text style={styles.helperText}>
@@ -358,7 +444,19 @@ export default function GerenciarColaboradores({ navigation }) {
                         equipe.map((item) => (
                             <View key={item.id} style={styles.colabCard}>
                                 <View style={styles.colabInfo}>
-                                    <Text style={styles.colabName}>{item.nome}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.colabName}>{item.nome}</Text>
+                                        {planoUsuario?.verifiedBadge && (
+                                            <View style={{
+                                                marginLeft: 8,
+                                                backgroundColor: '#FFD700',
+                                                borderRadius: 10,
+                                                padding: 2,
+                                            }}>
+                                                <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                                            </View>
+                                        )}
+                                    </View>
                                     <Text style={styles.colabEmail}>{item.email}</Text>
                                     <View style={styles.badge}>
                                         <Text style={styles.badgeText}>

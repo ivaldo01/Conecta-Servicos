@@ -9,6 +9,8 @@ import {
     Alert,
     ActivityIndicator,
     Image,
+    useWindowDimensions,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from "../../services/firebaseConfig";
@@ -16,6 +18,7 @@ import { doc, updateDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/fi
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import { liberarHorario } from '../../utils/agendaDisponibilidade';
+import Sidebar from '../../components/Sidebar';
 
 function parseNumero(valor, fallback = 0) {
     if (valor === null || valor === undefined || valor === '') return fallback;
@@ -140,6 +143,9 @@ function getInicialNome(nome = '') {
 }
 
 export default function DetalhesAgendamento({ route, navigation }) {
+    const { width: windowWidth } = useWindowDimensions();
+    const isLargeScreen = Platform.OS === 'web' && windowWidth > 768;
+
     const { agendamento } = route.params || {};
     const [loadingAcao, setLoadingAcao] = useState(false);
     const [loadingAvaliacao, setLoadingAvaliacao] = useState(true);
@@ -300,51 +306,80 @@ export default function DetalhesAgendamento({ route, navigation }) {
 
     const podeAvaliar = agendamento?.status === 'concluido' && !jaAvaliado;
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Detalhes do Agendamento</Text>
+    const MainContent = (
+        <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.scrollContent}
+            contentContainerStyle={[styles.content, isLargeScreen && styles.contentLarge]}
+        >
+            <View style={isLargeScreen ? styles.webContainer : null}>
+                <View style={[styles.header, isLargeScreen && styles.headerLarge]}>
+                    <View style={styles.headerCircle} />
+                    <View style={styles.headerCircleTwo} />
+                    {!isLargeScreen && (
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => navigation.goBack()}
+                        >
+                            <Ionicons name="arrow-back" size={24} color="#FFF" />
+                        </TouchableOpacity>
+                    )}
+                    <View style={styles.headerContent}>
+                        <Text style={styles.title}>Detalhes do Agendamento</Text>
 
-                    <View style={styles.badgesRow}>
-                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
-                            <Ionicons
-                                name={statusConfig.icon}
-                                size={16}
-                                color={statusConfig.cor}
-                            />
-                            <Text style={[styles.statusText, { color: statusConfig.cor }]}>
-                                {statusConfig.label}
-                            </Text>
-                        </View>
+                        <View style={styles.badgesRow}>
+                            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+                                <Ionicons
+                                    name={statusConfig.icon}
+                                    size={16}
+                                    color={statusConfig.cor}
+                                />
+                                <Text style={[styles.statusText, { color: statusConfig.cor }]}>
+                                    {statusConfig.label}
+                                </Text>
+                            </View>
 
-                        <View style={[styles.origemBadge, { backgroundColor: origemStyle.bg }]}>
-                            <Ionicons name={origemStyle.icon} size={14} color={origemStyle.color} />
-                            <Text style={[styles.origemText, { color: origemStyle.color }]}>
-                                {origemStyle.label}
-                            </Text>
+                            <View style={[styles.origemBadge, { backgroundColor: origemStyle.bg }]}>
+                                <Ionicons name={origemStyle.icon} size={14} color={origemStyle.color} />
+                                <Text style={[styles.origemText, { color: origemStyle.color }]}>
+                                    {origemStyle.label}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Profissional</Text>
+                <View style={isLargeScreen ? styles.cardsRow : null}>
+                    <View style={[styles.card, isLargeScreen && styles.cardHalf]}>
+                        <Text style={styles.sectionTitle}>Profissional</Text>
 
-                    <View style={styles.profissionalBox}>
-                        {fotoProfissional ? (
-                            <Image source={{ uri: fotoProfissional }} style={styles.avatar} />
-                        ) : (
-                            <View style={styles.avatarFallback}>
-                                <Text style={styles.avatarFallbackText}>
-                                    {getInicialNome(nomeProfissional)}
+                        <View style={styles.profissionalBox}>
+                            {fotoProfissional ? (
+                                <Image source={{ uri: fotoProfissional }} style={styles.avatar} />
+                            ) : (
+                                <View style={styles.avatarFallback}>
+                                    <Text style={styles.avatarFallbackText}>
+                                        {getInicialNome(nomeProfissional)}
+                                    </Text>
+                                </View>
+                            )}
+
+                            <View style={styles.profissionalInfo}>
+                                <Text style={styles.profissionalNome}>{nomeProfissional}</Text>
+                                <Text style={styles.profissionalSub}>
+                                    {agendamento?.clinicaNome || 'Atendimento agendado pelo app'}
                                 </Text>
                             </View>
-                        )}
+                        </View>
+                    </View>
 
-                        <View style={styles.profissionalInfo}>
-                            <Text style={styles.profissionalNome}>{nomeProfissional}</Text>
-                            <Text style={styles.profissionalSub}>
-                                {agendamento?.clinicaNome || 'Atendimento agendado pelo app'}
+                    <View style={[styles.card, isLargeScreen && styles.cardHalf]}>
+                        <Text style={styles.sectionTitle}>Data e horário</Text>
+
+                        <View style={styles.infoRow}>
+                            <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                            <Text style={styles.infoText}>
+                                {agendamento?.data} às {agendamento?.horario}
                             </Text>
                         </View>
                     </View>
@@ -370,17 +405,6 @@ export default function DetalhesAgendamento({ route, navigation }) {
                         <Text style={styles.totalLabel}>TOTAL</Text>
                         <Text style={styles.totalValue}>
                             {formatarMoeda(totalAgendamento)}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Data e horário</Text>
-
-                    <View style={styles.infoRow}>
-                        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-                        <Text style={styles.infoText}>
-                            {agendamento?.data} às {agendamento?.horario}
                         </Text>
                     </View>
                 </View>
@@ -425,67 +449,71 @@ export default function DetalhesAgendamento({ route, navigation }) {
                 <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Contato</Text>
 
-                    <TouchableOpacity
-                        style={styles.whatsBtn}
-                        onPress={abrirWhatsAppProfissional}
-                    >
-                        <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
-                        <Text style={styles.whatsText}>
-                            Chamar no WhatsApp com mensagem pronta
-                        </Text>
-                    </TouchableOpacity>
+                    <View style={isLargeScreen ? styles.actionsRowDesktop : null}>
+                        <TouchableOpacity
+                            style={[styles.whatsBtn, isLargeScreen && styles.actionBtnDesktop]}
+                            onPress={abrirWhatsAppProfissional}
+                        >
+                            <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                            <Text style={styles.whatsText}>
+                                Chamar no WhatsApp
+                            </Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.paymentBtn}
-                        onPress={abrirTelaPagamento}
-                    >
-                        <Ionicons name="wallet-outline" size={20} color="#FFF" />
-                        <Text style={styles.btnText}>VER COBRANÇA / PAGAMENTO</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.paymentBtn, isLargeScreen && styles.actionBtnDesktop]}
+                            onPress={abrirTelaPagamento}
+                        >
+                            <Ionicons name="wallet-outline" size={20} color="#FFF" />
+                            <Text style={styles.btnText}>VER COBRANÇA</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                {podeCancelar(agendamento?.status) && (
-                    <View style={styles.actionArea}>
-                        {loadingAcao ? (
-                            <ActivityIndicator
-                                size="large"
-                                color={colors.primary}
-                            />
-                        ) : (
+                <View style={isLargeScreen ? styles.actionsRowDesktop : null}>
+                    {podeCancelar(agendamento?.status) && (
+                        <View style={[styles.actionArea, isLargeScreen && styles.actionBtnDesktop]}>
+                            {loadingAcao ? (
+                                <ActivityIndicator
+                                    size="large"
+                                    color={colors.primary}
+                                />
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.cancelBtn}
+                                    onPress={cancelarAgendamento}
+                                >
+                                    <Ionicons
+                                        name="close-circle-outline"
+                                        size={20}
+                                        color="#FFF"
+                                    />
+                                    <Text style={styles.btnText}>
+                                        CANCELAR AGENDAMENTO
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
+
+                    {!loadingAvaliacao && podeAvaliar && (
+                        <View style={[styles.actionArea, isLargeScreen && styles.actionBtnDesktop]}>
                             <TouchableOpacity
-                                style={styles.cancelBtn}
-                                onPress={cancelarAgendamento}
+                                style={styles.rateBtn}
+                                onPress={abrirTelaAvaliacao}
                             >
                                 <Ionicons
-                                    name="close-circle-outline"
+                                    name="star-outline"
                                     size={20}
                                     color="#FFF"
                                 />
                                 <Text style={styles.btnText}>
-                                    CANCELAR AGENDAMENTO
+                                    AVALIAR ATENDIMENTO
                                 </Text>
                             </TouchableOpacity>
-                        )}
-                    </View>
-                )}
-
-                {!loadingAvaliacao && podeAvaliar && (
-                    <View style={styles.actionArea}>
-                        <TouchableOpacity
-                            style={styles.rateBtn}
-                            onPress={abrirTelaAvaliacao}
-                        >
-                            <Ionicons
-                                name="star-outline"
-                                size={20}
-                                color="#FFF"
-                            />
-                            <Text style={styles.btnText}>
-                                AVALIAR ATENDIMENTO
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                        </View>
+                    )}
+                </View>
 
                 {!loadingAvaliacao &&
                     agendamento?.status === 'concluido' &&
@@ -510,350 +538,397 @@ export default function DetalhesAgendamento({ route, navigation }) {
                         VOLTAR
                     </Text>
                 </TouchableOpacity>
-            </ScrollView>
-        </SafeAreaView>
+            </View>
+        </ScrollView>
+    );
+
+    return (
+        <View style={styles.screenContainer}>
+            {isLargeScreen ? (
+                <View style={styles.webLayout}>
+                    <Sidebar navigation={navigation} activeRoute="MeusAgendamentosCliente" />
+                    <View style={styles.webContentArea}>
+                        {MainContent}
+                    </View>
+                </View>
+            ) : (
+                <SafeAreaView style={styles.container}>
+                    {MainContent}
+                </SafeAreaView>
+            )}
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    screenContainer: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+    },
+    webLayout: {
+        flex: 1,
+        flexDirection: 'row',
+        height: '100vh',
+        overflow: 'hidden',
+    },
+    webContentArea: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        height: '100%',
+        display: 'flex',
+        overflow: Platform.OS === 'web' ? 'auto' : 'hidden',
+    },
     container: {
         flex: 1,
-        backgroundColor: '#EEF3F9',
     },
-
     content: {
-        paddingBottom: 28,
+        padding: 16,
+        paddingBottom: 40,
     },
-
+    contentLarge: {
+        padding: 40,
+        paddingTop: 48,
+        maxWidth: 1200,
+        alignSelf: 'center',
+        width: '100%',
+    },
+    scrollContent: {
+        flex: 1,
+        height: Platform.OS === 'web' ? '100%' : 'auto',
+    },
+    webContainer: {
+        width: '100%',
+    },
+    backButton: {
+        marginBottom: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionsRowDesktop: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    actionBtnDesktop: {
+        flex: 1,
+    },
     header: {
-        padding: 20,
         backgroundColor: colors.primary,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        borderRadius: 24,
+        padding: 24,
+        marginBottom: 20,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
+        overflow: 'hidden',
     },
-
+    headerLarge: {
+        marginBottom: 24,
+    },
+    headerCircle: {
+        position: 'absolute',
+        width: 130,
+        height: 130,
+        borderRadius: 65,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: -34,
+        right: -18,
+    },
+    headerCircleTwo: {
+        position: 'absolute',
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        bottom: -18,
+        left: -10,
+    },
+    headerContent: {
+        zIndex: 2,
+    },
     title: {
         fontSize: 22,
         fontWeight: '800',
         color: '#FFF',
+        marginBottom: 12,
     },
-
     badgesRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginTop: 12,
+        gap: 10,
     },
-
     statusBadge: {
-        alignSelf: 'flex-start',
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 20,
-        marginRight: 8,
-        marginBottom: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
     },
-
     statusText: {
+        fontSize: 13,
+        fontWeight: '700',
         marginLeft: 6,
-        fontWeight: '800',
-        fontSize: 12,
     },
-
     origemBadge: {
-        alignSelf: 'flex-start',
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 20,
-        marginBottom: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
     },
-
     origemText: {
-        marginLeft: 6,
-        fontWeight: '800',
         fontSize: 12,
+        fontWeight: '700',
+        marginLeft: 6,
     },
-
+    cardsRow: {
+        flexDirection: 'row',
+        gap: 20,
+        marginBottom: 20,
+    },
     card: {
         backgroundColor: '#FFF',
-        marginHorizontal: 16,
-        marginTop: 16,
-        padding: 18,
-        borderRadius: 18,
-        elevation: 3,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
         shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-        borderWidth: 1,
-        borderColor: '#E8EDF5',
+        elevation: 2,
     },
-
+    cardHalf: {
+        flex: 1,
+        marginBottom: 0,
+    },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '800',
-        color: colors.textDark,
-        marginBottom: 14,
+        color: '#1E293B',
+        marginBottom: 16,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-
     profissionalBox: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-
     avatar: {
-        width: 58,
-        height: 58,
-        borderRadius: 29,
-        backgroundColor: '#EDEFF3',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
     },
-
     avatarFallback: {
-        width: 58,
-        height: 58,
-        borderRadius: 29,
-        backgroundColor: `${colors.primary}18`,
-        alignItems: 'center',
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: `${colors.primary}15`,
         justifyContent: 'center',
+        alignItems: 'center',
     },
-
     avatarFallbackText: {
-        fontSize: 20,
+        fontSize: 24,
         fontWeight: '800',
         color: colors.primary,
     },
-
     profissionalInfo: {
         flex: 1,
-        marginLeft: 14,
+        marginLeft: 16,
     },
-
     profissionalNome: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '800',
-        color: colors.textDark,
+        color: '#1E293B',
     },
-
     profissionalSub: {
-        marginTop: 4,
-        fontSize: 13,
-        color: colors.secondary,
+        fontSize: 14,
+        color: '#64748B',
+        marginTop: 2,
     },
-
     itemServico: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
-        paddingBottom: 10,
+        paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#F1F3F5',
+        borderBottomColor: '#F1F5F9',
     },
-
     itemServicoLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-        paddingRight: 12,
     },
-
     servicoNome: {
-        fontSize: 14,
-        color: '#444',
-        marginLeft: 8,
-        flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginLeft: 10,
     },
-
     servicoPreco: {
-        fontWeight: '800',
-        color: colors.textDark,
-    },
-
-    totalRow: {
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderColor: '#EEE',
-        paddingTop: 14,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-
-    totalLabel: {
-        fontWeight: '800',
-        color: colors.textDark,
-    },
-
-    totalValue: {
-        fontSize: 19,
-        fontWeight: '800',
+        fontSize: 15,
+        fontWeight: '700',
         color: colors.primary,
     },
-
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 2,
+        borderTopColor: '#F1F5F9',
+    },
+    totalLabel: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1E293B',
+    },
+    totalValue: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#10B981',
+    },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-
-    infoText: {
-        fontSize: 15,
-        color: '#333',
-        marginLeft: 10,
-        flex: 1,
-    },
-
-    whatsBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F0FFF4',
-        padding: 14,
+        backgroundColor: '#F8FAFC',
+        padding: 16,
         borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#D8F5E3',
     },
-
-    whatsText: {
-        marginLeft: 8,
-        fontWeight: '700',
-        color: '#25D366',
-        flex: 1,
+    infoText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1E293B',
+        marginLeft: 12,
     },
-
     pagamentoResumoBox: {
-        backgroundColor: '#F7F9FC',
-        borderRadius: 14,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#E4EAF1',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 16,
+        padding: 16,
     },
-
     pagamentoTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 12,
+        marginBottom: 16,
     },
-
     pagamentoFormaText: {
         fontSize: 15,
-        fontWeight: '800',
-        color: colors.textDark,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginBottom: 6,
     },
-
     pagamentoStatusBadge: {
-        marginTop: 8,
-        alignSelf: 'flex-start',
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 16,
         paddingHorizontal: 10,
-        paddingVertical: 7,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
-
     pagamentoStatusText: {
-        marginLeft: 6,
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '700',
+        marginLeft: 6,
     },
-
     pagamentoValorText: {
         fontSize: 18,
         fontWeight: '800',
-        color: colors.primary,
+        color: '#1E293B',
     },
-
     pagamentoButtonInline: {
         backgroundColor: colors.primary,
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        alignSelf: 'flex-start',
+        paddingVertical: 12,
+        borderRadius: 12,
     },
-
     pagamentoButtonInlineText: {
         color: '#FFF',
-        fontWeight: '800',
+        fontWeight: '700',
         marginLeft: 8,
+        fontSize: 14,
     },
-
+    whatsBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: '#25D366',
+        backgroundColor: '#FFF',
+        marginBottom: 12,
+    },
+    whatsText: {
+        marginLeft: 10,
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#128C7E',
+    },
     paymentBtn: {
-        marginTop: 14,
-        backgroundColor: colors.primary,
-        padding: 16,
-        borderRadius: 14,
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: colors.primary,
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 3,
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 14,
+        backgroundColor: colors.primary,
     },
-
     actionArea: {
-        marginHorizontal: 16,
-        marginTop: 16,
+        marginBottom: 16,
     },
-
+    actionsRowDesktop: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    actionAreaDesktop: {
+        flex: 1,
+    },
     cancelBtn: {
-        backgroundColor: '#E74C3C',
-        padding: 16,
-        borderRadius: 14,
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#E74C3C',
-        shadowOpacity: 0.14,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 2,
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 16,
+        backgroundColor: '#EF4444',
     },
-
     rateBtn: {
-        backgroundColor: colors.primary,
-        padding: 16,
-        borderRadius: 14,
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: colors.primary,
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 3,
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 16,
+        backgroundColor: '#F59E0B',
     },
-
     btnText: {
         color: '#FFF',
         fontWeight: '800',
-        marginLeft: 8,
+        marginLeft: 10,
+        fontSize: 14,
     },
-
     avaliadoBox: {
-        marginHorizontal: 16,
-        marginTop: 16,
-        backgroundColor: '#F0FFF4',
-        borderRadius: 12,
-        padding: 14,
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        backgroundColor: '#ECFDF5',
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: '#D8F5E3',
+        borderColor: '#10B981',
     },
-
     avaliadoText: {
-        color: '#27AE60',
-        marginLeft: 6,
-        fontWeight: '800',
+        marginLeft: 10,
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#059669',
     },
-
     btnVoltar: {
         marginHorizontal: 16,
         marginTop: 16,
@@ -862,9 +937,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFF',
         borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#E8EDF5',
+        borderColor: '#E2E8F0',
     },
-
     btnVoltarTxt: {
         color: colors.primary,
         fontWeight: '800',

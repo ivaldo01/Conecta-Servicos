@@ -1,210 +1,319 @@
-import React, { useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
+  TouchableOpacity,
+  ScrollView,
   Alert,
-  KeyboardAvoidingView,
+  ActivityIndicator,
+  useWindowDimensions,
   Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from 'react-native';
-import { auth, db } from "../../services/firebaseConfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import colors from "../../constants/colors";
-import CustomButton from '../../components/CustomButton';
-
-function formatCPF(value) {
-  return String(value || '')
-    .replace(/\D/g, '')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d)/, '$1.$2')
-    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-    .slice(0, 14);
-}
-
-function formatTelefone(value) {
-  return String(value || '')
-    .replace(/\D/g, '')
-    .replace(/(\d{2})(\d)/, '($1) $2')
-    .replace(/(\d{5})(\d)/, '$1-$2')
-    .slice(0, 15);
-}
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { auth, db } from '../../services/firebaseConfig';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
+import colors from '../../constants/colors';
+import Sidebar from '../../components/Sidebar';
 
 export default function CadastroMenor({ navigation }) {
+  const { width } = useWindowDimensions();
+  const isLargeScreen = Platform.OS === 'web' && width > 768;
+
   const [nome, setNome] = useState('');
-  const [idade, setIdade] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [telefone, setTelefone] = useState('');
+  const [dataNascimento, setDataNascimento] = useState('');
+  const [parentesco, setParentesco] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const idadeRef = useRef(null);
-  const cpfRef = useRef(null);
-  const telefoneRef = useRef(null);
+  const formatarData = (text) => {
+    const cleaned = text.replace(/\D/g, '');
+    let formatted = cleaned;
+    if (cleaned.length > 2) {
+      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
+    }
+    if (cleaned.length > 4) {
+      formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
+    }
+    setDataNascimento(formatted);
+  };
 
-  const handleSave = async () => {
-    Keyboard.dismiss();
-
-    const user = auth.currentUser;
-
-    if (!user?.uid) {
-      Alert.alert("Erro", "Usuário não autenticado.");
+  const handleSalvar = async () => {
+    if (!nome || !dataNascimento || !parentesco) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos.');
       return;
     }
 
-    if (!nome.trim() || !idade.trim()) {
-      Alert.alert("Atenção", "Preencha o nome e a idade.");
+    if (dataNascimento.length !== 10) {
+      Alert.alert('Erro', 'Data de nascimento inválida.');
       return;
     }
 
+    setLoading(true);
     try {
-      await addDoc(collection(db, "usuarios", user.uid, "menores"), {
-        nome: nome.trim(),
-        idade: idade.trim(),
-        cpf: cpf.trim(),
-        telefone: telefone.trim(),
-        responsavelId: user.uid,
-        consentimento: true,
+      const user = auth.currentUser;
+      if (!user) return;
+
+      await addDoc(collection(db, 'usuarios', user.uid, 'dependentes'), {
+        nome,
+        dataNascimento,
+        parentesco,
         criadoEm: serverTimestamp(),
-        atualizadoEm: serverTimestamp(),
       });
 
-      Alert.alert("Sucesso", "Dependente cadastrado com sucesso!");
+      Alert.alert('Sucesso', 'Dependente cadastrado com sucesso!');
       navigation.goBack();
-    } catch (e) {
-      console.log("Erro ao cadastrar menor:", e);
-      Alert.alert("Erro", e.message || "Não foi possível cadastrar o dependente.");
+    } catch (error) {
+      console.log('Erro ao cadastrar dependente:', error);
+      Alert.alert('Erro', 'Não foi possível salvar o dependente.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+  const MainContent = (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.scrollContent, isLargeScreen && styles.scrollContentLarge]}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.title}>Novo Dependente</Text>
-          <Text style={styles.subtitle}>
-            Cadastre um menor para poder agendar atendimentos em nome dele.
-          </Text>
+      <View style={isLargeScreen ? styles.webContainer : null}>
+        <View style={[styles.header, isLargeScreen && styles.headerLarge]}>
+          {!isLargeScreen && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFF" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.titleArea}>
+            <Text style={[styles.title, isLargeScreen && styles.titleLarge]}>Novo Dependente</Text>
+            <Text style={[styles.subtitle, isLargeScreen && styles.subtitleLarge]}>Cadastre um menor para agendamentos</Text>
+          </View>
+        </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Nome do menor"
-            value={nome}
-            onChangeText={setNome}
-            returnKeyType="next"
-            onSubmitEditing={() => idadeRef.current?.focus()}
-          />
-
-          <TextInput
-            ref={idadeRef}
-            style={styles.input}
-            placeholder="Idade"
-            value={idade}
-            onChangeText={setIdade}
-            keyboardType="numeric"
-            returnKeyType="next"
-            onSubmitEditing={() => cpfRef.current?.focus()}
-          />
-
-          <TextInput
-            ref={cpfRef}
-            style={styles.input}
-            placeholder="CPF (opcional)"
-            value={cpf}
-            onChangeText={(text) => setCpf(formatCPF(text))}
-            keyboardType="numeric"
-            returnKeyType="next"
-            onSubmitEditing={() => telefoneRef.current?.focus()}
-          />
-
-          <TextInput
-            ref={telefoneRef}
-            style={styles.input}
-            placeholder="Telefone (opcional)"
-            value={telefone}
-            onChangeText={(text) => setTelefone(formatTelefone(text))}
-            keyboardType="numeric"
-            returnKeyType="done"
-            onSubmitEditing={handleSave}
-          />
-
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              Ao cadastrar, você declara ser o responsável legal pelo menor.
-            </Text>
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nome Completo</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Nome do dependente"
+                value={nome}
+                onChangeText={setNome}
+              />
+            </View>
           </View>
 
-          <CustomButton
-            title="Salvar Dependente"
-            icon="save"
-            color={colors.primary}
-            onPress={handleSave}
-          />
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Data de Nascimento</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="calendar-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="DD/MM/AAAA"
+                value={dataNascimento}
+                onChangeText={formatarData}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Parentesco</Text>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="people-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: Filho, Sobrinho, etc."
+                value={parentesco}
+                onChangeText={setParentesco}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleSalvar}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" />
+                <Text style={styles.buttonText}>Salvar Dependente</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <View style={styles.screenContainer}>
+      {isLargeScreen ? (
+        <View style={styles.webLayout}>
+          <Sidebar navigation={navigation} activeRoute="Perfil" />
+          <View style={styles.webContentArea}>
+            {MainContent}
+          </View>
+        </View>
+      ) : (
+        <SafeAreaView style={{ flex: 1 }}>
+          {MainContent}
+        </SafeAreaView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
+  screenContainer: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-
+  webLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    height: '100vh',
+    overflow: 'hidden',
+  },
+  webContentArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    height: '100%',
+    display: 'flex',
+    overflow: Platform.OS === 'web' ? 'auto' : 'hidden',
+  },
   container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: colors.background,
     paddingBottom: 40,
   },
-
+  scrollContentLarge: {
+    padding: 40,
+    paddingTop: 48,
+  },
+  webContainer: {
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    backgroundColor: colors.primary,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+  },
+  headerLarge: {
+    paddingTop: 32,
+    paddingBottom: 32,
+    borderRadius: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  titleArea: {
+    flex: 1,
+  },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: colors.textDark,
+    fontWeight: '800',
+    color: '#FFF',
   },
-
+  titleLarge: {
+    color: '#1E293B',
+    fontSize: 32,
+  },
   subtitle: {
     fontSize: 14,
-    color: colors.secondary,
-    marginBottom: 20,
-    lineHeight: 20,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
-
-  input: {
+  subtitleLarge: {
+    color: '#64748B',
+    fontSize: 16,
+  },
+  form: {
+    marginTop: 24,
+    gap: 20,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    marginLeft: 4,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFF',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#DDD',
-    color: colors.textDark,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 52,
   },
-
-  infoBox: {
-    marginBottom: 20,
-    backgroundColor: '#FFF7E8',
-    borderRadius: 10,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#FFE0A8',
+  inputIcon: {
+    marginRight: 10,
   },
-
-  infoText: {
-    fontSize: 13,
-    color: '#7A5C00',
-    textAlign: 'center',
-    lineHeight: 18,
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    height: 56,
+    borderRadius: 16,
+    marginTop: 12,
+    gap: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });

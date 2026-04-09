@@ -7,6 +7,8 @@ import {
   Alert,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
 import { collection, doc, getDocs, deleteDoc } from "firebase/firestore";
@@ -14,8 +16,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import CustomButton from '../../components/CustomButton';
+import Sidebar from '../../components/Sidebar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 function ListaMenores({ navigation }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isLargeScreen = Platform.OS === 'web' && windowWidth > 768;
+
   const [menores, setMenores] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,32 +93,127 @@ function ListaMenores({ navigation }) {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{item.nome || "Sem nome"}</Text>
-      <Text style={styles.cardText}>Idade: {item.idade || "-"}</Text>
+    <View style={[styles.card, isLargeScreen && styles.cardLarge]}>
+      <View style={styles.cardHeader}>
+        <View style={styles.avatarMini}>
+          <Text style={styles.avatarMiniText}>{getInicialNome(item.nome)}</Text>
+        </View>
+        <View style={styles.cardHeaderInfo}>
+          <Text style={styles.cardTitle}>{item.nome || "Sem nome"}</Text>
+          <Text style={styles.cardText}>Idade: {item.idade || "-"}</Text>
+        </View>
+      </View>
 
-      {!!item.cpf && (
-        <Text style={styles.cardText}>CPF: {item.cpf}</Text>
-      )}
+      <View style={styles.cardDetails}>
+        {!!item.cpf && (
+          <View style={styles.detailRow}>
+            <Ionicons name="card-outline" size={14} color="#64748B" />
+            <Text style={styles.cardTextDetail}>CPF: {item.cpf}</Text>
+          </View>
+        )}
 
-      {!!item.telefone && (
-        <Text style={styles.cardText}>Telefone: {item.telefone}</Text>
-      )}
+        {!!item.telefone && (
+          <View style={styles.detailRow}>
+            <Ionicons name="call-outline" size={14} color="#64748B" />
+            <Text style={styles.cardTextDetail}>Telefone: {item.telefone}</Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.cardButtons}>
-        <CustomButton
-          title="Editar"
-          icon="create"
-          color={colors.success}
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.editBtn]}
           onPress={() => navigation.navigate("EditarMenor", { menorId: item.id })}
-        />
-        <CustomButton
-          title="Excluir"
-          icon="trash"
-          color={colors.danger}
+        >
+          <Ionicons name="create-outline" size={18} color={colors.primary} />
+          <Text style={styles.editBtnText}>Editar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.deleteBtn]}
           onPress={() => handleDelete(item.id)}
-        />
+        >
+          <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          <Text style={styles.deleteBtnText}>Excluir</Text>
+        </TouchableOpacity>
       </View>
+    </View>
+  );
+
+  const getInicialNome = (nome) => {
+    return nome ? nome.charAt(0).toUpperCase() : 'D';
+  };
+
+  const MainContent = (
+    <View style={[styles.mainContent, isLargeScreen && styles.mainContentLarge]}>
+      <View style={isLargeScreen ? styles.webContainer : null}>
+        <View style={[styles.header, isLargeScreen && styles.headerLarge]}>
+          <View style={styles.headerTextArea}>
+            <Text style={styles.title}>Meus Dependentes</Text>
+            <Text style={styles.subtitle}>
+              Cadastre menores para agendar atendimentos em nome deles.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.addTopButton}
+            activeOpacity={0.9}
+            onPress={irParaCadastro}
+          >
+            <Ionicons name="add" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+
+        {menores.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconBox}>
+              <Ionicons name="people-outline" size={48} color={colors.primary} />
+            </View>
+
+            <Text style={styles.emptyTitle}>Nenhum dependente cadastrado</Text>
+            <Text style={styles.emptyText}>
+              Cadastre um menor para poder realizar agendamentos para ele.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={irParaCadastro}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#FFF" />
+              <Text style={styles.emptyButtonText}>Cadastrar dependente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={isLargeScreen ? styles.gridDesktop : null}>
+            {isLargeScreen ? (
+              menores.map((item) => (
+                <View key={item.id} style={styles.gridItemDesktop}>
+                  {renderItem({ item })}
+                </View>
+              ))
+            ) : (
+              <FlatList
+                data={menores}
+                keyExtractor={(item) => item.id}
+                renderItem={renderItem}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
+        )}
+      </View>
+
+      {!isLargeScreen && menores.length > 0 && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={irParaCadastro}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="add" size={28} color="#FFF" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -125,234 +227,285 @@ function ListaMenores({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTextArea}>
-          <Text style={styles.title}>Meus Dependentes</Text>
-          <Text style={styles.subtitle}>
-            Cadastre menores para agendar atendimentos em nome deles.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.addTopButton}
-          activeOpacity={0.9}
-          onPress={irParaCadastro}
-        >
-          <Ionicons name="add" size={20} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.topActionArea}>
-        <CustomButton
-          title="Novo Dependente"
-          icon="person-add"
-          color={colors.primary}
-          onPress={irParaCadastro}
-        />
-      </View>
-
-      {menores.length === 0 ? (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIconBox}>
-            <Ionicons name="people-outline" size={30} color={colors.primary} />
+    <View style={styles.screenContainer}>
+      {isLargeScreen ? (
+        <View style={styles.webLayout}>
+          <Sidebar navigation={navigation} activeRoute="Perfil" />
+          <View style={styles.webContentArea}>
+            {MainContent}
           </View>
-
-          <Text style={styles.emptyTitle}>Nenhum dependente cadastrado</Text>
-          <Text style={styles.emptyText}>
-            Cadastre um menor para poder realizar agendamentos para ele.
-          </Text>
-
-          <TouchableOpacity
-            style={styles.emptyButton}
-            onPress={irParaCadastro}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#FFF" />
-            <Text style={styles.emptyButtonText}>Cadastrar dependente</Text>
-          </TouchableOpacity>
         </View>
       ) : (
-        <>
-          <FlatList
-            data={menores}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={irParaCadastro}
-            activeOpacity={0.9}
-          >
-            <Ionicons name="add" size={28} color="#FFF" />
-          </TouchableOpacity>
-        </>
+        <SafeAreaView style={styles.container} edges={['top']}>
+          {MainContent}
+        </SafeAreaView>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  webLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    height: '100vh',
+    overflow: 'hidden',
+  },
+  webContentArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    height: '100%',
+    display: 'flex',
+    overflow: Platform.OS === 'web' ? 'auto' : 'hidden',
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8FAFC',
+  },
+  mainContent: {
+    flex: 1,
     padding: 20,
   },
-
+  mainContentLarge: {
+    padding: 40,
+    paddingTop: 48,
+  },
+  webContainer: {
+    maxWidth: 1000,
+    alignSelf: 'center',
+    width: '100%',
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: '#F8FAFC',
   },
-
   loadingText: {
     marginTop: 12,
-    color: colors.secondary,
+    color: '#64748B',
     fontSize: 14,
   },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
+    alignItems: 'center',
+    marginBottom: 24,
+    backgroundColor: colors.primary,
+    padding: 24,
+    borderRadius: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
-
+  headerLarge: {
+    marginBottom: 32,
+  },
   headerTextArea: {
     flex: 1,
     paddingRight: 12,
   },
-
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.textDark,
+    fontWeight: '800',
+    color: '#FFF',
   },
-
   subtitle: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 14,
-    color: colors.secondary,
+    color: 'rgba(255,255,255,0.8)',
     lineHeight: 20,
   },
-
   addTopButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-
-  topActionArea: {
-    marginBottom: 14,
+  gridDesktop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 20,
   },
-
+  gridItemDesktop: {
+    width: '31.5%',
+  },
   listContent: {
     paddingBottom: 100,
   },
-
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 40,
+    marginTop: 60,
   },
-
   emptyIconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: `${colors.primary}15`,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: `${colors.primary}10`,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textDark,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1E293B',
     marginBottom: 8,
     textAlign: 'center',
   },
-
   emptyText: {
-    color: '#888',
-    fontSize: 14,
+    color: '#64748B',
+    fontSize: 15,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 18,
+    lineHeight: 22,
+    marginBottom: 24,
   },
-
   emptyButton: {
-    height: 48,
-    paddingHorizontal: 18,
-    borderRadius: 14,
+    height: 52,
+    paddingHorizontal: 24,
+    borderRadius: 16,
     backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-
   emptyButtonText: {
-    marginLeft: 8,
+    marginLeft: 10,
     color: '#FFF',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 15,
   },
-
   card: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
-    elevation: 3,
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
-
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
+  cardLarge: {
+    marginBottom: 0,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatarMini: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: `${colors.primary}15`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarMiniText: {
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.primary,
   },
-
+  cardHeaderInfo: {
+    marginLeft: 14,
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
   cardText: {
     fontSize: 14,
-    marginBottom: 3,
-    color: '#555',
+    color: '#64748B',
+    marginTop: 2,
   },
-
+  cardDetails: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  cardTextDetail: {
+    fontSize: 13,
+    color: '#475569',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
   cardButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
+    gap: 12,
   },
-
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  editBtn: {
+    borderColor: `${colors.primary}30`,
+    backgroundColor: `${colors.primary}05`,
+  },
+  deleteBtn: {
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FEF2F2',
+  },
+  editBtnText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  deleteBtnText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
   fab: {
     position: 'absolute',
-    right: 22,
-    bottom: 22,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    right: 24,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
 });
 

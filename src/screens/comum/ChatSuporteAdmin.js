@@ -23,7 +23,10 @@ import {
     serverTimestamp,
     doc,
     updateDoc,
-    increment
+    increment,
+    where,
+    getDocs,
+    limit as firestoreLimit
 } from 'firebase/firestore';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
@@ -35,6 +38,7 @@ export default function ChatSuporteAdmin({ route, navigation }) {
     const [mensagens, setMensagens] = useState([]);
     const [novaMensagem, setNovaMensagem] = useState('');
     const [loading, setLoading] = useState(true);
+    const [processandoSaque, setProcessandoSaque] = useState(false);
     const flatListRef = useRef();
     const soundRef = useRef();
 
@@ -141,24 +145,166 @@ export default function ChatSuporteAdmin({ route, navigation }) {
         }
     };
 
+    const gerenciarStatusSaque = async (mensagemId, novoStatus, saqueIdExistente = null, valorSaqueExistente = null) => {
+        if (processandoSaque) return;
+
+        Alert.alert(
+            novoStatus === 'concluido' ? 'Confirmar Saque' : 'Recusar Saque',
+            novoStatus === 'concluido' 
+                ? 'Você confirma que já realizou a transferência Pix e deseja marcar como CONCLUÍDO?'
+                : 'Deseja recusar esta solicitação de saque?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Confirmar',
+                    onPress: async () => {
+                        try {
+                            setProcessandoSaque(true);
+
+                            let saqueId = saqueIdExistente;
+                            let valorSaque = valorSaqueExistente;
+
+                            // Se não tivermos o ID direto (mensagens antigas), fazemos a query que exige índice
+                            if (!saqueId) {
+                                console.log('Buscando saque via query (fallback)...');
+                                const saquesRef = collection(db, 'saques');
+                                const q = query(
+                                    saquesRef, 
+                                    where('userId', '==', userId), 
+                                    where('status', '==', 'pendente'),
+                                    orderBy('criadoEm', 'desc'),
+                                    firestoreLimit(1)
+                                );
+                                
+                                const querySnapshot = await getDocs(q);
+                                
+                                if (querySnapshot.empty) {
+                                    throw new Error('Nenhuma solicitação de saque pendente encontrada.');
+                                }
+
+                                const saqueDoc = querySnapshot.docs[0];
+                                saqueId = saqueDoc.id;
+                                valorSaque = saqueDoc.data().valor || 0;
+                            }
+
+                            // 2. Atualizar o status do saque na coleção 'saques'
+                            await updateDoc(doc(db, 'saques', saqueId), {
+                                status: novoStatus,
+                                atualizadoEm: serverTimestamp(),
+                                finalizadoEm: serverTimestamp()
+                            });
+
+                            // 3. Atualizar a mensagem no chat de suporte para desativar os botões
+                            await updateDoc(doc(db, 'suporte', userId, 'mensagens', mensagemId), {
+                                statusSaque: novoStatus,
+                                processadoEm: serverTimestamp()
+                            });
+
+                            // 4. Se for RECUSADO, devolver o saldo ao profissional
+                            if (novoStatus === 'recusado' && valorSaque > 0) {
+                                const saldoRef = doc(db, 'saldos', userId);
+                                await updateDoc(saldoRef, {
+                                    valor: increment(valorSaque),
+                                    saldoDisponivel: increment(valorSaque),
+                                    ultimaAtualizacao: serverTimestamp()
+                                });
+                            }
+
+                            // 5. Enviar mensagem de confirmação no chat
+                            const msgConfirmacao = novoStatus === 'concluido'
+                                ? `✅ Saque de R$ ${Number(valorSaque).toFixed(2)} foi CONCLUÍDO. O comprovante já está disponível no seu financeiro.`
+                                : `❌ Sua solicitação de saque de R$ ${Number(valorSaque).toFixed(2)} foi RECUSADA. O valor foi devolvido ao seu saldo disponível.`;
+
+                            await addDoc(collection(db, 'suporte', userId, 'mensagens'), {
+                                texto: msgConfirmacao,
+                                senderId: 'admin',
+                                createdAt: serverTimestamp(),
+                                isSystem: true
+                            });
+
+                            // 6. Atualizar o chat principal
+                            await updateDoc(doc(db, 'suporte', userId), {
+                                ultimaMensagem: msgConfirmacao,
+                                dataUltimaMensagem: serverTimestamp(),
+                                naoLidasUsuario: increment(1),
+                                temSaquePendente: false
+                            });
+
+                            Alert.alert('Sucesso', `Saque marcado como ${novoStatus.toUpperCase()} com sucesso!`);
+
+                        } catch (error) {
+                            console.error("Erro ao gerenciar saque:", error);
+                            Alert.alert("Erro", error.message || "Não foi possível atualizar o status do saque.");
+                        } finally {
+                            setProcessandoSaque(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const renderItem = ({ item }) => {
         const ehAdmin = item.senderId === 'admin';
+        const ehSaque = item.tipo === 'saque' || item.isSystem;
 
         return (
             <View style={[
                 styles.messageContainer,
-                ehAdmin ? styles.myMessage : styles.userMessage
+                ehAdmin ? styles.myMessage : styles.userMessage,
+                ehSaque && styles.systemMessageContainer
             ]}>
                 <View style={[
                     styles.messageBubble,
-                    ehAdmin ? styles.myBubble : styles.userBubble
+                    ehAdmin ? styles.myBubble : (ehSaque ? styles.saqueBubble : styles.userBubble)
                 ]}>
                     <Text style={[
                         styles.messageText,
-                        ehAdmin ? styles.myMessageText : styles.userMessageText
+                        ehAdmin ? styles.myMessageText : (ehSaque ? styles.saqueMessageText : styles.userMessageText)
                     ]}>
                         {item.texto}
                     </Text>
+
+                    {/* Botões de Ação para Saques Pendentes */}
+                    {item.tipo === 'saque' && !item.statusSaque && (
+                        <View style={styles.actionButtons}>
+                            <TouchableOpacity 
+                                style={[styles.actionButton, styles.approveButton]}
+                                onPress={() => gerenciarStatusSaque(item.id, 'concluido', item.saqueId, item.valorSaque)}
+                                disabled={processandoSaque}
+                            >
+                                {processandoSaque ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="checkmark-circle" size={16} color="#FFF" />
+                                        <Text style={styles.actionButtonText}>Aprovar Saque</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={[styles.actionButton, styles.rejectButton]}
+                                onPress={() => gerenciarStatusSaque(item.id, 'recusado', item.saqueId, item.valorSaque)}
+                                disabled={processandoSaque}
+                            >
+                                <Ionicons name="close-circle" size={16} color="#FFF" />
+                                <Text style={styles.actionButtonText}>Recusar</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Badge de Status se já processado */}
+                    {item.statusSaque && (
+                        <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: item.statusSaque === 'concluido' ? '#4CAF50' : '#F44336' }
+                        ]}>
+                            <Text style={styles.statusBadgeText}>
+                                {item.statusSaque === 'concluido' ? 'SAQUE CONCLUÍDO' : 'SAQUE RECUSADO'}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
         );
@@ -297,6 +443,62 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#E1E8F0',
         alignItems: 'flex-end',
+    },
+    systemMessageContainer: {
+        maxWidth: '90%',
+        alignSelf: 'center',
+    },
+    saqueBubble: {
+        backgroundColor: '#FFF',
+        borderWidth: 1,
+        borderColor: '#E1E8F0',
+        borderRadius: 12,
+        padding: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FF9800', // Alerta para saque
+    },
+    saqueMessageText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        marginTop: 12,
+        justifyContent: 'space-between',
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        flex: 0.48,
+        justifyContent: 'center',
+    },
+    approveButton: {
+        backgroundColor: '#4CAF50',
+    },
+    rejectButton: {
+        backgroundColor: '#F44336',
+    },
+    actionButtonText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '700',
+        marginLeft: 4,
+    },
+    statusBadge: {
+        marginTop: 10,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+    },
+    statusBadgeText: {
+        color: '#FFF',
+        fontSize: 11,
+        fontWeight: '800',
     },
     input: {
         flex: 1,

@@ -142,6 +142,8 @@ function getFormaPagamentoLabel(agendamento) {
             return 'Cartão de crédito';
         case 'cartao_debito':
             return 'Cartão de débito';
+        case 'especie':
+            return 'Dinheiro (Espécie)';
         case 'pix':
         default:
             return 'Pix';
@@ -242,7 +244,8 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
     const podeRecusar = agendamentoAtual?.status === 'pendente';
     const podeConcluir = agendamentoAtual?.status === 'confirmado';
     const cobrancaJaGerada = !!agendamentoAtual?.cobrancaGerada || !!agendamentoAtual?.pagamentoId;
-    const podeControlarCobranca = cobrancaJaGerada && ehChefe;
+    const ehPagamentoEspecie = agendamentoAtual?.formaPagamento === 'especie';
+    const podeControlarCobranca = (cobrancaJaGerada || ehPagamentoEspecie) && ehChefe;
     const pagamentoJaConfirmado = agendamentoAtual?.statusPagamento === 'pago';
     const pagamentoCancelado = agendamentoAtual?.statusPagamento === 'cancelado';
 
@@ -589,6 +592,16 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
             return;
         }
 
+        // Caso seja pagamento em espécie, não gera cobrança no Asaas
+        if (agendamentoAtual?.formaPagamento === 'especie') {
+            Alert.alert(
+                'Pagamento em Espécie',
+                'Para pagamentos em dinheiro, você não precisa gerar uma cobrança digital. Basta clicar em "CONFIRMAR RECEBIMENTO EM ESPÉCIE" quando receber o valor.',
+                [{ text: 'Entendi' }]
+            );
+            return;
+        }
+
         try {
             setLoadingCobranca(true);
 
@@ -718,6 +731,59 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
         } finally {
             setLoadingCobranca(false);
         }
+    };
+
+    const confirmarRecebimentoEspecie = () => {
+        Alert.alert(
+            'Recebimento em Espécie',
+            `Você confirma que recebeu o valor de ${formatarMoeda(totalAgendamento)} em dinheiro diretamente do cliente?\n\nEste valor será registrado apenas para seu controle financeiro.`,
+            [
+                { text: 'Não', style: 'cancel' },
+                {
+                    text: 'Sim, confirmar recebimento',
+                    onPress: async () => {
+                        try {
+                            setLoadingCobranca(true);
+                            const agendamentoRef = doc(db, 'agendamentos', agendamentoAtual.id);
+
+                            // Atualiza o agendamento
+                            const dadosUpdate = {
+                                statusPagamento: 'pago',
+                                pagamentoConfirmado: true,
+                                pagamentoConfirmadoEm: serverTimestamp(),
+                                recebidoEmEspecie: true, // Flag para relatórios
+                                atualizadoEm: serverTimestamp()
+                            };
+
+                            await updateDoc(agendamentoRef, dadosUpdate);
+
+                            setAgendamentoAtual(prev => ({
+                                ...prev,
+                                ...dadosUpdate
+                            }));
+
+                            if (agendamentoAtual?.clienteId) {
+                                await salvarNotificacaoSistema({
+                                    userId: agendamentoAtual.clienteId,
+                                    titulo: 'Pagamento Confirmado! ✅',
+                                    mensagem: `Seu pagamento em dinheiro de ${formatarMoeda(totalAgendamento)} foi confirmado pelo profissional.`,
+                                    screen: 'MeusAgendamentosCliente',
+                                    root: 'Main',
+                                    params: { agendamentoId: agendamentoAtual.id },
+                                });
+                            }
+
+                            Alert.alert('Sucesso', 'Recebimento em espécie confirmado com sucesso!');
+                        } catch (error) {
+                            console.log('Erro ao confirmar recebimento em espécie:', error);
+                            Alert.alert('Erro', 'Não foi possível confirmar o recebimento.');
+                        } finally {
+                            setLoadingCobranca(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const confirmarPagamento = () => {
@@ -931,7 +997,9 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                     </View>
 
                     <Text style={styles.billingText}>
-                        Você poderá gerar a cobrança assim que o serviço for marcado como concluído.
+                        {ehPagamentoEspecie
+                            ? 'Este atendimento foi marcado para pagamento em dinheiro no local.'
+                            : 'Você poderá gerar a cobrança assim que o serviço for marcado como concluído.'}
                     </Text>
 
                     <View style={styles.billingInfoBox}>
@@ -982,29 +1050,30 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                     <TouchableOpacity
                         style={[
                             styles.billingButton,
-                            (loadingCobranca || (!ehChefe && !cobrancaJaGerada)) && styles.buttonDisabled
+                            (loadingCobranca || (!ehChefe && !cobrancaJaGerada && !ehPagamentoEspecie)) && styles.buttonDisabled,
+                            ehPagamentoEspecie && { backgroundColor: '#2ECC71' }
                         ]}
-                        onPress={gerarCobranca}
+                        onPress={ehPagamentoEspecie ? confirmarRecebimentoEspecie : gerarCobranca}
                         activeOpacity={0.9}
-                        disabled={loadingCobranca || (!ehChefe && !cobrancaJaGerada)}
+                        disabled={loadingCobranca || (!ehChefe && !cobrancaJaGerada && !ehPagamentoEspecie)}
                     >
                         {loadingCobranca ? (
                             <ActivityIndicator size="small" color="#FFF" />
                         ) : (
                             <>
                                 <Ionicons
-                                    name={cobrancaJaGerada ? 'eye-outline' : 'receipt-outline'}
+                                    name={ehPagamentoEspecie ? 'cash-outline' : (cobrancaJaGerada ? 'eye-outline' : 'receipt-outline')}
                                     size={20}
                                     color="#FFF"
                                 />
                                 <Text style={styles.billingButtonText}>
-                                    {cobrancaJaGerada ? 'VER COBRANÇA' : 'GERAR COBRANÇA'}
+                                    {ehPagamentoEspecie ? 'CONFIRMAR RECEBIMENTO' : (cobrancaJaGerada ? 'VER COBRANÇA' : 'GERAR COBRANÇA')}
                                 </Text>
                             </>
                         )}
                     </TouchableOpacity>
 
-                    {!ehChefe && !cobrancaJaGerada && (
+                    {!ehChefe && !cobrancaJaGerada && !ehPagamentoEspecie && (
                         <Text style={styles.billingRestrictionNote}>
                             A geração de cobrança é restrita ao gestor.
                         </Text>
@@ -1014,18 +1083,25 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
                         <View style={styles.billingControls}>
                             {!pagamentoJaConfirmado && !pagamentoCancelado && (
                                 <TouchableOpacity
-                                    style={[styles.billingControlCard, styles.confirmPaymentButton]}
-                                    onPress={confirmarPagamento}
+                                    style={[
+                                        styles.billingControlCard,
+                                        agendamentoAtual?.formaPagamento === 'especie' ? styles.cashPaymentButton : styles.confirmPaymentButton
+                                    ]}
+                                    onPress={agendamentoAtual?.formaPagamento === 'especie' ? confirmarRecebimentoEspecie : confirmarPagamento}
                                     activeOpacity={0.9}
                                     disabled={loadingCobranca}
                                 >
                                     <View style={styles.billingControlIconWrap}>
-                                        <Ionicons name="checkmark-circle" size={28} color="#FFF" />
+                                        <Ionicons name={agendamentoAtual?.formaPagamento === 'especie' ? "cash" : "checkmark-circle"} size={28} color="#FFF" />
                                     </View>
                                     <View style={styles.billingControlTextBox}>
-                                        <Text style={styles.billingControlTitle}>Confirmar pagamento</Text>
+                                        <Text style={styles.billingControlTitle}>
+                                            {agendamentoAtual?.formaPagamento === 'especie' ? 'Confirmar recebimento em espécie' : 'Confirmar pagamento'}
+                                        </Text>
                                         <Text style={styles.billingControlDescription}>
-                                            Marque esta cobrança como recebida e confirme para o cliente.
+                                            {agendamentoAtual?.formaPagamento === 'especie'
+                                                ? 'Marque que você recebeu o valor em dinheiro. Isso não gerará taxas da plataforma.'
+                                                : 'Marque esta cobrança como recebida e confirme para o cliente.'}
                                         </Text>
                                     </View>
                                     <Ionicons name="chevron-forward" size={22} color="#FFF" />
@@ -1485,7 +1561,11 @@ const styles = StyleSheet.create({
     },
 
     confirmPaymentButton: {
-        backgroundColor: '#27AE60',
+        backgroundColor: colors.primary,
+    },
+
+    cashPaymentButton: {
+        backgroundColor: '#2ECC71', // Verde para dinheiro
     },
 
     expirePaymentButton: {

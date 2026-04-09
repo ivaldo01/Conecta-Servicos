@@ -8,8 +8,9 @@ import {
 } from 'firebase/firestore';
 
 import { db, auth } from './firebaseConfig';
+import { getTaxaServico, getTaxaSaque } from '../constants/plans';
 
-const BACKEND_URL = 'https://conecta-backend.vercel.app';
+const BACKEND_URL = 'https://backend-vercel-nu-topaz.vercel.app';
 
 export const STATUS_PAGAMENTO = {
     AGUARDANDO_COBRANCA: 'aguardando_cobranca',
@@ -22,9 +23,9 @@ export const STATUS_PAGAMENTO = {
 
 export const FORMAS_PAGAMENTO_LABEL = {
     pix: 'Pix',
-    boleto: 'Boleto',
     cartao_credito: 'Cartão de crédito',
     cartao_debito: 'Cartão de débito',
+    especie: 'Dinheiro (Espécie)',
 };
 
 export function getFormaPagamentoLabel(formaPagamento) {
@@ -210,7 +211,23 @@ async function salvarPagamentoFirestore({ agendamento, pagamentoGateway }) {
             : 0)
     );
 
-    const taxaPlataforma = toMoney(valorBruto * 0.1);
+    // Buscar plano do profissional para calcular taxa correta
+    let planoId = 'pro_iniciante'; // Padrão: plano gratuito (10%)
+    try {
+        const profissionalId = agendamento?.profissionalId || agendamento?.colaboradorId;
+        if (profissionalId) {
+            const profRef = doc(db, 'usuarios', profissionalId);
+            const profSnap = await getDoc(profRef);
+            if (profSnap.exists()) {
+                planoId = profSnap.data()?.planoAtivo || 'pro_iniciante';
+            }
+        }
+    } catch (e) {
+        console.warn('[salvarPagamentoFirestore] Erro ao buscar plano do profissional:', e.message);
+    }
+
+    const taxaServico = getTaxaServico(planoId);
+    const taxaPlataforma = toMoney(valorBruto * taxaServico);
     const valorLiquidoProfissional = toMoney(valorBruto - taxaPlataforma);
 
     const formaPagamento = agendamento?.formaPagamento || 'pix';
@@ -300,15 +317,31 @@ async function lerRespostaSegura(response) {
     throw new Error('Servidor retornou resposta inválida. Tente novamente mais tarde.');
 }
 
-export async function gerarCobrancaAgendamento({ agendamento }) {
+export async function gerarCobrancaAgendamento({ agendamento, creditCard, creditCardHolderInfo }) {
     if (!agendamento?.id) {
         throw new Error('AGENDAMENTO_INVALIDO');
     }
 
     const pagamentoExistente = await buscarCobrancaPorAgendamento(agendamento.id);
 
+    // Se já existe uma cobrança PAGA, não faz nada
+    if (pagamentoExistente?.status === 'pago') {
+        return {
+            pagamento: pagamentoExistente,
+            agendamentoAtualizado: {
+                ...agendamento,
+                statusPagamento: 'pago',
+                pagamentoConfirmado: true,
+            },
+            jaExistia: true,
+        };
+    }
+
+    // Se já existe uma cobrança e NÃO estamos enviando dados de cartão (ex: Pro apenas clicando em Gerar),
+    // retorna a cobrança existente para evitar duplicidade no Asaas.
     if (
         pagamentoExistente &&
+        !creditCard &&
         (pagamentoExistente?.gatewayPaymentId ||
             pagamentoExistente?.copiaEColaPix ||
             pagamentoExistente?.qrCodePix)
@@ -326,6 +359,7 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
         };
     }
 
+    // Se chegamos aqui, ou não existe cobrança, ou estamos tentando pagar via cartão agora.
     const formaPagamento = agendamento?.formaPagamento || 'pix';
 
     const cliente = await getDadosClienteAtual(formaPagamento);
@@ -341,6 +375,8 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
             email: cliente.email || undefined,
             telefone: cliente.telefone || undefined,
         },
+        creditCard,
+        creditCardHolderInfo
     };
 
     if (cliente.cpfCnpj) {
@@ -354,6 +390,7 @@ export async function gerarCobrancaAgendamento({ agendamento }) {
         descricao: `Pagamento do agendamento ${agendamento.id}`,
         clienteEmail: cliente.email,
         temCpf: !!cliente.cpfCnpj,
+        temCartao: !!creditCard
     });
 
     let response;
@@ -443,6 +480,79 @@ export async function consultarStatusPagamento(agendamentoId) {
         } catch (err) {
             console.error('[consultarStatusPagamento] Erro ao atualizar Firestore:', err.message);
         }
+    }
+
+    return data;
+}
+
+export async function criarAssinatura({ userId, planoId, valor, nomePlano, billingType = 'PIX', creditCard, creditCardHolderInfo }) {
+    if (!userId || !planoId || !valor) {
+        throw new Error('Dados incompletos para processar assinatura.');
+    }
+
+    let response;
+    try {
+        response = await fetch(`${BACKEND_URL}/api/createSubscription`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userId,
+                planoId,
+                valor,
+                nomePlano,
+                billingType,
+                creditCard,
+                creditCardHolderInfo
+            }),
+        });
+    } catch (networkError) {
+        console.error('[criarAssinatura] Erro de rede:', networkError.message);
+        throw new Error('Não foi possível conectar ao servidor. Verifique sua internet.');
+    }
+
+    const data = await lerRespostaSegura(response);
+
+    if (!response.ok) {
+        console.error('[criarAssinatura] Erro na resposta:', data);
+        throw new Error(data?.error || data?.details || 'Erro ao processar assinatura.');
+    }
+
+    return data;
+}
+
+export async function solicitarSaqueProfissional({ valor, pixKey, pixKeyType, userId }) {
+    if (!valor || !pixKey || !userId) {
+        console.error('[paymentService] Erro: Dados incompletos para saque:', { valor, pixKey, userId });
+        throw new Error('Dados incompletos para solicitação de saque.');
+    }
+
+    let response;
+
+    try {
+        response = await fetch(`${BACKEND_URL}/api/withdraw`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                valor,
+                pixKey,
+                pixKeyType: pixKeyType || 'CPF', // Default para CPF se não informado
+                userId,
+            }),
+        });
+    } catch (networkError) {
+        console.error('[solicitarSaqueProfissional] Erro de rede:', networkError.message);
+        throw new Error('Não foi possível conectar ao servidor. Verifique sua internet.');
+    }
+
+    const data = await lerRespostaSegura(response);
+
+    if (!response.ok) {
+        console.error('[solicitarSaqueProfissional] Erro na resposta:', data);
+        throw new Error(data?.error || 'Erro ao solicitar saque.');
     }
 
     return data;

@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { db, admin } = require('../lib/firebaseAdmin'); // 'admin' necessário para serverTimestamp e increment
 
-const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
+const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 
 module.exports = async (req, res) => {
@@ -27,60 +27,97 @@ module.exports = async (req, res) => {
 
         // 1. Verificar saldo do profissional
         const saldoRef = db.collection('saldos').doc(userId);
-        const saldoSnap = await saldoRef.get();
+        const userRef = db.collection('usuarios').doc(userId);
+        
+        const [saldoSnap, userSnap] = await Promise.all([
+            saldoRef.get(),
+            userRef.get()
+        ]);
 
-        if (!saldoSnap.exists) {
-            console.error('[withdraw] Saldo não encontrado para usuário:', userId);
-            return res.status(404).json({ error: 'Saldo não encontrado para este usuário' });
+        const userData = userSnap.exists ? userSnap.data() : {};
+        const planoAtivo = userData.planoAtivo || 'free';
+        
+        // Taxa de saque: R$ 2,00 para Free, R$ 0,00 para Premium
+        const taxaSaque = planoAtivo === 'premium' ? 0 : 2.00;
+        const valorTotalADebitar = valor + taxaSaque;
+
+        let saldoAtual = 0;
+        if (saldoSnap.exists) {
+            const data = saldoSnap.data();
+            saldoAtual = data.saldoDisponivel !== undefined ? data.saldoDisponivel : (data.valor || 0);
         }
 
-        const saldoAtual = saldoSnap.data()?.valor || 0;
+        saldoAtual = Number(saldoAtual);
 
-        if (saldoAtual < valor) {
-            console.warn('[withdraw] Saldo insuficiente:', { saldoAtual, valorSolicitado: valor });
-            return res.status(400).json({ error: `Saldo insuficiente. Disponível: R$ ${saldoAtual.toFixed(2)}` });
+        if (saldoAtual < valorTotalADebitar) {
+            console.warn('[withdraw] Saldo insuficiente para valor + taxa:', { saldoAtual, valorSolicitado: valor, taxaSaque });
+            return res.status(400).json({ 
+                error: `Saldo insuficiente. Valor: R$ ${valor.toFixed(2)} + Taxa de Saque (${planoAtivo}): R$ ${taxaSaque.toFixed(2)}. Total necessário: R$ ${valorTotalADebitar.toFixed(2)}`,
+            });
         }
-
-        // 2. Solicitar transferência Pix no Asaas
-        console.log('[withdraw] Enviando solicitação de transferência ao Asaas');
-        const response = await axios.post(
-            `${ASAAS_API_URL}/transfers`,
-            {
-                value: valor,
-                operationType: 'PIX',
-                bankAccount: {
-                    pixAddressKey: pixKey,
-                    pixAddressKeyType: keyType,
-                },
-            },
-            { headers: { 'access_token': ASAAS_API_KEY } }
-        );
-
-        console.log('[withdraw] Transferência criada com sucesso:', response.data.id);
 
         const now = admin.firestore.FieldValue.serverTimestamp();
 
         // 3. Registrar o saque no Firestore
-        await db.collection('saques').add({
+        const saqueDocRef = await db.collection('saques').add({
             userId,
             profissionalId: userId,
             valor,
+            taxaAplicada: taxaSaque,
+            planoNoMomento: planoAtivo,
             pixKey,
             pixKeyType: keyType,
-            status: 'solicitado',
-            gatewayTransferId: response.data.id,
+            status: 'pendente',
             criadoEm: now,
         });
 
-        // 4. Debitar o saldo
+        const saqueId = saqueDocRef.id;
+
+        // 4. Debitar o saldo (Valor solicitado + Taxa)
         await saldoRef.update({
-            valor: admin.firestore.FieldValue.increment(-valor),
+            valor: admin.firestore.FieldValue.increment(-valorTotalADebitar),
+            saldoDisponivel: admin.firestore.FieldValue.increment(-valorTotalADebitar),
             ultimoSaque: now,
+            atualizadoEm: now
         });
 
-        console.log('[withdraw] Saque processado com sucesso');
+        // 5. Opcional: Notificar o Suporte/Admin via Chat de Suporte
+        try {
+            const userSnap = await db.collection('usuarios').doc(userId).get();
+            const userData = userSnap.data();
+            const nomeUser = userData?.nome || 'Profissional';
 
-        return res.status(200).json({ success: true, transferId: response.data.id });
+            const chatRef = db.collection('suporte').doc(userId);
+            const msgTexto = `📢 SOLICITAÇÃO DE SAQUE\n\nValor: R$ ${valor.toFixed(2)}\nChave Pix: ${pixKey}\nTipo: ${keyType}\nNome: ${nomeUser}`;
+
+            await chatRef.set({
+                userId: userId,
+                nomeUsuario: nomeUser,
+                fotoUsuario: userData?.foto || null,
+                perfilUsuario: 'profissional',
+                ultimaMensagem: msgTexto,
+                dataUltimaMensagem: now,
+                naoLidasAdmin: admin.firestore.FieldValue.increment(1),
+                ativo: true,
+                temSaquePendente: true
+            }, { merge: true });
+
+            await chatRef.collection('mensagens').add({
+                texto: msgTexto,
+                senderId: userId,
+                createdAt: now,
+                isSystem: true,
+                tipo: 'saque',
+                saqueId: saqueId, // Salvamos o ID aqui para facilitar a aprovação sem precisar de query
+                valorSaque: valor
+            });
+        } catch (chatErr) {
+            console.error('[withdraw] Erro ao notificar chat de suporte:', chatErr.message);
+        }
+
+        console.log('[withdraw] Saque registrado para processamento manual');
+
+        return res.status(200).json({ success: true, message: 'Solicitação de saque enviada com sucesso. Aguarde o processamento manual.' });
 
     } catch (error) {
         console.error('[withdraw] Erro ao processar saque:', {

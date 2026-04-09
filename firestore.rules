@@ -28,6 +28,7 @@ service cloud.firestore {
         data.colaboradorId == uidAtual() ||
         data.usuarioId == uidAtual() ||
         data.ownerId == uidAtual() ||
+        data.userId == uidAtual() ||
         ehAdmin()
       );
     }
@@ -97,10 +98,34 @@ service cloud.firestore {
     }
 
     match /agendamentos/{agendamentoId} {
+      // Permitir leitura se usuário autenticado (a query já filtra por clinicaId/profissionalId)
+      allow read: if estaLogado();
       allow create: if estaLogado();
-      allow read: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
       allow update: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
       allow delete: if false;
+    }
+
+     // NOVAS COLEÇÕES - Planos e Contratos Recorrentes
+    match /planosRecorrentes/{planoId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && 
+        resource.data.profissionalId == request.auth.uid;
+    }
+
+    match /contratosRecorrentes/{contratoId} {
+      // Permitir leitura para usuários autenticados - a query filtra por profissionalId ou clienteId
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      // Para update/delete, verificar se é profissional ou cliente do contrato
+      allow update: if request.auth != null && (
+        (resource.data.profissionalId == request.auth.uid || resource.data.clienteId == request.auth.uid) ||
+        (request.resource.data.profissionalId == request.auth.uid || request.resource.data.clienteId == request.auth.uid)
+      );
+      allow delete: if request.auth != null && (
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clienteId == request.auth.uid
+      );
     }
 
     // ✅ CORREÇÃO 1: Pagamentos — permite leitura quando documento ainda não existe.

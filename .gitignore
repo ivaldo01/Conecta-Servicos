@@ -51,3 +51,4 @@ Thumbs.db
 # --- TYPESCRIPT ---
 *.tsbuildinfo
 firebase-auth.json.json
+.vercel

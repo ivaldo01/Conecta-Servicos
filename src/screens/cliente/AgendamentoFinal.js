@@ -8,6 +8,8 @@ import {
     ActivityIndicator,
     ScrollView,
     TextInput,
+    Platform,
+    useWindowDimensions,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
 import {
@@ -29,6 +31,8 @@ import {
     salvarNotificacaoProfissional,
 } from "../../utils/notificationUtils";
 import { travarHorario, liberarHorario } from '../../utils/agendaDisponibilidade';
+import Sidebar from '../../components/Sidebar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 async function enviarPushNotificacao(expoPushToken, clienteNome, data, horario) {
     await enviarPushAoProfissional(expoPushToken, {
@@ -48,12 +52,6 @@ const FORMAS_PAGAMENTO = [
         icon: 'qr-code-outline',
     },
     {
-        id: 'boleto',
-        titulo: 'Boleto',
-        descricao: 'Cobrança bancária',
-        icon: 'document-text-outline',
-    },
-    {
         id: 'cartao_credito',
         titulo: 'Cartão de crédito',
         descricao: 'Cobrança no crédito',
@@ -64,6 +62,12 @@ const FORMAS_PAGAMENTO = [
         titulo: 'Cartão de débito',
         descricao: 'Cobrança no débito',
         icon: 'card-outline',
+    },
+    {
+        id: 'especie',
+        titulo: 'Dinheiro',
+        descricao: 'Pagar no local (Espécie)',
+        icon: 'cash-outline',
     },
 ];
 
@@ -888,6 +892,224 @@ export default function AgendamentoFinal({ route, navigation }) {
         }
     };
 
+    const { width: windowWidth } = useWindowDimensions();
+    const isLargeScreen = Platform.OS === 'web' && windowWidth > 768;
+
+    const MainContent = (
+        <ScrollView
+            style={styles.container}
+            contentContainerStyle={[
+                styles.contentPadding,
+                isLargeScreen && styles.contentLarge,
+            ]}
+            showsVerticalScrollIndicator={false}
+        >
+            <View style={[styles.headerInfo, isLargeScreen && styles.headerInfoLarge]}>
+                <View style={styles.headerCircle} />
+                <View style={styles.headerCircleTwo} />
+                <View style={styles.headerContent}>
+                    <Text style={styles.title}>Finalizar Agendamento</Text>
+                    <Text style={styles.subtitle}>
+                        Confirme os detalhes e reserve seu horário
+                    </Text>
+                    {clinicaData && (
+                        <Text style={styles.subtitleClinic}>
+                            Profissional: {getNomePessoa(clinicaData)}
+                        </Text>
+                    )}
+                </View>
+            </View>
+
+            <View style={[styles.resumeCard, isLargeScreen && styles.resumeCardLarge]}>
+                <Text style={styles.resumeLabel}>TOTAL DO AGENDAMENTO</Text>
+                <Text style={styles.resumeValue}>{formatarMoeda(valorTotalAgendamento)}</Text>
+            </View>
+
+            <View style={[styles.formGrid, isLargeScreen && styles.formGridLarge]}>
+                <View style={styles.formColumn}>
+                    <Text style={styles.sectionLabel}>Para quem é o atendimento?</Text>
+                    <View style={styles.tipoAtendimentoRow}>
+                        <TouchableOpacity
+                            style={[styles.tipoAtendimentoCard, tipoAtendimento === 'cliente' && styles.tipoAtendimentoCardSelected]}
+                            onPress={() => setTipoAtendimento('cliente')}
+                        >
+                            <Ionicons name="person-outline" size={20} color={tipoAtendimento === 'cliente' ? colors.primary : '#64748B'} />
+                            <Text style={[styles.tipoAtendimentoText, tipoAtendimento === 'cliente' && styles.tipoAtendimentoTextSelected]}>Para mim</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.tipoAtendimentoCard, tipoAtendimento === 'menor' && styles.tipoAtendimentoCardSelected]}
+                            onPress={() => setTipoAtendimento('menor')}
+                        >
+                            <Ionicons name="people-outline" size={20} color={tipoAtendimento === 'menor' ? colors.primary : '#64748B'} />
+                            <Text style={[styles.tipoAtendimentoText, tipoAtendimento === 'menor' && styles.tipoAtendimentoTextSelected]}>Dependente</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {tipoAtendimento === 'menor' && (
+                        <View style={{ marginTop: 16 }}>
+                            {menores.length === 0 ? (
+                                <View style={styles.emptyBox}>
+                                    <Text style={styles.emptyBoxText}>Você ainda não cadastrou nenhum dependente.</Text>
+                                    <TouchableOpacity
+                                        style={styles.linkButton}
+                                        onPress={() => navigation.navigate('CadastroMenor')}
+                                    >
+                                        <Text style={styles.linkButtonText}>Cadastrar Dependente</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                menores.map((item) => (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        style={[styles.menorCard, menorSelecionado?.id === item.id && styles.menorCardSelected]}
+                                        onPress={() => setMenorSelecionado(item)}
+                                    >
+                                        <View style={styles.menorAvatar}>
+                                            <Text style={styles.menorAvatarText}>{item.nome?.charAt(0)}</Text>
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.menorNome}>{item.nome}</Text>
+                                            <Text style={styles.menorInfo}>{item.parentesco} • {item.idade} anos</Text>
+                                        </View>
+                                        {menorSelecionado?.id === item.id && (
+                                            <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                                        )}
+                                    </TouchableOpacity>
+                                ))
+                            )}
+                        </View>
+                    )}
+
+                    <Text style={styles.sectionLabel}>Data e Horário</Text>
+                    <TouchableOpacity style={styles.dateSelector} onPress={() => setShowPicker(true)}>
+                        <Ionicons name="calendar-outline" size={22} color={colors.primary} />
+                        <Text style={styles.dateSelectorText}>{formatarDataExibicao(date)}</Text>
+                        <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+                    </TouchableOpacity>
+
+                    {showPicker && (
+                        <DateTimePicker
+                            value={date}
+                            mode="date"
+                            display="default"
+                            minimumDate={new Date()}
+                            onChange={(event, selectedDate) => {
+                                setShowPicker(false);
+                                if (selectedDate) setDate(selectedDate);
+                            }}
+                        />
+                    )}
+
+                    <Text style={styles.sectionLabel}>Profissional</Text>
+                    <View style={styles.colabSection}>
+                        {colaboradoresDisponivelNoDia.map((colab) => (
+                            <TouchableOpacity
+                                key={colab.id}
+                                style={[styles.colabCard, colaboradorEscolhido?.id === colab.id && styles.colabSelected]}
+                                onPress={() => setColaboradorEscolhido(colab)}
+                            >
+                                <View style={[styles.colabAvatar, colaboradorEscolhido?.id === colab.id && styles.colabAvatarSelected]}>
+                                    <Text style={[styles.colabAvatarText, colaboradorEscolhido?.id === colab.id && { color: '#FFF' }]}>
+                                        {colab.nome?.charAt(0)}
+                                    </Text>
+                                </View>
+                                <View style={styles.colabInfo}>
+                                    <Text style={styles.colabNome}>{colab.nome}</Text>
+                                </View>
+                                {colaboradorEscolhido?.id === colab.id && (
+                                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+
+                <View style={styles.formColumn}>
+                    <Text style={styles.sectionLabel}>Horários Disponíveis</Text>
+                    <View style={styles.horariosLegenda}>
+                        <View style={styles.legendaItem}>
+                            <View style={[styles.legendaDot, { backgroundColor: colors.primary }]} />
+                            <Text style={styles.legendaText}>Livre</Text>
+                        </View>
+                        <View style={styles.legendaItem}>
+                            <View style={[styles.legendaDot, { backgroundColor: '#E2E8F0' }]} />
+                            <Text style={styles.legendaText}>Ocupado</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.horariosGrid}>
+                        {todosHorariosDodia.map((h) => {
+                            const estado = getEstadoHorario(h);
+                            const isSelected = horarioSelecionado === h;
+
+                            return (
+                                <TouchableOpacity
+                                    key={h}
+                                    disabled={estado !== 'livre'}
+                                    style={[
+                                        styles.horaChip,
+                                        estado === 'livre' && styles.horaChipLivre,
+                                        estado === 'ocupado' && styles.horaChipOcupado,
+                                        estado === 'passado' && styles.horaChipIndisponivel,
+                                        isSelected && styles.horaChipSelected,
+                                    ]}
+                                    onPress={() => setHorarioSelecionado(h)}
+                                >
+                                    <Text style={[
+                                        styles.horaChipText,
+                                        estado === 'livre' && styles.horaChipTextLivre,
+                                        estado === 'ocupado' && styles.horaChipTextOcupado,
+                                        isSelected && styles.horaChipTextSelected,
+                                    ]}>{h}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                        {todosHorariosDodia.length === 0 && (
+                            <View style={styles.emptyBox}>
+                                <Text style={styles.emptyBoxText}>Nenhum horário disponível para este profissional neste dia.</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <Text style={styles.sectionLabel}>Forma de Pagamento</Text>
+                    <View style={styles.paymentList}>
+                        {FORMAS_PAGAMENTO.map((item) => (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[styles.paymentCard, formaPagamento === item.id && styles.paymentCardSelected]}
+                                onPress={() => setFormaPagamento(item.id)}
+                            >
+                                <View style={styles.paymentIconArea}>
+                                    <Ionicons name={item.icon} size={22} color={formaPagamento === item.id ? colors.primary : '#64748B'} />
+                                </View>
+                                <View style={styles.paymentTextArea}>
+                                    <Text style={[styles.paymentTitle, formaPagamento === item.id && styles.paymentTitleSelected]}>{item.titulo}</Text>
+                                    <Text style={[styles.paymentDescription, formaPagamento === item.id && styles.paymentDescriptionSelected]}>{item.descricao}</Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.confirmButton, (loading || !horarioSelecionado || !colaboradorEscolhido) && styles.confirmButtonDisabled]}
+                        disabled={loading || !horarioSelecionado || !colaboradorEscolhido}
+                        onPress={finalizar}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark-done-circle" size={24} color="#FFF" />
+                                <Text style={styles.confirmButtonText}>CONFIRMAR AGENDAMENTO</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </ScrollView>
+    );
+
     if (loadingInicial) {
         return (
             <View style={styles.centerLoading}>
@@ -898,882 +1120,502 @@ export default function AgendamentoFinal({ route, navigation }) {
     }
 
     return (
-        <View style={styles.mainContainer}>
-            <ScrollView style={styles.container}>
-                <View style={styles.headerInfo}>
-                    <Text style={styles.title}>Finalizar Agendamento</Text>
-                    <Text style={styles.subtitle}>
-                        {servicos.length} serviço(s) selecionado(s)
-                    </Text>
-                    {!!clinicaData && (
-                        <Text style={styles.subtitleClinic}>
-                            Profissional: {getNomeClinica(clinicaData)}
-                        </Text>
-                    )}
-                </View>
-
-                <View style={styles.resumeCard}>
-                    <Text style={styles.resumeLabel}>VALOR TOTAL</Text>
-                    <Text style={styles.resumeValue}>{formatarMoeda(valorTotalAgendamento)}</Text>
-                </View>
-
-                <Text style={styles.sectionLabel}>Quem será atendido?</Text>
-
-                <View style={styles.tipoAtendimentoRow}>
-                    <TouchableOpacity
-                        style={[
-                            styles.tipoAtendimentoCard,
-                            tipoAtendimento === 'cliente' && styles.tipoAtendimentoCardSelected,
-                        ]}
-                        onPress={() => {
-                            setTipoAtendimento('cliente');
-                            setMenorSelecionado(null);
-                        }}
-                    >
-                        <Ionicons
-                            name="person-outline"
-                            size={20}
-                            color={tipoAtendimento === 'cliente' ? '#FFF' : colors.primary}
-                        />
-                        <Text
-                            style={[
-                                styles.tipoAtendimentoText,
-                                tipoAtendimento === 'cliente' && styles.tipoAtendimentoTextSelected,
-                            ]}
-                        >
-                            Para mim
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.tipoAtendimentoCard,
-                            tipoAtendimento === 'menor' && styles.tipoAtendimentoCardSelected,
-                        ]}
-                        onPress={() => setTipoAtendimento('menor')}
-                    >
-                        <Ionicons
-                            name="people-outline"
-                            size={20}
-                            color={tipoAtendimento === 'menor' ? '#FFF' : colors.primary}
-                        />
-                        <Text
-                            style={[
-                                styles.tipoAtendimentoText,
-                                tipoAtendimento === 'menor' && styles.tipoAtendimentoTextSelected,
-                            ]}
-                        >
-                            Para menor
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {tipoAtendimento === 'menor' && (
-                    <>
-                        <Text style={styles.sectionLabel}>Selecione o dependente</Text>
-
-                        {menores.length === 0 ? (
-                            <View style={styles.emptyBox}>
-                                <Text style={styles.emptyBoxText}>
-                                    Você ainda não tem dependentes cadastrados.
-                                </Text>
-
-                                <TouchableOpacity
-                                    style={styles.linkButton}
-                                    onPress={() => navigation.navigate('CadastroMenor')}
-                                >
-                                    <Text style={styles.linkButtonText}>Cadastrar dependente</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            menores.map((menor) => {
-                                const selecionado = menorSelecionado?.id === menor.id;
-
-                                return (
-                                    <TouchableOpacity
-                                        key={menor.id}
-                                        style={[
-                                            styles.menorCard,
-                                            selecionado && styles.menorCardSelected,
-                                        ]}
-                                        onPress={() => setMenorSelecionado(menor)}
-                                        activeOpacity={0.88}
-                                    >
-                                        <View style={styles.menorAvatar}>
-                                            <Text style={styles.menorAvatarText}>
-                                                {menor?.nome?.charAt(0)?.toUpperCase() || 'M'}
-                                            </Text>
-                                        </View>
-
-                                        <View style={{ flex: 1, marginLeft: 12 }}>
-                                            <Text style={styles.menorNome}>
-                                                {menor.nome || 'Dependente'}
-                                            </Text>
-                                            <Text style={styles.menorInfo}>
-                                                Idade: {menor.idade || '-'}
-                                            </Text>
-                                        </View>
-
-                                        <Ionicons
-                                            name={selecionado ? 'radio-button-on' : 'radio-button-off'}
-                                            size={22}
-                                            color={selecionado ? colors.primary : colors.border}
-                                        />
-                                    </TouchableOpacity>
-                                );
-                            })
-                        )}
-
-                        <Text style={styles.sectionLabel}>Necessidades Especiais / Observações</Text>
-                        <View style={styles.obsContainer}>
-                            <TextInput
-                                style={styles.obsInput}
-                                placeholder="Ex: Possui autismo, alergia a algum produto, dificuldade de locomoção, etc."
-                                placeholderTextColor="#A0A0A0"
-                                multiline
-                                numberOfLines={4}
-                                value={observacoesMenor}
-                                onChangeText={setObservacoesMenor}
-                                textAlignVertical="top"
-                            />
-                            <Text style={styles.obsHint}>
-                                Informe detalhes que ajudem o profissional a oferecer o melhor atendimento.
-                            </Text>
-                        </View>
-                    </>
-                )}
-
-                <Text style={styles.sectionLabel}>Selecione a Data</Text>
-                <TouchableOpacity
-                    style={styles.dateSelector}
-                    onPress={() => setShowPicker(true)}
-                >
-                    <Ionicons name="calendar-outline" size={24} color={colors.primary} />
-                    <Text style={styles.dateSelectorText}>
-                        {date.toLocaleDateString('pt-BR', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                        })}
-                    </Text>
-                    <Ionicons name="chevron-down" size={20} color={colors.secondary} />
-                </TouchableOpacity>
-
-                {showPicker && (
-                    <DateTimePicker
-                        value={date}
-                        mode="date"
-                        minimumDate={new Date()}
-                        onChange={(event, selectedDate) => {
-                            setShowPicker(false);
-                            if (selectedDate) {
-                                setDate(selectedDate);
-                            }
-                        }}
-                    />
-                )}
-
-                <Text style={styles.sectionLabel}>Forma de Pagamento</Text>
-                <View style={styles.paymentList}>
-                    {FORMAS_PAGAMENTO.map((item) => {
-                        const selecionado = formaPagamento === item.id;
-
-                        return (
-                            <TouchableOpacity
-                                key={item.id}
-                                style={[
-                                    styles.paymentCard,
-                                    selecionado && styles.paymentCardSelected,
-                                ]}
-                                onPress={() => setFormaPagamento(item.id)}
-                                activeOpacity={0.88}
-                            >
-                                <View style={styles.paymentIconArea}>
-                                    <Ionicons
-                                        name={item.icon}
-                                        size={22}
-                                        color={selecionado ? '#FFF' : colors.primary}
-                                    />
-                                </View>
-
-                                <View style={styles.paymentTextArea}>
-                                    <Text
-                                        style={[
-                                            styles.paymentTitle,
-                                            selecionado && styles.paymentTitleSelected,
-                                        ]}
-                                    >
-                                        {item.titulo}
-                                    </Text>
-                                    <Text
-                                        style={[
-                                            styles.paymentDescription,
-                                            selecionado && styles.paymentDescriptionSelected,
-                                        ]}
-                                    >
-                                        {item.descricao}
-                                    </Text>
-                                </View>
-
-                                <Ionicons
-                                    name={selecionado ? 'radio-button-on' : 'radio-button-off'}
-                                    size={22}
-                                    color={selecionado ? colors.primary : colors.border}
-                                />
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-
-                <View style={styles.paymentInfoBox}>
-                    <Ionicons name="information-circle-outline" size={18} color="#8A6D3B" />
-                    <Text style={styles.paymentInfoText}>
-                        O profissional vai gerar a cobrança depois, com base no valor deste agendamento e na forma de pagamento escolhida por você.
-                    </Text>
-                </View>
-
-                {/* ── 1. ESCOLHA DO PROFISSIONAL ── */}
-                <Text style={styles.sectionLabel}>Escolha o Profissional</Text>
-
-                {!servicos.length ? (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyBoxText}>
-                            Nenhum serviço foi enviado para o agendamento.
-                        </Text>
+        <View style={styles.screenContainer}>
+            {isLargeScreen ? (
+                <View style={styles.webLayout}>
+                    <Sidebar navigation={navigation} activeRoute="BuscaProfissionais" />
+                    <View style={styles.webContentArea}>
+                        {MainContent}
                     </View>
-                ) : colaboradoresDisponivelNoDia.length === 0 ? (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyBoxText}>
-                            Nenhum profissional disponível para este serviço nesta data.
-                        </Text>
-                    </View>
-                ) : (
-                    <View style={styles.colabSection}>
-                        {colaboradoresDisponivelNoDia.map((colab) => {
-                            const selecionado = colaboradorEscolhido?.id === colab.id;
-
-                            return (
-                                <TouchableOpacity
-                                    key={colab.id}
-                                    style={[
-                                        styles.colabCard,
-                                        selecionado && styles.colabSelected,
-                                    ]}
-                                    onPress={() => {
-                                        setColaboradorEscolhido(colab);
-                                        setHorarioSelecionado(null);
-                                    }}
-                                >
-                                    <View
-                                        style={[
-                                            styles.colabAvatar,
-                                            selecionado && styles.colabAvatarSelected,
-                                        ]}
-                                    >
-                                        <Text style={styles.colabAvatarText}>
-                                            {(colab.nome || 'P').charAt(0).toUpperCase()}
-                                        </Text>
-                                    </View>
-
-                                    <View style={styles.colabInfo}>
-                                        <Text style={styles.colabNome}>{colab.nome}</Text>
-                                    </View>
-
-                                    <Ionicons
-                                        name={selecionado ? 'radio-button-on' : 'radio-button-off'}
-                                        size={22}
-                                        color={selecionado ? colors.primary : colors.border}
-                                    />
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                )}
-
-                {/* ── 2. HORÁRIOS DO PROFISSIONAL SELECIONADO ── */}
-                <Text style={styles.sectionLabel}>Horários</Text>
-
-                {!colaboradorEscolhido ? (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyBoxText}>
-                            Selecione um profissional acima para ver os horários disponíveis.
-                        </Text>
-                    </View>
-                ) : todosHorariosDodia.length === 0 ? (
-                    <View style={styles.emptyBox}>
-                        <Text style={styles.emptyBoxText}>
-                            Este profissional não possui horários configurados para esta data.
-                        </Text>
-                    </View>
-                ) : (
-                    <>
-                        <View style={styles.horariosLegenda}>
-                            <View style={styles.legendaItem}>
-                                <View style={[styles.legendaDot, { backgroundColor: '#E8F5E9' }]} />
-                                <Text style={styles.legendaText}>Disponível</Text>
-                            </View>
-                            <View style={styles.legendaItem}>
-                                <View style={[styles.legendaDot, { backgroundColor: '#FFEBEE' }]} />
-                                <Text style={styles.legendaText}>Ocupado</Text>
-                            </View>
-                            <View style={styles.legendaItem}>
-                                <View style={[styles.legendaDot, { backgroundColor: '#F5F5F5' }]} />
-                                <Text style={styles.legendaText}>Passado</Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.horariosGrid}>
-                            {todosHorariosDodia.map((h) => {
-                                const estado = getEstadoHorario(h);
-                                const selecionado = horarioSelecionado === h;
-                                const clicavel = estado === 'livre';
-
-                                return (
-                                    <TouchableOpacity
-                                        key={h}
-                                        disabled={!clicavel}
-                                        activeOpacity={clicavel ? 0.7 : 1}
-                                        style={[
-                                            styles.horaChip,
-                                            estado === 'livre' && styles.horaChipLivre,
-                                            estado === 'ocupado' && styles.horaChipOcupado,
-                                            estado === 'passado' && styles.horaChipIndisponivel,
-                                            selecionado && styles.horaChipSelected,
-                                        ]}
-                                        onPress={() => setHorarioSelecionado(h)}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.horaChipText,
-                                                estado === 'livre' && styles.horaChipTextLivre,
-                                                estado === 'ocupado' && styles.horaChipTextOcupado,
-                                                estado === 'passado' && styles.horaChipTextIndisponivel,
-                                                selecionado && styles.horaChipTextSelected,
-                                            ]}
-                                        >
-                                            {h}
-                                        </Text>
-                                        {estado === 'ocupado' && (
-                                            <Text style={styles.horaChipOcupadoLabel}>Ocupado</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </>
-                )}
-
-                <TouchableOpacity
-                    style={[styles.confirmButton, loading && styles.confirmButtonDisabled]}
-                    onPress={finalizar}
-                    disabled={loading}
-                    activeOpacity={0.9}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#FFF" />
-                    ) : (
-                        <>
-                            <Ionicons name="checkmark-circle-outline" size={22} color="#FFF" />
-                            <Text style={styles.confirmButtonText}>CONFIRMAR AGENDAMENTO</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
-
-                <View style={{ height: 40 }} />
-            </ScrollView>
+                </View>
+            ) : (
+                <SafeAreaView style={styles.mainContainer}>
+                    {MainContent}
+                </SafeAreaView>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    screenContainer: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+    },
+    webLayout: {
+        flex: 1,
+        flexDirection: 'row',
+        height: '100vh',
+        overflow: 'hidden',
+    },
+    webContentArea: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
+        height: '100%',
+        display: 'flex',
+        overflow: Platform.OS === 'web' ? 'auto' : 'hidden',
+    },
     mainContainer: {
         flex: 1,
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F8FAFC',
     },
-
     container: {
         flex: 1,
+        height: Platform.OS === 'web' ? '100%' : 'auto',
     },
-
+    contentPadding: {
+        paddingBottom: 40,
+    },
+    contentLarge: {
+        maxWidth: 1200,
+        alignSelf: 'center',
+        width: '100%',
+        paddingHorizontal: 40,
+        paddingTop: 32,
+    },
     centerLoading: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F7F8FA',
+        backgroundColor: '#F8FAFC',
     },
-
     loadingText: {
         marginTop: 12,
-        color: '#666',
+        color: '#64748B',
         fontSize: 14,
     },
-
     headerInfo: {
         padding: 24,
-        backgroundColor: '#FFF',
-        borderBottomWidth: 1,
-        borderColor: '#EEE',
+        backgroundColor: colors.primary,
+        borderRadius: 24,
+        marginHorizontal: 16,
+        marginTop: 16,
+        elevation: 6,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        overflow: 'hidden',
     },
-
+    headerInfoLarge: {
+        marginHorizontal: 0,
+        padding: 32,
+    },
+    headerCircle: {
+        position: 'absolute',
+        width: 130,
+        height: 130,
+        borderRadius: 65,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: -34,
+        right: -18,
+    },
+    headerCircleTwo: {
+        position: 'absolute',
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        bottom: -18,
+        left: -10,
+    },
+    headerContent: {
+        zIndex: 2,
+    },
     title: {
         fontSize: 24,
         fontWeight: '800',
-        color: '#1A1A2E',
+        color: '#FFF',
     },
-
     subtitle: {
         marginTop: 4,
         fontSize: 14,
-        color: '#666',
+        color: 'rgba(255,255,255,0.84)',
     },
-
     subtitleClinic: {
-        marginTop: 2,
-        fontSize: 13,
-        color: colors.primary,
+        marginTop: 4,
+        fontSize: 14,
+        color: '#FFF',
         fontWeight: '700',
     },
-
     resumeCard: {
-        marginHorizontal: 20,
+        marginHorizontal: 16,
         marginTop: 16,
         backgroundColor: colors.primary,
-        borderRadius: 18,
-        padding: 20,
+        borderRadius: 24,
+        padding: 24,
         alignItems: 'center',
+        elevation: 4,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
     },
-
+    resumeCardLarge: {
+        marginHorizontal: 0,
+    },
     resumeLabel: {
         color: 'rgba(255,255,255,0.8)',
         fontSize: 12,
         fontWeight: '700',
         letterSpacing: 1,
     },
-
     resumeValue: {
         color: '#FFF',
-        fontSize: 30,
+        fontSize: 32,
         fontWeight: '800',
         marginTop: 4,
     },
-
-    sectionLabel: {
-        marginHorizontal: 20,
-        marginTop: 20,
-        marginBottom: 10,
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#333',
+    formGrid: {
+        paddingHorizontal: 16,
     },
-
+    formGridLarge: {
+        flexDirection: 'row',
+        paddingHorizontal: 0,
+        gap: 24,
+        marginTop: 24,
+    },
+    formColumn: {
+        flex: 1,
+    },
+    sectionLabel: {
+        marginTop: 24,
+        marginBottom: 12,
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1E293B',
+        marginLeft: 4,
+    },
     tipoAtendimentoRow: {
         flexDirection: 'row',
-        marginHorizontal: 20,
         gap: 12,
     },
-
     tipoAtendimentoCard: {
         flex: 1,
         borderWidth: 2,
-        borderColor: colors.primary,
-        borderRadius: 14,
-        paddingVertical: 14,
+        borderColor: '#E2E8F0',
+        borderRadius: 16,
+        paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
         gap: 8,
+        backgroundColor: '#FFF',
     },
-
     tipoAtendimentoCardSelected: {
-        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+        backgroundColor: `${colors.primary}08`,
     },
-
     tipoAtendimentoText: {
         fontSize: 14,
         fontWeight: '700',
+        color: '#64748B',
+    },
+    tipoAtendimentoTextSelected: {
         color: colors.primary,
     },
-
-    tipoAtendimentoTextSelected: {
-        color: '#FFF',
-    },
-
     emptyBox: {
-        marginHorizontal: 20,
-        backgroundColor: '#F0F4FF',
-        borderRadius: 14,
-        padding: 18,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 16,
+        padding: 24,
         alignItems: 'center',
     },
-
     emptyBoxText: {
-        color: '#666',
+        color: '#64748B',
         textAlign: 'center',
         lineHeight: 20,
     },
-
     linkButton: {
-        marginTop: 12,
+        marginTop: 16,
         backgroundColor: colors.primary,
-        paddingHorizontal: 18,
-        paddingVertical: 10,
-        borderRadius: 10,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 12,
     },
-
     linkButtonText: {
         color: '#FFF',
         fontWeight: '700',
     },
-
     menorCard: {
-        marginHorizontal: 20,
-        marginBottom: 10,
+        marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        borderRadius: 14,
-        padding: 14,
-        borderWidth: 2,
-        borderColor: '#EEF1F4',
-        elevation: 1,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
     },
-
     menorCardSelected: {
         borderColor: colors.primary,
-        backgroundColor: `${colors.primary}08`,
+        backgroundColor: `${colors.primary}05`,
     },
-
     menorAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: `${colors.primary}20`,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#EEF2FF',
         alignItems: 'center',
         justifyContent: 'center',
     },
-
     menorAvatarText: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '800',
         color: colors.primary,
     },
-
     menorNome: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#1A1A2E',
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1E293B',
     },
-
     menorInfo: {
-        fontSize: 12,
-        color: '#888',
+        fontSize: 13,
+        color: '#64748B',
         marginTop: 2,
     },
-
     obsContainer: {
-        marginHorizontal: 20,
+        marginBottom: 12,
     },
-
     obsInput: {
         backgroundColor: '#FFF',
-        borderRadius: 14,
-        padding: 14,
+        borderRadius: 16,
+        padding: 16,
         minHeight: 100,
         borderWidth: 1,
-        borderColor: '#E4EAF1',
-        fontSize: 14,
-        color: '#333',
+        borderColor: '#E2E8F0',
+        fontSize: 15,
+        color: '#1E293B',
     },
-
     obsHint: {
-        marginTop: 6,
+        marginTop: 8,
         fontSize: 12,
-        color: '#999',
-        lineHeight: 16,
+        color: '#94A3B8',
+        marginLeft: 4,
     },
-
     dateSelector: {
-        marginHorizontal: 20,
         backgroundColor: '#FFF',
-        borderRadius: 14,
-        padding: 16,
+        borderRadius: 16,
+        padding: 18,
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#E4EAF1',
-        elevation: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
     },
-
     dateSelectorText: {
         flex: 1,
-        marginLeft: 10,
+        marginLeft: 12,
         fontSize: 15,
-        color: '#333',
+        color: '#1E293B',
         fontWeight: '600',
         textTransform: 'capitalize',
     },
-
     paymentList: {
-        marginHorizontal: 20,
+        gap: 12,
     },
-
     paymentCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFF',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        borderWidth: 2,
-        borderColor: '#EEF1F4',
-        elevation: 1,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
     },
-
     paymentCardSelected: {
         borderColor: colors.primary,
-        backgroundColor: `${colors.primary}08`,
+        backgroundColor: `${colors.primary}05`,
     },
-
     paymentIconArea: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: `${colors.primary}15`,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#EEF2FF',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 16,
     },
-
     paymentTextArea: {
         flex: 1,
     },
-
     paymentTitle: {
         fontSize: 15,
-        fontWeight: '800',
-        color: '#1A1A2E',
+        fontWeight: '700',
+        color: '#1E293B',
     },
-
     paymentTitleSelected: {
         color: colors.primary,
     },
-
     paymentDescription: {
-        fontSize: 12,
-        color: '#888',
+        fontSize: 13,
+        color: '#64748B',
         marginTop: 2,
     },
-
     paymentDescriptionSelected: {
-        color: `${colors.primary}AA`,
+        color: '#64748B',
     },
-
     paymentInfoBox: {
-        marginHorizontal: 20,
-        marginTop: 8,
+        marginTop: 16,
         flexDirection: 'row',
         alignItems: 'flex-start',
         backgroundColor: '#FFFBEB',
-        borderRadius: 12,
-        padding: 12,
+        borderRadius: 16,
+        padding: 16,
         borderWidth: 1,
         borderColor: '#FEF3C7',
     },
-
     paymentInfoText: {
         flex: 1,
-        marginLeft: 8,
-        fontSize: 12,
-        color: '#8A6D3B',
-        lineHeight: 18,
+        marginLeft: 10,
+        fontSize: 13,
+        color: '#92400E',
+        lineHeight: 20,
     },
-
+    colabSection: {
+        gap: 12,
+    },
+    colabCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+    },
+    colabSelected: {
+        borderColor: colors.primary,
+        backgroundColor: `${colors.primary}05`,
+    },
+    colabAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#EEF2FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+    },
+    colabAvatarSelected: {
+        backgroundColor: colors.primary,
+    },
+    colabAvatarText: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: colors.primary,
+    },
+    colabInfo: {
+        flex: 1,
+    },
+    colabNome: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1E293B',
+    },
+    horariosLegenda: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        marginBottom: 16,
+        marginLeft: 4,
+    },
+    legendaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    legendaDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    legendaText: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '500',
+    },
     horariosGrid: {
-        marginHorizontal: 20,
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 10,
     },
-
     horaChip: {
-        paddingHorizontal: 18,
-        paddingVertical: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderRadius: 12,
-        borderWidth: 2,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        backgroundColor: '#FFF',
+        minWidth: 80,
+        alignItems: 'center',
     },
-
     horaChipLivre: {
         borderColor: colors.primary,
-        backgroundColor: '#FFF',
     },
-
-    horaChipIndisponivel: {
-        borderColor: '#DDD',
-        backgroundColor: '#F5F5F5',
+    horaChipOcupado: {
+        backgroundColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
         opacity: 0.6,
     },
-
-    horaChipOcupado: {
-        borderColor: '#FFCDD2',
-        backgroundColor: '#FFEBEE',
+    horaChipIndisponivel: {
+        backgroundColor: '#F1F5F9',
+        borderColor: '#E2E8F0',
+        opacity: 0.4,
     },
-
     horaChipSelected: {
         backgroundColor: colors.primary,
         borderColor: colors.primary,
     },
-
     horaChipText: {
         fontWeight: '700',
         fontSize: 14,
+        color: '#64748B',
     },
-
     horaChipTextLivre: {
         color: colors.primary,
     },
-
-    horaChipTextIndisponivel: {
-        color: '#BBB',
-    },
-
     horaChipTextOcupado: {
-        color: '#E57373',
         textDecorationLine: 'line-through',
     },
-
     horaChipTextSelected: {
         color: '#FFF',
     },
-
-    horaChipOcupadoLabel: {
-        fontSize: 9,
-        color: '#E57373',
-        fontWeight: '600',
-        textAlign: 'center',
-        marginTop: 2,
-        letterSpacing: 0.3,
-    },
-
-    horariosLegenda: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 14,
-        marginHorizontal: 20,
-        marginBottom: 10,
-    },
-
-    legendaItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-    },
-
-    legendaDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#DDD',
-    },
-
-    legendaText: {
-        fontSize: 11,
-        color: '#888',
-        fontWeight: '500',
-    },
-
-    colabSection: {
-        marginTop: 4,
-    },
-
-    colabCard: {
-        marginHorizontal: 20,
-        marginBottom: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        borderRadius: 14,
-        padding: 14,
-        borderWidth: 2,
-        borderColor: '#EEF1F4',
-        elevation: 1,
-    },
-
-    colabSelected: {
-        borderColor: colors.primary,
-        backgroundColor: `${colors.primary}08`,
-    },
-
-    colabDisabled: {
-        borderColor: '#EEE',
-        backgroundColor: '#FAFAFA',
-        opacity: 0.6,
-    },
-
-    colabAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: `${colors.primary}20`,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-
-    colabAvatarSelected: {
-        backgroundColor: `${colors.primary}30`,
-    },
-
-    colabAvatarText: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: colors.primary,
-    },
-
-    colabInfo: {
-        flex: 1,
-    },
-
-    colabNome: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#1A1A2E',
-    },
-
-    colabNomeDisabled: {
-        color: '#999',
-    },
-
-    colabMsg: {
-        fontSize: 12,
-        color: '#E67E22',
-        marginTop: 2,
-    },
-
     confirmButton: {
-        marginHorizontal: 20,
-        marginTop: 24,
+        marginTop: 32,
         backgroundColor: colors.primary,
         borderRadius: 16,
-        paddingVertical: 16,
+        paddingVertical: 18,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        elevation: 3,
+        elevation: 4,
         shadowColor: colors.primary,
         shadowOpacity: 0.3,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
     },
-
     confirmButtonDisabled: {
-        opacity: 0.7,
+        backgroundColor: '#CBD5E1',
+        shadowOpacity: 0,
+        elevation: 0,
     },
-
     confirmButtonText: {
         color: '#FFF',
         fontWeight: '800',
-        fontSize: 15,
-        marginLeft: 8,
+        fontSize: 16,
+        marginLeft: 10,
     },
 });
