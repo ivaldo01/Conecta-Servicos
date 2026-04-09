@@ -3,6 +3,7 @@
   "routes": [
     { "src": "/api/webhook",       "dest": "/api/webhook.js"       },
     { "src": "/api/createPayment", "dest": "/api/createPayment.js" },
+    { "src": "/api/gerarPix",      "dest": "/api/gerarPix.js"      },
     { "src": "/api/withdraw",      "dest": "/api/withdraw.js"      },
     { "src": "/api/createSubscription", "dest": "/api/createSubscription.js" },
     { "src": "/api/gerarAgendamentosRecorrentes", "dest": "/api/gerarAgendamentosRecorrentes.js" },
