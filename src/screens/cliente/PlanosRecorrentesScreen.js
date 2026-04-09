@@ -276,7 +276,7 @@ export default function PlanosRecorrentesScreen({ route, navigation }) {
       const contratoRef = await addDoc(collection(db, 'contratosRecorrentes'), contratoData);
 
       if (formaPagamento === 'PIX') {
-        const response = await fetch('https://backend-vercel-nu-topaz.vercel.app/api/gerarPix', {
+        const response = await fetch('https://backendvercel-git-main-conecta-solutions.vercel.app/api/gerarPix', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

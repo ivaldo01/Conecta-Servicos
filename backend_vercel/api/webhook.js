@@ -153,8 +153,9 @@ module.exports = async (req, res) => {
                     await agendamentoRef.set({
                         clienteId: clienteId,
                         clienteNome: clienteNome,
-                        profissionalId: profissionalId,
-                        colaboradorId: profissionalId,
+                        profissionalId: profissionalId || null,
+                        colaboradorId: profissionalId || null,
+
 
                         // Dados do agendamento
                         dataAgendamento: payment.dueDate ? admin.firestore.Timestamp.fromDate(new Date(payment.dueDate)) : admin.firestore.FieldValue.serverTimestamp(),
