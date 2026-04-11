@@ -31,6 +31,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
+import { temSeloVerificado, temAnuncios } from '../../constants/plans';
 import logo from '../../../assets/logo.png';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -252,6 +253,7 @@ export default function HomeScreen({ navigation }) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [proximoAgendamento, setProximoAgendamento] = useState(null);
 
   const slidesRef = useRef(null);
   const primeiroNome = getPrimeiroNome(usuario?.nome);
@@ -394,6 +396,35 @@ export default function HomeScreen({ navigation }) {
     );
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user?.uid) return;
+
+    const unsubscribeAgenda = onSnapshot(
+      query(collection(db, 'agendamentos'), where('clienteId', '==', user.uid)),
+      (snapshot) => {
+         const agendamentosValidos = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(a => String(a.status).toLowerCase() === 'agendado');
+
+         const agora = new Date();
+         const agendamentosOrdenados = agendamentosValidos.map(a => {
+            const dataBase = typeof a.dataAgendamento?.toDate === 'function' ? a.dataAgendamento.toDate() : new Date(a.dataAgendamento);
+            if (a.horaInicio) {
+              const [h, m] = a.horaInicio.split(':');
+              dataBase.setHours(parseInt(h), parseInt(m), 0, 0);
+            }
+            return { ...a, _dataFechada: dataBase };
+         }).filter(a => a._dataFechada >= agora).sort((a,b) => a._dataFechada - b._dataFechada);
+
+         setProximoAgendamento(agendamentosOrdenados.length > 0 ? agendamentosOrdenados[0] : null);
+      },
+      (error) => console.log('Erro ao buscar agendamentos HomeScreen:', error)
+    );
+
+    return () => unsubscribeAgenda();
   }, []);
 
   const slidesComAds = useMemo(() => {
@@ -581,9 +612,14 @@ export default function HomeScreen({ navigation }) {
 
         {/* Conteúdo do card */}
         <View style={styles.profContent}>
-          <Text style={styles.profName} numberOfLines={1}>
-            {profissional?.nome || profissional?.nomeFantasia || 'Profissional'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={[styles.profName, { marginBottom: 0, flexShrink: 1 }]} numberOfLines={1}>
+              {profissional?.nome || profissional?.nomeFantasia || 'Profissional'}
+            </Text>
+            {temSeloVerificado(profissional?.planoAtivo) && (
+              <Ionicons name="checkmark-circle" size={16} color="#3498DB" style={{ marginLeft: 4 }} />
+            )}
+          </View>
 
           <Text style={styles.profCategory} numberOfLines={1}>
             {profissional?.especialidade || 'Serviços gerais'}
@@ -696,7 +732,7 @@ export default function HomeScreen({ navigation }) {
               activeOpacity={0.9}
               onPress={() => navigation.navigate('Notificacoes')}
             >
-              <Ionicons name="notifications-outline" size={22} color="#FFF" />
+              <Ionicons name="notifications-outline" size={22} color={colors.primary} />
 
               {totalNotificacoesNaoLidas > 0 && (
                 <View style={styles.notificationBadge}>
@@ -712,7 +748,7 @@ export default function HomeScreen({ navigation }) {
               activeOpacity={0.9}
               onPress={abrirPerfilCliente}
             >
-              <Ionicons name="person-outline" size={22} color="#FFF" />
+              <Ionicons name="person-outline" size={22} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -732,6 +768,56 @@ export default function HomeScreen({ navigation }) {
             <Ionicons name="arrow-forward-circle" size={30} color={colors.primary} />
           </TouchableOpacity>
         </View>
+
+        {proximoAgendamento && (
+           <TouchableOpacity 
+             activeOpacity={0.9}
+             style={{ backgroundColor: '#F59E0B', marginHorizontal: 16, marginTop: -10, marginBottom: 20, padding: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#F59E0B', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {height: 4}, elevation: 5 }}
+             onPress={() => navigation.navigate('MeusAgendamentosCliente')}
+           >
+              <View style={{ backgroundColor: '#FFF', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                 <Ionicons name="time" size={24} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                 <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13, textTransform: 'uppercase' }}>Lembrete de Sessão</Text>
+                 <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600', marginTop: 2 }}>
+                    Amanhã / Hoje às {proximoAgendamento.horaInicio}
+                 </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#FFF" />
+           </TouchableOpacity>
+        )}
+
+        {favoritosIds.length > 0 && profissionais.length > 0 && (
+           <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginLeft: 18, marginBottom: 12 }}>
+                 Profissionais Favoritos
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                 {profissionais.filter(p => favoritosIds.includes(p.id)).slice(0, 8).map(prof => (
+                    <TouchableOpacity 
+                       key={prof.id} 
+                       activeOpacity={0.8}
+                       onPress={() => abrirPerfilProfissional(prof)}
+                       style={{ alignItems: 'center', marginRight: 16, width: 72 }}
+                    >
+                       <View style={{ width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: colors.primary, padding: 2, marginBottom: 6 }}>
+                          <View style={{ flex: 1, backgroundColor: '#E2E8F0', borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                             {prof.fotoPerfil ? (
+                                <Image source={{ uri: prof.fotoPerfil }} style={{ width: '100%', height: '100%' }} />
+                             ) : (
+                                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#64748B' }}>{prof.nome?.charAt(0).toUpperCase()}</Text>
+                             )}
+                          </View>
+                       </View>
+                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', textAlign: 'center' }} numberOfLines={1}>
+                          {prof.nome?.split(' ')[0]}
+                       </Text>
+                    </TouchableOpacity>
+                 ))}
+              </ScrollView>
+           </View>
+        )}
 
         <ScrollView
           ref={slidesRef}
@@ -792,7 +878,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        <AdBanner />
+        <AdBanner enabled={temAnuncios(usuario?.planoAtivo)} />
 
         <View style={styles.sectionHeader}>
           <View>
@@ -840,18 +926,23 @@ export default function HomeScreen({ navigation }) {
             </View>
           )}
         </View>
-
-        <View style={styles.featuresRow}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.featuresScrollContainer}
+        >
           <TouchableOpacity
             style={[styles.featureCard, { backgroundColor: '#FFF7E8' }]}
             activeOpacity={0.92}
             onPress={() => navigation.navigate('MeusAgendamentosCliente')}
           >
             <View style={[styles.featureIconCircle, { backgroundColor: 'rgba(217,163,0,0.14)' }]}>
-              <Ionicons name="flash-outline" size={20} color="#D9A300" />
+              <Ionicons name="flash-outline" size={24} color="#D9A300" />
             </View>
-            <Text style={styles.featureTitle}>Agendamento rápido</Text>
-            <Text style={styles.featureText}>Escolha e reserve em poucos toques</Text>
+            <View style={styles.featureTextWrapper}>
+              <Text style={styles.featureTitle}>Agendamento rápido</Text>
+              <Text style={styles.featureText}>Escolha e reserve em poucos toques</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -862,12 +953,14 @@ export default function HomeScreen({ navigation }) {
             <View style={[styles.featureIconCircle, { backgroundColor: 'rgba(35,165,90,0.14)' }]}>
               <Ionicons
                 name="shield-checkmark-outline"
-                size={20}
+                size={24}
                 color="#23A55A"
               />
             </View>
-            <Text style={styles.featureTitle}>Profissionais confiáveis</Text>
-            <Text style={styles.featureText}>Perfis completos e mais segurança</Text>
+            <View style={styles.featureTextWrapper}>
+              <Text style={styles.featureTitle}>Profissionais confiáveis</Text>
+              <Text style={styles.featureText}>Perfis verificados e mais segurança</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -876,12 +969,14 @@ export default function HomeScreen({ navigation }) {
             onPress={abrirMelhoresAvaliados}
           >
             <View style={[styles.featureIconCircle, { backgroundColor: 'rgba(58,123,255,0.14)' }]}>
-              <Ionicons name="star-outline" size={20} color="#3A7BFF" />
+              <Ionicons name="star-outline" size={24} color="#3A7BFF" />
             </View>
-            <Text style={styles.featureTitle}>Melhores avaliações</Text>
-            <Text style={styles.featureText}>Encontre quem se destaca no app</Text>
+            <View style={styles.featureTextWrapper}>
+              <Text style={styles.featureTitle}>Melhores avaliações</Text>
+              <Text style={styles.featureText}>Encontre quem se destaca no app</Text>
+            </View>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         <View style={styles.sectionHeader}>
           <View>
@@ -1032,31 +1127,36 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
     position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 
   notificationBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 18,
-    height: 18,
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
     paddingHorizontal: 4,
-    borderRadius: 9,
+    borderRadius: 10,
     backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: '#FFF',
   },
 
   notificationBadgeText: {
     color: '#FFF',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
   },
 
@@ -1064,9 +1164,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 
   searchBox: {
@@ -1381,54 +1486,54 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  featuresRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+  featuresScrollContainer: {
     paddingHorizontal: 4,
+    paddingBottom: 10,
+    marginBottom: 20,
   },
 
   featureCard: {
-    width: '31%',
+    width: 260,
+    flexDirection: 'row',
     backgroundColor: '#FFF',
     borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    marginBottom: 12,
+    marginRight: 16,
     borderWidth: 1,
     borderColor: '#E8EDF5',
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
 
   featureIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginRight: 14,
+  },
+
+  featureTextWrapper: {
+    flex: 1,
   },
 
   featureTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
     color: colors.textDark,
-    marginBottom: 6,
-    textAlign: 'center',
-    lineHeight: 18,
+    marginBottom: 4,
   },
 
   featureText: {
-    fontSize: 11,
-    color: colors.secondary,
-    lineHeight: 16,
-    textAlign: 'center',
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
 
   horizontalListContent: {

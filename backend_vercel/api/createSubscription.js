@@ -27,7 +27,8 @@ module.exports = async (req, res) => {
             nomePlano,
             billingType = 'PIX',
             creditCard,
-            creditCardHolderInfo
+            creditCardHolderInfo,
+            discount
         } = req.body;
 
         if (!userId || !planoId || !valor) {
@@ -136,6 +137,10 @@ module.exports = async (req, res) => {
                 subscriptionBody.creditCardHolderInfo = creditCardHolderInfo;
                 // Para cartão, o nextDueDate pode ser hoje se quisermos cobrar na hora,
                 // mas Asaas cobra a primeira mensalidade na criação se for cartão e não tiver trial.
+            }
+
+            if (discount) {
+                subscriptionBody.discount = discount;
             }
 
             const subscriptionResponse = await axios.post(`${ASAAS_API_URL}/subscriptions`, subscriptionBody, {

@@ -485,7 +485,7 @@ export async function consultarStatusPagamento(agendamentoId) {
     return data;
 }
 
-export async function criarAssinatura({ userId, planoId, valor, nomePlano, billingType = 'PIX', creditCard, creditCardHolderInfo }) {
+export async function criarAssinatura({ userId, planoId, valor, nomePlano, billingType = 'PIX', creditCard, creditCardHolderInfo, discount }) {
     if (!userId || !planoId || !valor) {
         throw new Error('Dados incompletos para processar assinatura.');
     }
@@ -504,7 +504,8 @@ export async function criarAssinatura({ userId, planoId, valor, nomePlano, billi
                 nomePlano,
                 billingType,
                 creditCard,
-                creditCardHolderInfo
+                creditCardHolderInfo,
+                discount
             }),
         });
     } catch (networkError) {

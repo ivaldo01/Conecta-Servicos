@@ -30,7 +30,7 @@ import { db } from '../../services/firebaseConfig';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsuario } from '../../hooks/useUsuario';
 import { solicitarSaqueProfissional } from '../../services/paymentService';
-import { getTaxaSaque } from '../../constants/plans';
+import { PLANS, getTaxaSaque, getTaxaServico } from '../../constants/plans';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -165,7 +165,7 @@ function EmptyState({ icon, title, subtitle }) {
   );
 }
 
-export default function FinanceiroPro() {
+export default function FinanceiroPro({ navigation }) {
   const { usuario: authUser, loadingAuth } = useAuth();
   const { dadosUsuario, loadingUsuario } = useUsuario(authUser?.uid);
 
@@ -195,6 +195,7 @@ export default function FinanceiroPro() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [modalBancoVisible, setModalBancoVisible] = useState(false);
+  const [modalPlanoVisible, setModalPlanoVisible] = useState(false);
   const [valorSaque, setValorSaque] = useState('');
   const [chavePix, setChavePix] = useState('');
   const [loadingSaque, setLoadingSaque] = useState(false);
@@ -227,6 +228,7 @@ export default function FinanceiroPro() {
     let pagamentosProfissional = [];
     let pagamentosClinica = [];
     let pagamentosColaborador = [];
+    let pagamentosAssinaturas = [];
     let saquesAtuais = [];
 
     function atualizarLoading() {
@@ -249,6 +251,7 @@ export default function FinanceiroPro() {
         ...pagamentosProfissional,
         ...pagamentosClinica,
         ...pagamentosColaborador,
+        ...pagamentosAssinaturas,
       ].forEach((item) => {
         mapa.set(item.id, item);
       });
@@ -370,12 +373,50 @@ export default function FinanceiroPro() {
       }
     );
 
+    const unsubAssinaturas = onSnapshot(
+      query(collection(db, 'contratosRecorrentes'), where('profissionalId', '==', usuario.uid)),
+      (snap) => {
+        const taxaServico = getTaxaServico(usuario?.planoAtivo);
+
+        pagamentosAssinaturas = snap.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(c => String(c.status).toLowerCase() === 'ativo')
+          .map(c => {
+            const valorLiquido = c.valorMensal - (c.valorMensal * taxaServico);
+            const dataBase = c.ultimoPagamento || c.dataInicio || { toDate: () => new Date() };
+            return {
+              id: c.id,
+              agendamentoId: c.id,
+              status: 'pago',
+              formaPagamento: c.formaPagamento || 'cartao',
+              formaPagamentoLabel: 'Assinatura',
+              valorBruto: c.valorMensal,
+              taxaPlataforma: c.valorMensal * taxaServico,
+              valorLiquidoProfissional: valorLiquido,
+              valorLiquido,
+              atualizadoEm: dataBase,
+              pagoEm: dataBase,
+              criadoEm: dataBase,
+              clienteNome: c.clienteNome || 'Assinante Recorrente',
+              servicoNome: `Plano: ${c.nomePlano || 'Assinatura'}`,
+            };
+          });
+        atualizarPagamentos();
+      },
+      (error) => {
+        console.log('Erro ao ouvir contratos recorrentes:', error);
+        pagamentosAssinaturas = [];
+        atualizarPagamentos();
+      }
+    );
+
     return () => {
       unsubSaldo?.();
       unsubProfissional?.();
       unsubClinica?.();
       unsubColaborador?.();
       unsubSaques?.();
+      unsubAssinaturas?.();
     };
   }, [usuario?.uid, ehColaborador]);
 
@@ -504,10 +545,13 @@ export default function FinanceiroPro() {
     const hoje = new Date();
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const inicioMesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    const fimMesPassado = new Date(hoje.getFullYear(), hoje.getMonth(), 0, 23, 59, 59);
 
     let totalRecebido = 0;
     let recebidoHoje = 0;
     let recebidoMes = 0;
+    let recebidoMesPassado = 0;
     let cobrancasGeradas = 0;
     let cobrancasPagas = 0;
     let cobrancasCanceladas = 0;
@@ -561,6 +605,8 @@ export default function FinanceiroPro() {
 
           if (dataPagamento >= inicioMes) {
             recebidoMes += valorConsiderado;
+          } else if (dataPagamento >= inicioMesPassado && dataPagamento <= fimMesPassado) {
+            recebidoMesPassado += valorConsiderado;
           }
         }
       }
@@ -579,11 +625,15 @@ export default function FinanceiroPro() {
     const saldoBloqueadoFirestore = parseNumero(saldoConta?.saldoBloqueado ?? 0);
 
     const saldoDisponivelFallback = pagamentos
-      .filter((item) => ['pago', 'received', 'confirmed'].includes(getStatusPagamento(item)))
+      .filter((item) => ['pago', 'received', 'confirmed'].includes(getStatusPagamento(item)) && item.formaPagamentoLabel !== 'Assinatura')
+      .reduce((acc, item) => acc + getValorLiquido(item), 0);
+
+    const assinaturasAdicionais = pagamentos
+      .filter((item) => item.formaPagamentoLabel === 'Assinatura')
       .reduce((acc, item) => acc + getValorLiquido(item), 0);
 
     const saldoDisponivel =
-      saldoConta ? saldoDisponivelFirestore : saldoDisponivelFallback;
+      (saldoConta ? saldoDisponivelFirestore : saldoDisponivelFallback) + assinaturasAdicionais;
 
     const saldoPendente = saldoConta ? saldoPendenteFirestore : 0;
     const saldoBloqueado = saldoConta ? saldoBloqueadoFirestore : 0;
@@ -639,6 +689,7 @@ export default function FinanceiroPro() {
       totalRecebido,
       recebidoHoje,
       recebidoMes,
+      recebidoMesPassado,
       saldoDisponivel,
       saldoPendente,
       saldoBloqueado,
@@ -703,7 +754,27 @@ export default function FinanceiroPro() {
   // Obter taxa de saque baseada no plano do usuário
   const planoId = usuario?.planoAtivo || 'pro_iniciante';
   const taxaSaque = getTaxaSaque(planoId);
+  const taxaComissaoPercentual = getTaxaServico(planoId) * 100;
   const isTaxaZero = taxaSaque === 0;
+
+  // Encontrar o objeto do plano iterando na constante PLANS
+  const objetoPlano = useMemo(() => {
+    let currPlano = PLANS.PROFESSIONAL.INICIANTE;
+    for (const key in PLANS.PROFESSIONAL) {
+      if (PLANS.PROFESSIONAL[key].id === planoId) {
+        currPlano = PLANS.PROFESSIONAL[key];
+        break;
+      }
+    }
+    return currPlano;
+  }, [planoId]);
+
+  const percentualCrescimento = useMemo(() => {
+    const passado = Number(resumo?.recebidoMesPassado) || 0;
+    const atual = Number(resumo?.recebidoMes) || 0;
+    if (passado === 0) return atual > 0 ? 100 : 0;
+    return Number((((atual - passado) / passado) * 100).toFixed(1));
+  }, [resumo.recebidoMes, resumo.recebidoMesPassado]);
 
   async function solicitarSaque() {
     const valor = Number(String(valorSaque).replace(',', '.'));
@@ -1036,7 +1107,7 @@ export default function FinanceiroPro() {
               <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.refreshButton}>
                 <Ionicons name="cash-outline" size={20} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => navigation.navigate('Premium')} style={[styles.refreshButton, { backgroundColor: '#F1C40F20' }]}>
+              <TouchableOpacity onPress={() => setModalPlanoVisible(true)} style={[styles.refreshButton, { backgroundColor: '#F1C40F20', borderColor: '#F1C40F' }]}>
                 <Ionicons name="star" size={20} color="#F1C40F" />
               </TouchableOpacity>
             </View>
@@ -1120,178 +1191,172 @@ export default function FinanceiroPro() {
           </View>
         )}
 
-        <View style={styles.infoGrid}>
-          <InfoMiniCard
-            icon="today-outline"
-            label="Recebido hoje"
-            value={formatCurrency(resumo.recebidoHoje)}
-            subtitle="pagamentos confirmados"
-          />
-          <InfoMiniCard
-            icon="calendar-outline"
-            label="Recebido no mês"
-            value={formatCurrency(resumo.recebidoMes)}
-            subtitle="entradas do mês"
-          />
-          <InfoMiniCard
-            icon="checkmark-done-circle-outline"
-            label={ehColaborador ? 'Total já recebido' : 'Total recebido'}
-            value={formatCurrency(resumo.totalRecebido)}
-            subtitle={ehColaborador ? `${resumo.cobrancasPagas} serviço(s) concluído(s) pagos` : `${resumo.cobrancasPagas} cobrança(s) paga(s)`}
-          />
-          <InfoMiniCard
-            icon="trending-up-outline"
-            label="Ticket médio"
-            value={formatCurrency(resumo.ticketMedio)}
-            subtitle="por cobrança paga"
-          />
-          <InfoMiniCard
-            icon="time-outline"
-            label="Pendentes"
-            value={String(resumo.cobrancasGeradas)}
-            subtitle="aguardando pagamento"
-          />
-          {ehColaborador ? (
-            <InfoMiniCard
-              icon="cash-outline"
-              label="Em aberto"
-              value={formatCurrency(resumo.valorEmAberto)}
-              subtitle="cobranças aguardando pagamento"
-            />
-          ) : (
-            <InfoMiniCard
-              icon="card-outline"
-              label="Total sacado"
-              value={formatCurrency(resumo.totalSacado)}
-              subtitle={`${ultimosSaques.filter((item) => String(item.status).toLowerCase() === 'pago').length} saque(s) pagos`}
-            />
-          )}
-        </View>
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>
-            {ehColaborador ? 'Comparativo dos resultados' : 'Comparativo dos saldos'}
-          </Text>
-
-          {resumo.dadosGrafico.map((item) => (
-            <View key={item.label} style={styles.barItem}>
-              <View style={styles.barHeader}>
-                <Text style={styles.barLabel}>{item.label}</Text>
-                <Text style={styles.barValue}>{formatCurrency(item.valor)}</Text>
-              </View>
-
-              <View style={styles.barTrack}>
-                <View style={[styles.barFill, { width: `${item.percentual}%` }]} />
-              </View>
-            </View>
-          ))}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+          <View style={{ flex: 1, backgroundColor: '#FFF', padding: 16, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6 }}>
+            <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginTop: 10 }}>{formatCurrency(resumo.recebidoMes)}</Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>Recebido este mês</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: '#FFF', padding: 16, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6 }}>
+            <Ionicons name="today-outline" size={24} color="#F59E0B" />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginTop: 10 }}>{formatCurrency(resumo.recebidoHoje)}</Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>Recebido hoje</Text>
+          </View>
         </View>
 
         {!ehColaborador && (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Saques recentes</Text>
+          <View style={[styles.sectionCard, { marginTop: 16, backgroundColor: '#FFF' }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Análise de Crescimento</Text>
+              <Ionicons name="bar-chart-outline" size={20} color={colors.primary} />
+            </View>
 
-            {ultimosSaques.length === 0 ? (
-              <EmptyState
-                icon="cash-outline"
-                title="Nenhum saque solicitado"
-                subtitle="Quando você solicitar um saque, ele aparecerá aqui."
-              />
-            ) : (
-              ultimosSaques.map((item) => {
-                const statusColor = getSaqueStatusColor(String(item?.status || '').toLowerCase());
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 140, marginTop: 10, paddingHorizontal: 20 }}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>Mês Passado</Text>
+                <View style={{ width: 44, height: Number.isFinite((resumo.recebidoMesPassado / Math.max(resumo.recebidoMesPassado, resumo.recebidoMes, 1)) * 100) ? Math.max(10, Math.min(100, (resumo.recebidoMesPassado / Math.max(resumo.recebidoMesPassado, resumo.recebidoMes, 1)) * 100)) : 10, backgroundColor: '#E2E8F0', borderTopLeftRadius: 6, borderTopRightRadius: 6 }} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginTop: 8 }}>{formatCurrency(resumo.recebidoMesPassado)}</Text>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: '#666', marginBottom: 6 }}>Este Mês</Text>
+                <View style={{ width: 44, height: Number.isFinite((resumo.recebidoMes / Math.max(resumo.recebidoMesPassado, resumo.recebidoMes, 1)) * 100) ? Math.max(10, Math.min(100, (resumo.recebidoMes / Math.max(resumo.recebidoMesPassado, resumo.recebidoMes, 1)) * 100)) : 10, backgroundColor: colors.primary, borderTopLeftRadius: 6, borderTopRightRadius: 6 }} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary, marginTop: 8 }}>{formatCurrency(resumo.recebidoMes)}</Text>
+              </View>
+            </View>
 
-                return (
-                  <View key={item.id} style={styles.saqueCard}>
-                    <View style={styles.saqueLeft}>
-                      <View style={[styles.saqueIconWrap, { backgroundColor: `${statusColor}15` }]}>
-                        <Ionicons name="arrow-up-circle-outline" size={18} color={statusColor} />
-                      </View>
-
-                      <View style={styles.saqueTextBox}>
-                        <Text style={styles.saqueTitle}>
-                          {formatCurrency(
-                            item?.valor ??
-                            item?.valorSolicitado ??
-                            item?.valorAprovado ??
-                            0
-                          )}
-                        </Text>
-                        <Text style={styles.saqueSubtitle}>
-                          {item?.pixAddressKey || item?.chavePix
-                            ? `Chave Pix: ${item?.pixAddressKey || item?.chavePix}`
-                            : 'Chave Pix não informada'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.saqueRight}>
-                      <Text style={[styles.saqueStatus, { color: statusColor }]}>
-                        {getSaqueStatusLabel(String(item?.status || '').toLowerCase())}
-                      </Text>
-                      <Text style={styles.saqueDate}>
-                        {formatDateBR(item?.solicitadoEm || item?.criadoEm)}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, backgroundColor: '#F8FAFC', padding: 12, borderRadius: 12 }}>
+              <Ionicons name={percentualCrescimento >= 0 ? "trending-up-outline" : "trending-down-outline"} size={20} color={percentualCrescimento >= 0 ? "#10B981" : "#EF4444"} />
+              <Text style={{ color: percentualCrescimento >= 0 ? "#10B981" : "#EF4444", fontWeight: '700', fontSize: 14, marginLeft: 8 }}>
+                {percentualCrescimento > 0 ? '+' : ''}{percentualCrescimento}% {percentualCrescimento >= 0 ? 'de crescimento' : 'de queda'}
+              </Text>
+            </View>
           </View>
         )}
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Últimas cobranças</Text>
-
-          {ultimasCobrancas.length === 0 ? (
-            <EmptyState
-              icon="receipt-outline"
-              title="Nenhuma cobrança encontrada"
-              subtitle="Quando você gerar cobranças, elas aparecerão aqui."
-            />
-          ) : (
-            ultimasCobrancas.map((item) => (
-              <View key={item.id} style={styles.atendimentoCard}>
-                <View style={styles.atendimentoAvatar}>
-                  <Ionicons name="person-outline" size={18} color={colors.primary} />
-                </View>
-
-                <View style={styles.atendimentoContent}>
-                  <Text style={styles.atendimentoCliente}>
-                    {item?.clienteNome || 'Cliente'}
-                  </Text>
-                  <Text style={styles.atendimentoInfo}>
-                    {item?.data || item?.dataAgendamento || 'Data não informada'} às{' '}
-                    {item?.horario || item?.horarioAgendamento || '--:--'}
-                  </Text>
-                  <Text style={styles.atendimentoMeta}>
-                    {(item?.formaPagamentoLabel || item?.formaPagamento || 'Pix')} • {getStatusPagamento(item)}
-                  </Text>
-                </View>
-
-                <Text style={styles.atendimentoValor}>
-                  {formatCurrency(getValorBruto(item))}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
-
-        <View style={styles.tipCard}>
-          <Ionicons name="bulb-outline" size={22} color="#856404" />
-          <Text style={styles.tipText}>
-            {ehColaborador ? (
-              'Esta subconta mostra apenas os seus rendimentos, atualizados automaticamente conforme os pagamentos recebidos nos serviços concluídos por você. Saques e saldo principal seguem sob gestão da conta superior.'
-            ) : (
-              <>
-                Agora o financeiro usa o documento de saldo como fonte principal. Quando o pagamento
-                for confirmado pelo webhook, o valor líquido deve aparecer em
-                <Text style={styles.tipBold}> saldo disponível</Text>.
-              </>
-            )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {ehColaborador ? 'Comparativo dos resultados' : 'Comparativo dos saldos'}
           </Text>
         </View>
-      </ScrollView>
+
+        {resumo.dadosGrafico.map((item) => (
+          <View key={item.label} style={styles.barItem}>
+            <View style={styles.barHeader}>
+              <Text style={styles.barLabel}>{item.label}</Text>
+              <Text style={styles.barValue}>{formatCurrency(item.valor)}</Text>
+            </View>
+
+            <View style={styles.barTrack}>
+              <View style={[styles.barFill, { width: `${item.percentual}%` }]} />
+            </View>
+          </View>
+        ))}
+
+      {!ehColaborador && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Saques recentes</Text>
+
+          {ultimosSaques.length === 0 ? (
+            <EmptyState
+              icon="cash-outline"
+              title="Nenhum saque solicitado"
+              subtitle="Quando você solicitar um saque, ele aparecerá aqui."
+            />
+          ) : (
+            ultimosSaques.map((item) => {
+              const statusColor = getSaqueStatusColor(String(item?.status || '').toLowerCase());
+
+              return (
+                <View key={item.id} style={styles.saqueCard}>
+                  <View style={styles.saqueLeft}>
+                    <View style={[styles.saqueIconWrap, { backgroundColor: `${statusColor}15` }]}>
+                      <Ionicons name="arrow-up-circle-outline" size={18} color={statusColor} />
+                    </View>
+
+                    <View style={styles.saqueTextBox}>
+                      <Text style={styles.saqueTitle}>
+                        {formatCurrency(
+                          item?.valor ??
+                          item?.valorSolicitado ??
+                          item?.valorAprovado ??
+                          0
+                        )}
+                      </Text>
+                      <Text style={styles.saqueSubtitle}>
+                        {item?.pixAddressKey || item?.chavePix
+                          ? `Chave Pix: ${item?.pixAddressKey || item?.chavePix}`
+                          : 'Chave Pix não informada'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.saqueRight}>
+                    <Text style={[styles.saqueStatus, { color: statusColor }]}>
+                      {getSaqueStatusLabel(String(item?.status || '').toLowerCase())}
+                    </Text>
+                    <Text style={styles.saqueDate}>
+                      {formatDateBR(item?.solicitadoEm || item?.criadoEm)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+      )}
+
+      <View style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>Últimas cobranças</Text>
+
+        {ultimasCobrancas.length === 0 ? (
+          <EmptyState
+            icon="receipt-outline"
+            title="Nenhuma cobrança encontrada"
+            subtitle="Quando você gerar cobranças, elas aparecerão aqui."
+          />
+        ) : (
+          ultimasCobrancas.map((item) => (
+            <View key={item.id} style={styles.atendimentoCard}>
+              <View style={styles.atendimentoAvatar}>
+                <Ionicons name="person-outline" size={18} color={colors.primary} />
+              </View>
+
+              <View style={styles.atendimentoContent}>
+                <Text style={styles.atendimentoCliente}>
+                  {item?.clienteNome || 'Cliente'}
+                </Text>
+                <Text style={styles.atendimentoInfo}>
+                  {item?.data || item?.dataAgendamento || 'Data não informada'} às{' '}
+                  {item?.horario || item?.horarioAgendamento || '--:--'}
+                </Text>
+                <Text style={styles.atendimentoMeta}>
+                  {(item?.formaPagamentoLabel || item?.formaPagamento || 'Pix')} • {getStatusPagamento(item)}
+                </Text>
+              </View>
+
+              <Text style={styles.atendimentoValor}>
+                {formatCurrency(getValorBruto(item))}
+              </Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.tipCard}>
+        <Ionicons name="bulb-outline" size={22} color="#856404" />
+        <Text style={styles.tipText}>
+          {ehColaborador ? (
+            'Esta subconta mostra apenas os seus rendimentos, atualizados automaticamente conforme os pagamentos recebidos nos serviços concluídos por você. Saques e saldo principal seguem sob gestão da conta superior.'
+          ) : (
+            <>
+              Agora o financeiro usa o documento de saldo como fonte principal. Quando o pagamento
+              for confirmado pelo webhook, o valor líquido deve aparecer em
+              <Text style={styles.tipBold}> saldo disponível</Text>.
+            </>
+          )}
+        </Text>
+      </View>
+    </ScrollView >
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1444,6 +1509,61 @@ export default function FinanceiroPro() {
           </View>
         </View>
       </Modal>
+      <Modal animateType="fade" transparent={true} visible={modalPlanoVisible} onRequestClose={() => setModalPlanoVisible(false)}>
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#F1C40F20', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 }}>
+               <Ionicons name="star" size={32} color="#F1C40F" />
+            </View>
+
+            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Seu Plano Atual</Text>
+            <Text style={[styles.modalSubtitle, { textAlign: 'center', marginBottom: 20 }]}>
+              Você está utilizando o <Text style={{fontWeight: 'bold', color: '#222'}}>{objetoPlano.name}</Text>.
+            </Text>
+
+            <View style={{ backgroundColor: '#F8F9FA', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                 <Text style={{ color: '#666' }}>Taxa sobre Serviço (Plataforma):</Text>
+                 <Text style={{ fontWeight: 'bold', color: '#E74C3C' }}>{taxaComissaoPercentual}%</Text>
+               </View>
+               <View style={{ height: 1, backgroundColor: '#EEE', marginBottom: 12 }} />
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                 <Text style={{ color: '#666' }}>Taxa Fixa de Saque:</Text>
+                 <Text style={{ fontWeight: 'bold', color: isTaxaZero ? '#27AE60' : '#E74C3C' }}>
+                    {isTaxaZero ? 'GRÁTIS' : formatCurrency(taxaSaque)}
+                 </Text>
+               </View>
+            </View>
+
+            <View style={{ marginBottom: 24 }}>
+               {objetoPlano.features.slice(0, 3).map((feat, index) => (
+                  <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                     <Ionicons name="checkmark-circle" size={18} color="#27AE60" style={{ marginRight: 8 }} />
+                     <Text style={{ fontSize: 13, color: '#444' }}>{feat}</Text>
+                  </View>
+               ))}
+               <Text style={{ fontSize: 12, color: '#999', marginTop: 4, fontStyle: 'italic' }}>
+                 E muitos outros benefícios exclusivos...
+               </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={() => {
+                setModalPlanoVisible(false);
+                navigation.navigate('Premium');
+              }}
+            >
+              <Text style={styles.btnPrimaryText}>Mudar Plano Premium</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.btnSecondary} onPress={() => setModalPlanoVisible(false)}>
+              <Text style={styles.btnSecondaryText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </>
   );
 }

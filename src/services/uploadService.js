@@ -136,3 +136,48 @@ export async function uploadFotoGaleriaProfissional(userId, uri) {
         throw error;
     }
 }
+
+// ARQUIVOS DO SUPORTE (PDF, IMAGENS)
+export async function uploadArquivoSuporte(userId, uri, mimeType, fileName) {
+    if (!userId || !uri) throw new Error('DADOS_INCOMPLETOS');
+    
+    try {
+        const formData = new FormData();
+        
+        if (Platform.OS === 'web') {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            formData.append('file', blob);
+        } else {
+            formData.append('file', {
+                uri,
+                type: mimeType || 'image/jpeg',
+                name: fileName || `anexo_${Date.now()}`,
+            });
+        }
+        
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        formData.append('folder', `suporte/${userId}`);
+        
+        // '/auto/upload' permite processar dinamicamente imagem, vídeo ou raw document
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
+            {
+                method: 'POST',
+                body: formData,
+            }
+        );
+        
+        const data = await response.json();
+        
+        if (!response.ok || !data?.secure_url) {
+            console.log('Erro Cloudinary Suporte:', data);
+            throw new Error(data?.error?.message || 'ERRO_UPLOAD_CLOUDINARY');
+        }
+        
+        return data.secure_url;
+    } catch (error) {
+        console.log('Erro ao fazer upload de anexo no suporte:', error);
+        throw error;
+    }
+}

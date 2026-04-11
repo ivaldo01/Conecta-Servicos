@@ -24,6 +24,7 @@ import NativeAdCard from '../../components/NativeAdCard';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
+import { temAnuncios } from '../../constants/plans';
 import { getHojeStr as getHojeFiltroStr } from '../../utils/agendamentoUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -496,7 +497,7 @@ export default function HomeProfissional({ navigation }) {
                     </View>
                 </View>
 
-                <AdBanner />
+                <AdBanner enabled={temAnuncios(usuario?.planoAtivo)} />
 
                 {/* ── CARD FINANCEIRO ── */}
                 <View style={styles.financeCard}>

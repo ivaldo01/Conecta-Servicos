@@ -28,6 +28,7 @@ import {
 
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
+import { temSeloVerificado } from '../../constants/plans';
 
 function formatarTelefoneWhatsApp(telefone = '') {
     return String(telefone || '').replace(/\D/g, '');
@@ -487,9 +488,14 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                 </View>
 
                 <View style={isLargeScreen ? styles.headerTextLarge : null}>
-                    <Text style={[styles.nome, isLargeScreen && styles.nomeLarge]}>{getNomeProfissional(perfil)}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.nome, isLargeScreen && styles.nomeLarge, { marginBottom: 0 }]}>{getNomeProfissional(perfil)}</Text>
+                        {temSeloVerificado(perfil?.planoAtivo) && (
+                            <Ionicons name="checkmark-circle" size={24} color="#3498DB" style={{ marginLeft: 6 }} />
+                        )}
+                    </View>
 
-                    <Text style={[styles.subInfo, isLargeScreen && styles.subInfoLarge]}>
+                    <Text style={[styles.subInfo, isLargeScreen && styles.subInfoLarge, { marginTop: 4 }]}>
                         {perfil?.categoria || perfil?.especialidade || 'Profissional verificado no app'}
                     </Text>
 

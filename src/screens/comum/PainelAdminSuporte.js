@@ -53,6 +53,8 @@ export default function PainelAdminSuporte({ navigation }) {
             }));
             setChats(chatsData);
             setLoading(false);
+        }, (error) => {
+            console.warn("Erro no listener de suporte (comum no logoff):", error);
         });
 
         return () => unsubscribe();

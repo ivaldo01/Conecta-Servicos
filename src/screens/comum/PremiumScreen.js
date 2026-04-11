@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,10 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
-  Modal,
   Image,
   TextInput,
+  Animated,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,17 @@ export default function PremiumScreen({ navigation }) {
   const [modalPagamentoVisible, setModalPagamentoVisible] = useState(false);
   const [metodoSelecionado, setMetodoSelecionado] = useState('PIX');
   const [planoSelecionado, setPlanoSelecionado] = useState(null);
+
+  // Animação do Banner de 50%
+  const scaleAnim = useMemo(() => new Animated.Value(1), []);
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 1.05, duration: 800, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 1, duration: 800, useNativeDriver: true })
+      ])
+    ).start();
+  }, [scaleAnim]);
 
   // Dados do Cartão
   const [cardData, setCardData] = useState({
@@ -89,7 +101,7 @@ export default function PremiumScreen({ navigation }) {
       let payload = {
         userId: authUser.uid,
         planoId: planoSelecionado.id,
-        valor: planoSelecionado.price,
+        valor: planoSelecionado.price > 0 ? (planoSelecionado.price * 0.5) : 0,
         nomePlano: planoSelecionado.name,
         billingType: metodoSelecionado
       };
@@ -199,6 +211,15 @@ export default function PremiumScreen({ navigation }) {
               ? 'Escolha o plano ideal para escalar seu negócio com taxas reduzidas e suporte prioritário.'
               : 'Aproveite cashback, descontos exclusivos e uma experiência sem anúncios.'}
           </Text>
+
+          {/* Banner Animado 50% OFF */}
+          <Animated.View style={[styles.promoBanner, { transform: [{ scale: scaleAnim }] }]}>
+             <Ionicons name="gift" size={24} color="#FFF" style={{ marginRight: 8 }} />
+             <View>
+               <Text style={styles.promoBannerTitle}>SUPER LANÇAMENTO 🎉</Text>
+               <Text style={styles.promoBannerText}>50% de Desconto na assinatura inteira!</Text>
+             </View>
+          </Animated.View>
         </View>
 
         {/* Renderiza todos os planos disponíveis */}
@@ -246,13 +267,18 @@ export default function PremiumScreen({ navigation }) {
                       <Text style={[styles.period, { color: '#666' }]}>/mês</Text>
                     </>
                   ) : (
-                    <>
-                      <Text style={[styles.currency, !isIniciante && styles.premiumText]}>R$</Text>
-                      <Text style={[styles.price, !isIniciante && styles.premiumText]}>
-                        {plano.price.toFixed(2).replace('.', ',')}
+                    <View style={{ flexDirection: 'column' }}>
+                      <Text style={[styles.originalPriceText, !isIniciante && { color: 'rgba(255,255,255,0.7)' }]}>
+                        De R$ {plano.price.toFixed(2).replace('.', ',')}
                       </Text>
-                      <Text style={[styles.period, !isIniciante && styles.premiumText]}>/mês</Text>
-                    </>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                        <Text style={[styles.currency, !isIniciante && styles.premiumText]}>R$</Text>
+                        <Text style={[styles.price, !isIniciante && styles.premiumText]}>
+                          {(plano.price * 0.5).toFixed(2).replace('.', ',')}
+                        </Text>
+                        <Text style={[styles.period, !isIniciante && styles.premiumText]}>/mês</Text>
+                      </View>
+                    </View>
                   )}
                 </View>
 
@@ -363,11 +389,18 @@ export default function PremiumScreen({ navigation }) {
               )}
               <Text style={[styles.planName, styles.premiumText]}>{PLANS.CLIENT.PREMIUM.name}</Text>
               <View style={styles.priceRow}>
-                <Text style={[styles.currency, styles.premiumText]}>R$</Text>
-                <Text style={[styles.price, styles.premiumText]}>
-                  {PLANS.CLIENT.PREMIUM.price.toFixed(2).replace('.', ',')}
-                </Text>
-                <Text style={[styles.period, styles.premiumText]}>/mês</Text>
+                <View style={{ flexDirection: 'column' }}>
+                  <Text style={[styles.originalPriceText, { color: 'rgba(255,255,255,0.7)' }]}>
+                    De R$ {PLANS.CLIENT.PREMIUM.price.toFixed(2).replace('.', ',')}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={[styles.currency, styles.premiumText]}>R$</Text>
+                    <Text style={[styles.price, styles.premiumText]}>
+                      {(PLANS.CLIENT.PREMIUM.price * 0.5).toFixed(2).replace('.', ',')}
+                    </Text>
+                    <Text style={[styles.period, styles.premiumText]}>/mês</Text>
+                  </View>
+                </View>
               </View>
 
               <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
@@ -549,7 +582,9 @@ export default function PremiumScreen({ navigation }) {
                     {metodoSelecionado === 'PIX' ? 'Gerar Pix' : 'Confirmar Assinatura'}
                   </Text>
                   <Text style={styles.confirmButtonValue}>
-                    R$ {planoSelecionado?.price?.toFixed(2).replace('.', ',')}/mês
+                    {planoSelecionado?.price > 0 
+                       ? `R$ ${(planoSelecionado.price * 0.5).toFixed(2).replace('.', ',')}/mês` 
+                       : 'Grátis'}
                   </Text>
                 </>
               )}
@@ -602,6 +637,33 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  promoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E74C3C',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+    marginTop: 8,
+  },
+  promoBannerTitle: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  promoBannerText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
   },
   planCard: {
     backgroundColor: '#FFF',
@@ -656,7 +718,14 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 16,
+    marginBottom: 20,
+    minHeight: 50,
+  },
+  originalPriceText: {
+    fontSize: 14,
+    textDecorationLine: 'line-through',
+    color: '#95A5A6',
+    marginBottom: -4,
   },
   currency: {
     fontSize: 16,

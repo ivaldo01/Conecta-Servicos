@@ -3,8 +3,7 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
-
+expo-env.d
 # --- FIREBASE & SEGURANÇA (Importante) ---
 # O arquivo abaixo contém chaves privadas do seu projeto
 .eas/

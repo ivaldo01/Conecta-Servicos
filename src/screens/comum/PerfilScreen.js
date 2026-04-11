@@ -694,6 +694,22 @@ export default function PerfilScreen({ navigation }) {
 
             <TouchableOpacity
               style={styles.menuItem}
+              onPress={() => navigation.navigate("MeusContratos")}
+            >
+              <View style={[styles.iconBox, { backgroundColor: '#E8EAF6' }]}>
+                <Ionicons name="repeat-outline" size={22} color="#3F51B5" />
+              </View>
+
+              <View style={styles.menuTextWrap}>
+                <Text style={styles.menuText}>Meus Planos e Assinaturas</Text>
+                <Text style={styles.menuSubText}>Acompanhe seus planos ativos</Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={20} color="#CCC" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => navigation.navigate("FavoritosCliente")}
             >
               <View style={[styles.iconBox, { backgroundColor: '#FCE4EC' }]}>

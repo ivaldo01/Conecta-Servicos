@@ -28,7 +28,7 @@ import Animated, {
   withDelay
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { signInWithEmailAndPassword, deleteUser, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
@@ -46,6 +46,30 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const senhaInputRef = useRef(null);
+
+  const handleRecuperarSenha = async () => {
+    if (!email.trim()) {
+      Alert.alert('Atenção', 'Informe seu e-mail no campo acima para recuperar a senha.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      Alert.alert('E-mail enviado', 'Verifique sua caixa de entrada (e spam) para criar uma nova senha.');
+    } catch (error) {
+      console.log('Erro ao recuperar senha:', error);
+      let mensagem = 'Não foi possível enviar o e-mail de recuperação.';
+      if (error.code === 'auth/user-not-found') {
+         mensagem = 'Usuário não cadastrado com esse e-mail.';
+      } else if (error.code === 'auth/invalid-email') {
+         mensagem = 'O e-mail informado é inválido.';
+      }
+      Alert.alert('Erro', mensagem);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Animação para os círculos flutuantes
   const floatValue = useSharedValue(0);
@@ -262,6 +286,13 @@ export default function LoginScreen({ navigation }) {
             />
           </TouchableOpacity>
         </View>
+        <TouchableOpacity 
+          style={styles.forgotPasswordButton} 
+          onPress={handleRecuperarSenha}
+          disabled={loading}
+        >
+          <Text style={styles.forgotPasswordText}>Esqueci minha senha</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -642,6 +673,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     marginTop: 6,
+  },
+
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+
+  forgotPasswordText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   loginButtonDisabled: {

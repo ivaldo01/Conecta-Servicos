@@ -1,0 +1,3 @@
+# EAS Build - Não ignorar arquivos necessários para o build
+!google-services.json
+!android/app/google-services.json

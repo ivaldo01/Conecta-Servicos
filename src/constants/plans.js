@@ -173,6 +173,7 @@ export function temAnuncios(planoId) {
 }
 
 export function temSeloVerificado(planoId) {
+  if (planoId === 'client_premium' || planoId === 'conecta_vip') return true;
   const plano = getPlanoProfissional(planoId);
   return plano?.verifiedBadge === true;
 }

@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { db, auth } from '../../services/firebaseConfig';
 import {
   collection,
@@ -23,6 +25,8 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import colors from '../../constants/colors';
+import { criarAssinatura } from '../../services/paymentService';
+import { TextInput } from 'react-native';
 
 const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
@@ -42,6 +46,18 @@ export default function PlanosRecorrentesScreen({ route, navigation }) {
   const [horariosOcupados, setHorariosOcupados] = useState([]);
   const [diaAtual, setDiaAtual] = useState(null);
   const [etapaModal, setEtapaModal] = useState('resumo');
+  const [pixData, setPixData] = useState(null);
+
+  // Dados do cartão
+  const [cardData, setCardData] = useState({
+    holderName: '',
+    number: '',
+    expiry: '',
+    cvv: '',
+    cpfCnpj: '',
+    cep: '',
+    numeroEndereco: ''
+  });
 
   useEffect(() => {
     carregarDados();
@@ -275,65 +291,75 @@ export default function PlanosRecorrentesScreen({ route, navigation }) {
 
       const contratoRef = await addDoc(collection(db, 'contratosRecorrentes'), contratoData);
 
-      if (formaPagamento === 'PIX') {
-        const response = await fetch('https://backendvercel-git-main-conecta-solutions.vercel.app/api/gerarPix', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            planoId: plano.id,
-            valor: plano.valorMensal,
-            nomePlano: plano.nome,
-            billingType: 'PIX',
-            contratoRecorrenteId: contratoRef.id
-          })
+      if (formaPagamento === 'PIX' || formaPagamento === 'CREDIT_CARD') {
+        let creditCardConfig = undefined;
+        let creditCardHolderInfoConfig = undefined;
+
+        if (formaPagamento === 'CREDIT_CARD') {
+          const [month, year] = cardData.expiry.split('/');
+          creditCardConfig = {
+            holderName: cardData.holderName,
+            number: cardData.number.replace(/\s/g, ''),
+            expiryMonth: month,
+            expiryYear: '20' + year,
+            ccv: cardData.cvv
+          };
+          creditCardHolderInfoConfig = {
+            name: cardData.holderName,
+            email: auth.currentUser.email || 'cliente@email.com',
+            cpfCnpj: cardData.cpfCnpj.replace(/\D/g, ''),
+            postalCode: cardData.cep.replace(/\D/g, ''),
+            addressNumber: cardData.numeroEndereco || 'SN',
+            mobilePhone: '11999999999' // mock phone
+          };
+        }
+
+        const data = await criarAssinatura({
+          userId: auth.currentUser.uid,
+          planoId: plano.id,
+          valor: plano.valorMensal,
+          nomePlano: plano.nome,
+          billingType: formaPagamento,
+          creditCard: creditCardConfig,
+          creditCardHolderInfo: creditCardHolderInfoConfig
         });
 
-        // Verificar se resposta é OK antes de tentar parse
-        const responseText = await response.text();
-        console.log('Resposta bruta da API PIX:', responseText.substring(0, 500));
-
-        if (!response.ok) {
-          console.error('Erro API PIX - Status:', response.status);
-          console.error('Erro API PIX - Body:', responseText);
-          throw new Error(`Erro no servidor PIX: ${response.status} - ${responseText.substring(0, 200)}`);
-        }
-
-        let data;
+        // Disparar Notificação para o Profissional
         try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('Erro ao fazer parse JSON:', parseError);
-          console.error('Texto recebido:', responseText);
-          throw new Error('Resposta inválida do servidor PIX');
+          await addDoc(collection(db, 'usuarios', profissionalId, 'notificacoes'), {
+            titulo: 'Nova Assinatura Contratada! 🎉',
+            mensagem: `${auth.currentUser.displayName || 'Um cliente'} acabou de assinar o plano "${plano.nome}".`,
+            tipo: 'nova_assinatura',
+            lida: false,
+            data: serverTimestamp()
+          });
+        } catch (errNotif) {
+          console.log('Erro ao notificar profissional:', errNotif);
         }
 
-        if (data.success) {
-          setModalVisible(false);
-          navigation.navigate('PagamentoPix', {
-            pixEncodedId: data.pixEncodedId,
-            pixPayload: data.pixPayload,
-            contratoId: contratoRef.id,
-            valor: plano.valorMensal
+        if (formaPagamento === 'PIX') {
+          setPixData({
+            qrCode: data.pixEncodedId || data.qrCode,
+            copiaECola: data.pixPayload || data.copyPaste || data.payload
           });
+          setEtapaModal('pix_gerado');
         } else {
-          throw new Error(data.error || 'Erro ao criar cobrança PIX');
+          // Sucesso Cartão
+          setEtapaModal('sucesso');
         }
       } else {
-        Alert.alert(
-          'Contrato Criado!',
-          `Plano "${plano.nome}" contratado com sucesso!\n\nOs agendamentos serão gerados automaticamente.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setModalVisible(false);
-                navigation.navigate('MeusContratos');
-              }
-            }
-          ]
-        );
+        // Fluxo mock/dinheiro
+        try {
+          await addDoc(collection(db, 'usuarios', profissionalId, 'notificacoes'), {
+            titulo: 'Nova Assinatura Contratada! 🎉',
+            mensagem: `${auth.currentUser.displayName || 'Um cliente'} acabou de assinar o plano "${plano.nome}".`,
+            tipo: 'nova_assinatura',
+            lida: false,
+            data: serverTimestamp()
+          });
+        } catch (errNotif) {}
+        
+        setEtapaModal('sucesso');
       }
 
     } catch (error) {
@@ -719,7 +745,7 @@ export default function PlanosRecorrentesScreen({ route, navigation }) {
 
                     <TouchableOpacity
                       style={styles.pagamentoButton}
-                      onPress={() => contratarPlano('CARTAO')}
+                      onPress={() => setEtapaModal('dados_cartao')}
                       disabled={contratando}
                     >
                       <View style={styles.pagamentoIcon}>
@@ -729,11 +755,7 @@ export default function PlanosRecorrentesScreen({ route, navigation }) {
                         <Text style={styles.pagamentoNome}>Cartão de Crédito</Text>
                         <Text style={styles.pagamentoDesc}>Cobrança automática mensal</Text>
                       </View>
-                      {contratando ? (
-                        <ActivityIndicator color={colors.primary} />
-                      ) : (
-                        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-                      )}
+                      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -750,6 +772,199 @@ export default function PlanosRecorrentesScreen({ route, navigation }) {
                       </Text>
                     </View>
                   </>
+                )}
+
+                {etapaModal === 'dados_cartao' && (
+                  <View style={styles.cardFormContainer}>
+                    <Text style={styles.etapaTitulo}>Dados do Cartão</Text>
+
+                    <Text style={styles.inputLabel}>Número do Cartão</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="0000 0000 0000 0000"
+                      keyboardType="numeric"
+                      maxLength={16}
+                      value={cardData.number}
+                      onChangeText={(v) => setCardData({ ...cardData, number: v })}
+                    />
+
+                    <Text style={styles.inputLabel}>Nome no Cartão</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Ex: JOAO DA SILVA"
+                      autoCapitalize="characters"
+                      value={cardData.holderName}
+                      onChangeText={(v) => setCardData({ ...cardData, holderName: v })}
+                    />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={styles.inputLabel}>Validade (MM/AA)</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="MM/AA"
+                          keyboardType="numeric"
+                          maxLength={5}
+                          value={cardData.expiry}
+                          onChangeText={(v) => {
+                            if (v.length === 2 && !v.includes('/')) v += '/';
+                            setCardData({ ...cardData, expiry: v });
+                          }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.inputLabel}>CVV</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="000"
+                          keyboardType="numeric"
+                          maxLength={4}
+                          value={cardData.cvv}
+                          onChangeText={(v) => setCardData({ ...cardData, cvv: v })}
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={styles.inputLabel}>CPF/CNPJ do Titular</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="000.000.000-00"
+                      keyboardType="numeric"
+                      value={cardData.cpfCnpj}
+                      onChangeText={(v) => setCardData({ ...cardData, cpfCnpj: v })}
+                    />
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 2, marginRight: 10 }}>
+                        <Text style={styles.inputLabel}>CEP</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="00000-000"
+                          keyboardType="numeric"
+                          maxLength={9}
+                          value={cardData.cep}
+                          onChangeText={(v) => setCardData({ ...cardData, cep: v })}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.inputLabel}>Nº</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="123"
+                          keyboardType="numeric"
+                          value={cardData.numeroEndereco}
+                          onChangeText={(v) => setCardData({ ...cardData, numeroEndereco: v })}
+                        />
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.continuarButton, contratando && { opacity: 0.7 }]}
+                      onPress={() => contratarPlano('CREDIT_CARD')}
+                      disabled={contratando}
+                    >
+                      {contratando ? (
+                        <ActivityIndicator color="#FFF" />
+                      ) : (
+                        <Text style={styles.continuarButtonText}>Assinar Plano</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.voltarButton}
+                      onPress={() => setEtapaModal('pagamento')}
+                      disabled={contratando}
+                    >
+                      <Text style={styles.voltarButtonText}>Voltar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {etapaModal === 'pix_gerado' && pixData && (
+                  <View style={styles.cardFormContainer}>
+                    <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                      <Ionicons name="checkmark-circle" size={50} color={colors.success || '#4CAF50'} />
+                      <Text style={[styles.etapaTitulo, { marginBottom: 8, marginTop: 10 }]}>Assinatura Criada!</Text>
+                      <Text style={{ textAlign: 'center', color: colors.textSecondary }}>
+                        Realize o pagamento do primeiro mês para ativar seu plano "{planoSelecionado?.nome}".
+                      </Text>
+                    </View>
+
+                    {pixData.qrCode ? (
+                      <View style={{ alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#eee', marginBottom: 16 }}>
+                        <Image
+                          source={{ uri: String(pixData.qrCode).startsWith('data:image') ? pixData.qrCode : `data:image/png;base64,${pixData.qrCode}` }}
+                          style={{ width: 220, height: 220 }}
+                        />
+                        <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10 }}>Escaneie o QR Code no seu app do banco</Text>
+                      </View>
+                    ) : null}
+
+                    <Text style={styles.inputLabel}>Código PIX (Copia e Cola)</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12, backgroundColor: '#fafafa', marginBottom: 24 }}>
+                      <Text
+                        style={{ flex: 1, paddingVertical: 14, color: colors.textDark }}
+                        numberOfLines={1}
+                        ellipsizeMode="middle"
+                        selectable={true}
+                      >
+                        {pixData.copiaECola || 'Código não disponível'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          if (pixData.copiaECola) {
+                            await Clipboard.setStringAsync(pixData.copiaECola);
+                            Alert.alert('Copiado', 'Código PIX copiado com sucesso!');
+                          }
+                        }}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="copy-outline" size={24} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.continuarButton}
+                      onPress={() => setEtapaModal('sucesso')}
+                    >
+                      <Text style={styles.continuarButtonText}>Já realizei o pagamento</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.voltarButton}
+                      onPress={() => {
+                        setModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.voltarButtonText}>Fechar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {etapaModal === 'sucesso' && (
+                  <View style={{ alignItems: 'center', paddingVertical: 30 }}>
+                    <View style={{
+                      width: 80, height: 80, borderRadius: 40, backgroundColor: '#E8F5E9',
+                      justifyContent: 'center', alignItems: 'center', marginBottom: 20
+                    }}>
+                      <Ionicons name="checkmark-circle" size={54} color="#4CAF50" />
+                    </View>
+                    <Text style={[styles.etapaTitulo, { textAlign: 'center' }]}>Assinatura Concluída!</Text>
+                    <Text style={[styles.etapaSubtitulo, { textAlign: 'center', fontSize: 15, marginBottom: 30 }]}>
+                      Seu plano foi contratado com sucesso. O profissional já foi notificado dos seus agendamentos recorrentes!
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.contratarButton}
+                      onPress={() => {
+                        setModalVisible(false);
+                        navigation.navigate('MeusContratos');
+                      }}
+                    >
+                      <Ionicons name="documents-outline" size={24} color={colors.white} />
+                      <Text style={styles.contratarButtonText}>Acessar Meus Contratos</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </ScrollView>
             )}
@@ -1098,6 +1313,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginRight: 8,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   voltarButton: {
     paddingVertical: 12,
@@ -1117,6 +1334,7 @@ const styles = StyleSheet.create({
     width: '48%',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 14,
     borderRadius: 12,
     borderWidth: 2,
@@ -1211,5 +1429,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
+  },
+  cardFormContainer: {
+    padding: 16,
+  },
+  etapaTitulo: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textDark,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+    color: colors.textDark,
+    backgroundColor: '#fff',
   },
 });

@@ -9,6 +9,9 @@ import {
   RefreshControl,
   ScrollView,
   Modal,
+  Image,
+  ImageBackground,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db, auth } from '../../services/firebaseConfig';
@@ -31,6 +34,7 @@ import colors from '../../constants/colors';
 
 const STATUS_CONFIG = {
   ATIVO: { color: '#2E7D32', label: 'Ativo', icon: 'checkmark-circle' },
+  PAUSADO: { color: '#0284C7', label: 'Pausado', icon: 'pause-circle' },
   PENDENTE_PAGAMENTO: { color: '#FF9800', label: 'Aguardando Pagamento', icon: 'time' },
   PAGO: { color: '#1565C0', label: 'Pago', icon: 'card' },
   VENCIDO: { color: '#E63946', label: 'Vencido', icon: 'alert-circle' },
@@ -133,6 +137,21 @@ export default function MeusContratosScreen({ navigation }) {
     setModalDetalhes(true);
   };
 
+  const abrirWhatsApp = () => {
+    if (!contratoSelecionado) return;
+    const { profissional } = contratoSelecionado;
+    const telefone = profissional?.telefone || profissional?.whatsapp;
+    if (!telefone) {
+      Alert.alert('Ops', 'O profissional não possui telefone cadastrado.');
+      return;
+    }
+    const numeroLimpo = telefone.replace(/\D/g, '');
+    const mensagem = encodeURIComponent(`Olá ${profissional?.nome || 'Profissional'}! Sou o cliente referente à assinatura do plano "${contratoSelecionado?.plano?.nome || 'Serviço'}". Gostaria de conversar com você!`);
+    Linking.openURL(`https://wa.me/55${numeroLimpo}?text=${mensagem}`).catch(() => {
+      Alert.alert('Erro', 'Não foi possível abrir o WhatsApp.');
+    });
+  };
+
   const remarcarSessao = async (agendamento) => {
     Alert.alert(
       'Remarcar Sessão',
@@ -178,50 +197,78 @@ export default function MeusContratosScreen({ navigation }) {
   };
 
   const confirmarCancelamento = (contrato, comMulta) => {
-    const mensagem = comMulta
-      ? `Deseja realmente cancelar? Você será cobrado uma multa por descumprir o período de fidelidade.`
-      : `Deseja realmente cancelar o contrato? Os agendamentos futuros serão cancelados.`;
-
     Alert.alert(
-      'Confirmar Cancelamento',
-      mensagem,
+      'Opção Recomendada',
+      'Em vez de cancelar e perder seus horários fixos com o profissional, que tal pausar sua assinatura por 30 dias?',
       [
-        { text: 'Não', style: 'cancel' },
         {
-          text: 'Sim, Cancelar',
-          style: 'destructive',
+          text: 'Pausar Assinatura',
+          style: 'default',
           onPress: async () => {
-            try {
-              // Cancelar contrato
-              await updateDoc(doc(db, 'contratosRecorrentes', contrato.id), {
-                status: 'CANCELADO',
-                canceladoEm: serverTimestamp(),
-                atualizadoEm: serverTimestamp(),
-                motivoCancelamento: comMulta ? 'Fidelidade descumprida' : 'Solicitação do cliente'
-              });
-
-              // Cancelar agendamentos futuros
-              const agendamentosFuturos = agendamentosDoContrato.filter(
-                a => a.dataAgendamento > new Date() && a.status !== 'cancelado'
-              );
-
-              await Promise.all(
-                agendamentosFuturos.map(agendamento =>
-                  updateDoc(doc(db, 'agendamentos', agendamento.id), {
-                    status: 'cancelado',
-                    motivoCancelamento: 'Contrato cancelado',
-                    canceladoEm: serverTimestamp(),
-                  })
-                )
-              );
-
-              Alert.alert('Sucesso', 'Contrato cancelado com sucesso!');
-              setModalDetalhes(false);
-            } catch (error) {
-              Alert.alert('Erro', 'Não foi possível cancelar o contrato');
-            }
+             try {
+                await updateDoc(doc(db, 'contratosRecorrentes', contrato.id), {
+                   status: 'PAUSADO',
+                   atualizadoEm: serverTimestamp(),
+                   motivoPausa: 'Retenção'
+                });
+                Alert.alert('Sucesso', 'Seu contrato foi pausado. Seus horários estão congelados!');
+                setModalDetalhes(false);
+             } catch(e) {
+                Alert.alert('Erro', 'Não foi possível pausar.');
+             }
           }
-        }
+        },
+        {
+          text: 'Continuar Cancelamento',
+          style: 'destructive',
+          onPress: () => {
+             const mensagem = comMulta
+               ? `Fidelidade: Você será cobrado uma multa proporcional. Deseja mesmo cancelar?`
+               : `Deseja realmente cancelar definitivamente o contrato?`;
+
+             Alert.alert(
+               'Atenção',
+               mensagem,
+               [
+                 { text: 'Voltar', style: 'cancel' },
+                 {
+                   text: 'Sim, Cancelar',
+                   style: 'destructive',
+                   onPress: async () => {
+                     try {
+                       await updateDoc(doc(db, 'contratosRecorrentes', contrato.id), {
+                         status: 'CANCELADO',
+                         canceladoEm: serverTimestamp(),
+                         atualizadoEm: serverTimestamp(),
+                         motivoCancelamento: comMulta ? 'Fidelidade descumprida' : 'Solicitação do cliente'
+                       });
+
+                       const agendamentosFuturos = agendamentosDoContrato.filter(
+                         a => a.dataAgendamento > new Date() && a.status !== 'cancelado'
+                       );
+
+                       await Promise.all(
+                         agendamentosFuturos.map(agendamento =>
+                           updateDoc(doc(db, 'agendamentos', agendamento.id), {
+                             status: 'cancelado',
+                             motivoCancelamento: 'Contrato cancelado',
+                             canceladoEm: serverTimestamp(),
+                           })
+                         )
+                       );
+
+                       Alert.alert('Sucesso', 'Cancelado com sucesso.');
+                       setModalDetalhes(false);
+                     } catch (error) {
+                       Alert.alert('Erro', 'Não foi possível cancelar o contrato');
+                     }
+                   }
+                 }
+               ]
+             );
+          }
+        },
+        { text: 'Voltar', style: 'cancel' }
       ]
     );
   };
@@ -229,6 +276,32 @@ export default function MeusContratosScreen({ navigation }) {
   const getProximoVencimentoText = (data) => {
     if (!data) return 'N/A';
     return format(data, 'dd/MM/yyyy', { locale: ptBR });
+  };
+
+  const reativarContrato = async (contrato) => {
+    Alert.alert(
+      'Reativar Assinatura',
+      'Bem-vindo de volta! Deseja descongelar sua assinatura e retomar seus horários?',
+      [
+        { text: 'Agora não', style: 'cancel' },
+        {
+          text: 'Sim, Reativar',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'contratosRecorrentes', contrato.id), {
+                 status: 'ATIVO',
+                 atualizadoEm: serverTimestamp()
+              });
+              Alert.alert('Sucesso', 'Sua assinatura está ATIVA novamente!');
+              setModalDetalhes(false);
+            } catch(e) {
+              Alert.alert('Erro', 'Não foi possível reativar a assinatura.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const getStatusConfig = (status) => {
@@ -251,22 +324,35 @@ export default function MeusContratosScreen({ navigation }) {
         style={styles.card}
         onPress={() => abrirDetalhes(item)}
       >
-        <View style={styles.cardHeader}>
-          <View style={styles.profissionalInfo}>
-            <Text style={styles.profissionalNome}>
-              {item.profissional?.nome || 'Profissional'}
-            </Text>
-            <Text style={styles.planoNome}>{item.plano?.nome}</Text>
+        <ImageBackground 
+          source={{ uri: item.profissional?.fotoCapa || 'https://via.placeholder.com/400x150/F8FAFC/94A3B8?text=Agenda+Serviços' }}
+          style={styles.cardBanner}
+        >
+          <View style={styles.bannerOverlay}>
+            <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + 'E6' }]}>
+              <Ionicons name={statusConfig.icon} size={14} color="#FFF" />
+              <Text style={[styles.statusText, { color: '#FFF' }]}>
+                {statusConfig.label}
+              </Text>
+            </View>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '20' }]}>
-            <Ionicons name={statusConfig.icon} size={14} color={statusConfig.color} />
-            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-              {statusConfig.label}
-            </Text>
-          </View>
-        </View>
+        </ImageBackground>
 
-        <View style={styles.cardBody}>
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeader}>
+            <Image 
+              source={{ uri: item.profissional?.fotoPerfil || 'https://via.placeholder.com/150/E2E8F0/64748B?text=👤' }}
+              style={styles.avatarFoto}
+            />
+            <View style={styles.profissionalInfo}>
+              <Text style={styles.profissionalNome}>
+                {item.profissional?.nome || 'Profissional'}
+              </Text>
+              <Text style={styles.planoNome}>{item.plano?.nome}</Text>
+            </View>
+          </View>
+
+          <View style={styles.cardBody}>
           <View style={styles.infoRow}>
             <Ionicons name="cash-outline" size={16} color={colors.textSecondary} />
             <Text style={styles.infoText}>
@@ -296,21 +382,22 @@ export default function MeusContratosScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${(item.sessoesRealizadas / item.sessoesTotaisContrato) * 100}%`,
-                backgroundColor: statusConfig.color
-              }
-            ]}
-          />
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${(item.sessoesRealizadas / item.sessoesTotaisContrato) * 100}%`,
+                  backgroundColor: statusConfig.color
+                }
+              ]}
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {item.sessoesRealizadas} de {item.sessoesTotaisContrato} sessões realizadas
+            {item.sessoesRestantesMesAtual > 0 && ` • ${item.sessoesRestantesMesAtual} restantes este mês`}
+          </Text>
         </View>
-        <Text style={styles.progressText}>
-          {item.sessoesRealizadas} de {item.sessoesTotaisContrato} sessões realizadas
-          {item.sessoesRestantesMesAtual > 0 && ` • ${item.sessoesRestantesMesAtual} restantes este mês`}
-        </Text>
       </TouchableOpacity>
     );
   };
@@ -499,19 +586,41 @@ export default function MeusContratosScreen({ navigation }) {
                 </View>
 
                 {/* Ações */}
-                {contratoSelecionado.status === 'ATIVO' && (
-                  <View style={styles.acoesSection}>
+                <View style={styles.acoesSection}>
+                  <TouchableOpacity
+                    style={styles.acaoWhatsappButton}
+                    onPress={abrirWhatsApp}
+                  >
+                    <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                    <Text style={styles.acaoWhatsappText}>
+                      Remarcar / Falar no WhatsApp
+                    </Text>
+                  </TouchableOpacity>
+
+                  {contratoSelecionado.status === 'ATIVO' && (
                     <TouchableOpacity
                       style={styles.cancelarButton}
                       onPress={() => cancelarContrato(contratoSelecionado)}
                     >
-                      <Ionicons name="close-circle" size={20} color="#E63946" />
+                      <Ionicons name="pause-circle" size={20} color="#E63946" />
                       <Text style={styles.cancelarButtonText}>
-                        Cancelar Contrato
+                        Pausar ou Cancelar
                       </Text>
                     </TouchableOpacity>
-                  </View>
-                )}
+                  )}
+
+                  {contratoSelecionado.status === 'PAUSADO' && (
+                    <TouchableOpacity
+                      style={[styles.cancelarButton, { backgroundColor: '#E0F2FE', borderColor: '#38BDF8', marginTop: 10 }]}
+                      onPress={() => reativarContrato(contratoSelecionado)}
+                    >
+                      <Ionicons name="play-circle" size={20} color="#0284C7" />
+                      <Text style={[styles.cancelarButtonText, { color: '#0284C7' }]}>
+                        Reativar Assinatura
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </ScrollView>
             )}
           </View>
@@ -524,93 +633,135 @@ export default function MeusContratosScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    padding: 20,
+    paddingTop: 56,
     backgroundColor: colors.primary,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 10,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.white,
   },
   listContent: {
-    padding: 16,
-    paddingBottom: 20,
+    padding: 20,
+    paddingBottom: 40,
   },
   card: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    marginBottom: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    marginBottom: 20,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 15,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  cardBanner: {
+    height: 90,
+    width: '100%',
+    backgroundColor: colors.primary,
+  },
+  bannerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    alignItems: 'flex-end',
+    padding: 12,
+  },
+  cardContent: {
+    padding: 20,
+    paddingTop: 12,
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 18,
+    marginTop: -35, // Puxa pra cima da capa
+  },
+  avatarFoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: '#FFF',
+    backgroundColor: '#F1F5F9',
+    marginRight: 12,
   },
   profissionalInfo: {
     flex: 1,
+    marginTop: 35, // Compensa o push up
   },
   profissionalNome: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.textDark,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
   },
   planoNome: {
     fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 2,
+    color: '#64748B',
+    fontWeight: '600',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 99,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 4,
   },
   cardBody: {
-    marginBottom: 12,
+    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   infoText: {
     fontSize: 14,
-    color: colors.textSecondary,
-    marginLeft: 8,
+    color: '#475569',
+    marginLeft: 10,
+    fontWeight: '500',
   },
   progressBar: {
-    height: 6,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 3,
-    marginBottom: 6,
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    marginBottom: 10,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   progressText: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#64748B',
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -619,198 +770,240 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textDark,
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginTop: 20,
   },
   emptyText: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: 15,
+    color: '#64748B',
     textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 20,
+    marginTop: 10,
+    lineHeight: 22,
   },
   buscarButton: {
-    marginTop: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    marginTop: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
     backgroundColor: colors.primary,
-    borderRadius: 8,
+    borderRadius: 14,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buscarButtonText: {
     color: colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     maxHeight: '85%',
+    paddingBottom: 50,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#F1F5F9',
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textDark,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   modalBody: {
-    padding: 20,
+    padding: 24,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#94A3B8',
     textTransform: 'uppercase',
-    marginBottom: 8,
+    letterSpacing: 0.5,
+    marginBottom: 10,
   },
   sectionValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textDark,
+    fontWeight: '800',
+    color: '#1E293B',
   },
   sectionSubvalue: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 2,
+    fontSize: 15,
+    color: '#64748B',
+    marginTop: 4,
   },
   planoDetalhes: {
     flexDirection: 'row',
-    marginTop: 8,
+    marginTop: 10,
   },
   planoDetalhe: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#475569',
     marginRight: 16,
+    fontWeight: '500',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   progressoBox: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    padding: 20,
+    borderRadius: 20,
   },
   progressoItem: {
     alignItems: 'center',
+    flex: 1,
   },
   progressoNumero: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     color: colors.primary,
   },
   progressoLabel: {
     fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
+    color: '#64748B',
+    marginTop: 6,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   noAgendamentos: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#64748B',
     fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 20,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
   },
   agendamentoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   agendamentoPassado: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   agendamentoCancelado: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FEE2E2',
   },
   agendamentoData: {
     alignItems: 'center',
     backgroundColor: colors.primary,
-    padding: 8,
-    borderRadius: 8,
-    minWidth: 60,
+    padding: 10,
+    borderRadius: 12,
+    minWidth: 64,
   },
   agendamentoDiaSemana: {
     fontSize: 10,
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   agendamentoDiaNumero: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     color: colors.white,
+    marginTop: 2,
   },
   agendamentoMes: {
     fontSize: 10,
     color: colors.white,
+    fontWeight: '600',
+    marginTop: 2,
   },
   agendamentoInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 16,
   },
   agendamentoHora: {
     fontSize: 16,
-    fontWeight: '600',
-    color: colors.textDark,
+    fontWeight: '800',
+    color: '#1E293B',
   },
   agendamentoStatus: {
     fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
+    color: '#64748B',
+    marginTop: 4,
+    fontWeight: '500',
   },
   agendamentoRemarcado: {
     fontSize: 11,
     color: colors.primary,
-    marginTop: 2,
+    marginTop: 4,
+    fontWeight: '600',
   },
   remarcarButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   remarcarText: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.primary,
-    marginLeft: 4,
-    fontWeight: '500',
+    marginLeft: 6,
+    fontWeight: '700',
   },
   acoesSection: {
-    marginTop: 8,
-    paddingTop: 16,
+    marginTop: 24,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#F1F5F9',
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   cancelarButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E63946',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFF0F2',
   },
   cancelarButtonText: {
-    color: '#E63946',
-    fontSize: 16,
-    fontWeight: '600',
     marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#E63946',
   },
+  acaoWhatsappButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#25D366',
+    marginBottom: 12,
+  },
+  acaoWhatsappText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  }
 });

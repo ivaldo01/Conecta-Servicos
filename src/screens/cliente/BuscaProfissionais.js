@@ -27,7 +27,7 @@ import {
 } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
-import { getPrioridadeBusca, getPlanoProfissional } from "../../constants/plans";
+import { getPrioridadeBusca, getPlanoProfissional, temSeloVerificado } from "../../constants/plans";
 
 // --- Funções Auxiliares ---
 function parseCoord(valor) {
@@ -249,7 +249,12 @@ export default function BuscaProfissionais({ navigation, route }) {
           </View>
 
           <View style={{ marginLeft: 70 }}>
-            <Text style={styles.resultName} numberOfLines={1}>{getNomeProfissional(item)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.resultName, { flexShrink: 1 }]} numberOfLines={1}>{getNomeProfissional(item)}</Text>
+              {temSeloVerificado(item?.planoAtivo) && (
+                <Ionicons name="checkmark-circle" size={16} color="#3498DB" style={{ marginLeft: 4 }} />
+              )}
+            </View>
             <Text style={styles.resultSub} numberOfLines={1}>{getEspecialidadeProfissional(item)}</Text>
 
             <View style={styles.badgesRow}>
@@ -290,7 +295,12 @@ export default function BuscaProfissionais({ navigation, route }) {
         {selectedPro && (
           <TouchableOpacity style={styles.proCard} onPress={() => abrirPerfil(selectedPro)}>
             <View style={styles.proCardContent}>
-              <Text style={styles.proName}>{getNomeProfissional(selectedPro)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                <Text style={[styles.proName, { marginBottom: 0, flexShrink: 1 }]}>{getNomeProfissional(selectedPro)}</Text>
+                {temSeloVerificado(selectedPro?.planoAtivo) && (
+                  <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginLeft: 6 }} />
+                )}
+              </View>
               <Text style={styles.proSpec}>{getEspecialidadeProfissional(selectedPro)}</Text>
               <View style={styles.viewBtn}>
                 <Text style={styles.viewBtnText}>Ver Perfil Completo</Text>
