@@ -438,7 +438,7 @@ export default function AgendamentoFinal({ route, navigation }) {
 
         const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
         const trabalhaHora = agenda?.horarios?.includes(horario);
-        const fazServicos = servicos.every((s) =>
+        const fazServicos = servicos.length === 0 || colab.ehDono || servicos.every((s) =>
             colab.servicosHabilitados?.includes(s.id)
         );
 
@@ -454,7 +454,7 @@ export default function AgendamentoFinal({ route, navigation }) {
             const agenda = agendaDoColaborador(colab);
             const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
             const temHorarios = (agenda?.horarios || []).length > 0;
-            const fazServicos = servicos.every((s) =>
+            const fazServicos = servicos.length === 0 || colab.ehDono || servicos.every((s) =>
                 colab.servicosHabilitados?.includes(s.id)
             );
 
@@ -475,7 +475,7 @@ export default function AgendamentoFinal({ route, navigation }) {
         equipe.forEach((colab) => {
             const agenda = agendaDoColaborador(colab);
             const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
-            const fazServicos = servicos.every((s) =>
+            const fazServicos = servicos.length === 0 || colab.ehDono || servicos.every((s) =>
                 colab.servicosHabilitados?.includes(s.id)
             );
 
@@ -518,7 +518,7 @@ export default function AgendamentoFinal({ route, navigation }) {
         return equipe.filter((colab) => {
             const agenda = agendaDoColaborador(colab);
             const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
-            const fazServicos = servicos.every((s) =>
+            const fazServicos = servicos.length === 0 || colab.ehDono || servicos.every((s) =>
                 colab.servicosHabilitados?.includes(s.id)
             );
             return trabalhaDia && fazServicos;
@@ -533,7 +533,7 @@ export default function AgendamentoFinal({ route, navigation }) {
         const agenda = agendaDoColaborador(colab);
         const trabalhaDia = agenda?.dias?.includes(diaSemanaSelecionado);
         const trabalhaHora = agenda?.horarios?.includes(horarioSelecionado);
-        const fazServicos = servicos.every((s) =>
+        const fazServicos = servicos.length === 0 || colab.ehDono || servicos.every((s) =>
             colab.servicosHabilitados?.includes(s.id)
         );
 

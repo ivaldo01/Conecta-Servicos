@@ -18,7 +18,12 @@ import {
     doc,
     getDoc,
     onSnapshot,
+    or,
+    writeBatch,
+    deleteDoc,
+    updateDoc,
 } from 'firebase/firestore';
+import { Alert } from 'react-native';
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
@@ -26,7 +31,6 @@ import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
 import { temAnuncios, getMaxFuncionarios } from '../../constants/plans';
 import { getHojeStr as getHojeFiltroStr, isAtendendoAgora } from '../../utils/agendamentoUtils';
-import { updateDoc } from 'firebase/firestore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_WIDTH = Math.min(SCREEN_WIDTH - 44, 300);
@@ -166,6 +170,19 @@ export default function HomeProfissional({ navigation }) {
     const [configAgenda, setConfigAgenda] = useState(null);
     const [statusAtendimento, setStatusAtendimento] = useState({ atendendo: false, manual: false });
 
+    // Cálculos para o resumo do dia
+    const pendentes = useMemo(() => 
+        agendamentos.filter(a => a.status === 'pendente').length
+    , [agendamentos]);
+
+    const confirmadosHoje = useMemo(() => 
+        agendamentos.filter(a => a.status === 'confirmado' && a.dataFiltro === hojeFiltro).length
+    , [agendamentos, hojeFiltro]);
+
+    const concluidos = useMemo(() => 
+        agendamentos.filter(a => a.status === 'concluido').length
+    , [agendamentos]);
+
     useEffect(() => {
         const user = auth.currentUser;
         if (!user?.uid) return;
@@ -211,14 +228,10 @@ export default function HomeProfissional({ navigation }) {
     useEffect(() => {
         let ativo = true;
 
-        async function carregarDados() {
+        async function carregarDono() {
             try {
                 const user = auth.currentUser;
-
-                if (!user?.uid) {
-                    if (ativo) setLoading(false);
-                    return;
-                }
+                if (!user?.uid) return;
 
                 const userRef = doc(db, 'usuarios', user.uid);
                 const userSnap = await getDoc(userRef);
@@ -226,32 +239,36 @@ export default function HomeProfissional({ navigation }) {
                 if (ativo && userSnap.exists()) {
                     setUsuario(userSnap.data());
                 }
+            } catch (error) {
+                console.log('Erro ao carregar dados do usuário:', error);
+            }
+        }
 
-                const possibilidades = [
-                    query(collection(db, 'agendamentos'), where('profissionalId', '==', user.uid)),
-                    query(collection(db, 'agendamentos'), where('clinicaId', '==', user.uid)),
-                    query(collection(db, 'agendamentos'), where('colaboradorId', '==', user.uid)),
-                ];
+        carregarDono();
 
-                const resultados = await Promise.allSettled(
-                    possibilidades.map((consulta) => getDocs(consulta))
-                );
+        const user = auth.currentUser;
+        let unsubAgendamentos;
 
+        if (user?.uid) {
+            const q = query(
+                collection(db, 'agendamentos'),
+                or(
+                    where('profissionalId', '==', user.uid),
+                    where('clinicaId', '==', user.uid),
+                    where('colaboradorId', '==', user.uid)
+                )
+            );
+
+            unsubAgendamentos = onSnapshot(q, (snapshot) => {
                 const mapa = new Map();
-
-                resultados.forEach((resultado) => {
-                    if (resultado.status === 'fulfilled') {
-                        resultado.value.forEach((docSnap) => {
-                            mapa.set(docSnap.id, {
-                                id: docSnap.id,
-                                ...docSnap.data(),
-                            });
-                        });
-                    }
+                snapshot.forEach((docSnap) => {
+                    mapa.set(docSnap.id, {
+                        id: docSnap.id,
+                        ...docSnap.data(),
+                    });
                 });
 
                 const lista = Array.from(mapa.values());
-
                 lista.sort((a, b) => {
                     const dataA = a?.dataCriacao?.seconds || 0;
                     const dataB = b?.dataCriacao?.seconds || 0;
@@ -265,15 +282,15 @@ export default function HomeProfissional({ navigation }) {
                 if (ativo) {
                     setAgendamentos(lista);
                     setProximos(proximosOrdenados);
+                    setLoading(false);
                 }
-            } catch (error) {
-                console.log('Erro ao carregar dashboard profissional:', error);
-            } finally {
+            }, (error) => {
+                console.log('Erro no listener de agendamentos:', error);
                 if (ativo) setLoading(false);
-            }
+            });
+        } else {
+            setLoading(false);
         }
-
-        carregarDados();
 
         // Listener para configurações de agenda e status manual
         const user = auth.currentUser;
@@ -286,7 +303,8 @@ export default function HomeProfissional({ navigation }) {
 
             return () => {
                 ativo = false;
-                unsubAgenda();
+                if (unsubAgenda) unsubAgenda();
+                if (unsubAgendamentos) unsubAgendamentos();
             };
         }
 
@@ -323,6 +341,54 @@ export default function HomeProfissional({ navigation }) {
 
         return () => clearInterval(interval);
     }, [usuario, configAgenda]);
+
+    // Limpa horários que ficaram "travados" na coleção agenda_ocupada
+    const limparHorariosPresos = async () => {
+        try {
+            const user = auth.currentUser;
+            if (!user?.uid) return;
+
+            Alert.alert(
+                "Limpar Agenda",
+                "Isso irá liberar todos os horários que podem estar 'travados' indevidamente por tentativas de agendamento não concluídas. Deseja continuar?",
+                [
+                    { text: "Cancelar", style: "cancel" },
+                    { 
+                        text: "Sim, Limpar", 
+                        onPress: async () => {
+                            setLoading(true);
+                            try {
+                                const q = query(
+                                    collection(db, 'agenda_ocupada'), 
+                                    where('clinicaId', '==', user.uid)
+                                );
+                                const snap = await getDocs(q);
+                                
+                                if (snap.empty) {
+                                    Alert.alert("Info", "Não foram encontrados horários travados.");
+                                    setLoading(false);
+                                    return;
+                                }
+
+                                const batch = writeBatch(db);
+                                snap.forEach(d => batch.delete(d.ref));
+                                await batch.commit();
+                                
+                                Alert.alert("Sucesso", `${snap.size} horário(s) foram liberados com sucesso!`);
+                            } catch (err) {
+                                console.log('Erro ao limpar horários:', err);
+                                Alert.alert("Erro", "Não foi possível limpar os horários.");
+                            } finally {
+                                setLoading(false);
+                            }
+                        }
+                    }
+                ]
+            );
+        } catch (error) {
+            console.log('Erro ao disparar limpeza:', error);
+        }
+    };
 
     const toggleStatusManual = async () => {
         try {
@@ -538,6 +604,14 @@ export default function HomeProfissional({ navigation }) {
                     </View>
 
                     <View style={styles.statusActions}>
+                        <TouchableOpacity 
+                            style={styles.fixButton}
+                            onPress={limparHorariosPresos}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="build-outline" size={18} color="#64748B" />
+                        </TouchableOpacity>
+
                         <TouchableOpacity 
                             style={[styles.statusToggle, { backgroundColor: statusAtendimento.atendendo ? '#EF4444' : '#22C55E' }]}
                             onPress={toggleStatusManual}
@@ -1224,6 +1298,17 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
         color: '#64748B',
+    },
+    fixButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
 
     // ── SEÇÕES GERAIS ──
