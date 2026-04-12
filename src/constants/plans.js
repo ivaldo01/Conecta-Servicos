@@ -124,7 +124,7 @@ export const PLANS = {
     },
     PREMIUM: {
       id: 'client_premium',
-      name: 'Conecta VIP',
+      name: 'Conecta Solutions VIP',
       price: 14.90,
       ads: false,
       features: [

@@ -333,7 +333,7 @@ export default function GerenciarColaboradores({ navigation }) {
                             </View>
                             <Text style={styles.lockTitle}>Funcionalidade Premium</Text>
                             <Text style={styles.lockSubtitle}>
-                                O gerenciamento de equipe e subcontas está disponível apenas nos planos Conecta VIP (Profissional, Empresa e Franquia).
+                                O gerenciamento de equipe e subcontas está disponível apenas nos planos Conecta Solutions VIP (Profissional, Empresa e Franquia).
                             </Text>
                             <TouchableOpacity 
                                 style={styles.upgradeBtn}

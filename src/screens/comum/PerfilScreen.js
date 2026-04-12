@@ -789,7 +789,7 @@ export default function PerfilScreen({ navigation }) {
           </View>
 
           <View style={styles.menuTextWrap}>
-            <Text style={styles.menuText}>Conecta VIP</Text>
+            <Text style={styles.menuText}>Conecta Solutions VIP</Text>
             <Text style={styles.menuSubText}>Ver planos e assinatura</Text>
           </View>
 

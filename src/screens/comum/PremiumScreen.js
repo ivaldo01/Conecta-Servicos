@@ -192,7 +192,7 @@ export default function PremiumScreen({ navigation }) {
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {ehProfissional ? 'Planos para Profissionais' : 'Benefícios Conecta VIP'}
+          {ehProfissional ? 'Planos para Profissionais' : 'Benefícios Conecta Solutions VIP'}
         </Text>
       </View>
 
@@ -417,7 +417,9 @@ export default function PremiumScreen({ navigation }) {
                   <Text style={styles.buttonText}>Plano Ativo</Text>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.button} onPress={() => abrirSelecaoPagamento(PLANS.CLIENT.PREMIUM)}>
+                <TouchableOpacity style={styles.premiumButton} onPress={() => abrirSelecaoPagamento(PLANS.CLIENT.PREMIUM)}>
+                  <Ionicons name="diamond" size={20} color="#1A1A1A" />
+                  <Text style={styles.premiumButtonText}>Assinar Conecta Solutions VIP</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -522,12 +524,14 @@ export default function PremiumScreen({ navigation }) {
                 <TextInput
                   style={styles.input}
                   placeholder="Nome no cartão"
+                  placeholderTextColor="#999"
                   value={cardData.holderName}
                   onChangeText={(text) => setCardData({ ...cardData, holderName: text })}
                 />
                 <TextInput
                   style={styles.input}
                   placeholder="Número do cartão"
+                  placeholderTextColor="#999"
                   keyboardType="numeric"
                   value={cardData.number}
                   onChangeText={(text) => setCardData({ ...cardData, number: text })}
@@ -536,12 +540,14 @@ export default function PremiumScreen({ navigation }) {
                   <TextInput
                     style={[styles.input, styles.inputHalf]}
                     placeholder="Validade (MM/AA)"
+                    placeholderTextColor="#999"
                     value={cardData.expiry}
                     onChangeText={(text) => setCardData({ ...cardData, expiry: text })}
                   />
                   <TextInput
                     style={[styles.input, styles.inputHalf]}
                     placeholder="CVV"
+                    placeholderTextColor="#999"
                     keyboardType="numeric"
                     secureTextEntry
                     value={cardData.cvv}
@@ -551,18 +557,21 @@ export default function PremiumScreen({ navigation }) {
                 <TextInput
                   style={styles.input}
                   placeholder="CPF/CNPJ do titular"
+                  placeholderTextColor="#999"
                   value={cardData.cpfCnpj}
                   onChangeText={(text) => setCardData({ ...cardData, cpfCnpj: text })}
                 />
                 <TextInput
                   style={styles.input}
                   placeholder="CEP"
+                  placeholderTextColor="#999"
                   value={cardData.cep}
                   onChangeText={(text) => setCardData({ ...cardData, cep: text })}
                 />
                 <TextInput
                   style={styles.input}
                   placeholder="Número do endereço"
+                  placeholderTextColor="#999"
                   value={cardData.numeroEndereco}
                   onChangeText={(text) => setCardData({ ...cardData, numeroEndereco: text })}
                 />
@@ -606,6 +615,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginTop: 10, // Evita corte em dispositivos com punch-hole
   },
   backButton: {
     marginRight: 12,
@@ -819,12 +829,12 @@ const styles = StyleSheet.create({
   },
   modalView: {
     backgroundColor: '#FFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
-    paddingBottom: 40,
-    width: '90%',
+    paddingBottom: 32, // Ajustado para dar mais ar ao botão de confirmação
+    width: '92%',
     maxWidth: 400,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -927,13 +937,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#D1D1D1', // Borda mais visível
+    backgroundColor: '#F9F9F9', // Fundo levemente cinza para contraste
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 15,
+    color: '#333', // Texto digitado escuro e visível
   },
   cardRow: {
     flexDirection: 'row',

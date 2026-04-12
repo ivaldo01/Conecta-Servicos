@@ -119,7 +119,7 @@ export default function TermosUso({ navigation }) {
                         • Destaque no sistema de busca e recomendações prioritárias.{"\n"}
                         • Acesso a relatórios financeiros avançados.{"\n"}{"\n"}
 
-                        4.3. <Text style={styles.bold}>Conecta VIP (Clientes Premium)</Text>:{"\n"}
+                        4.3. <Text style={styles.bold}>Conecta Solutions VIP (Clientes Premium)</Text>:{"\n"}
                         • Navegação sem anúncios.{"\n"}
                         • Acesso antecipado a profissionais de alta performance.{"\n"}
                         • Cashback em agendamentos selecionados.{"\n"}
@@ -200,7 +200,7 @@ export default function TermosUso({ navigation }) {
                         {aceito && <Ionicons name="checkmark" size={16} color="#FFF" />}
                     </View>
                     <Text style={styles.checkboxText}>
-                        Eu li e aceito os termos da Coneta Solutions
+                        Eu li e aceito os termos da Conecta Solutions
                     </Text>
                 </TouchableOpacity>
 
