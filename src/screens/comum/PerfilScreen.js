@@ -558,7 +558,7 @@ export default function PerfilScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.editBtn}
-          onPress={() => navigation.navigate("ConfigurarPerfil")}
+          onPress={() => navigation.navigate(ehProfissional ? "ConfigurarPerfil" : "EditarPerfil")}
         >
           <Ionicons name="create-outline" size={16} color={colors.primary} />
           <Text style={styles.editBtnText}>

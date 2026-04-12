@@ -178,12 +178,10 @@ export default function ConfigurarServicos() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.container}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
         >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View style={styles.container}>
                     <View style={styles.header}>
                         <Text style={styles.title}>{ehColaborador ? 'Serviços liberados' : 'Configurar Serviços'}</Text>
                         <Text style={styles.subtitle}>
@@ -272,8 +270,6 @@ export default function ConfigurarServicos() {
                             />
                         )}
                     </View>
-                </View>
-            </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
     );
 }

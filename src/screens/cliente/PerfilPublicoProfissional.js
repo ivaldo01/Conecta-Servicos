@@ -24,6 +24,7 @@ import {
     setDoc,
     deleteDoc,
     serverTimestamp,
+    where,
 } from 'firebase/firestore';
 
 import { auth, db } from '../../services/firebaseConfig';
@@ -248,19 +249,9 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
 
             try {
                 const avaliacoesRef = collection(db, 'avaliacoes');
-                const avaliacoesSnap = await getDocs(query(avaliacoesRef));
-                const listaAvaliacoes = avaliacoesSnap.docs
-                    .map((item) => ({
-                        id: item.id,
-                        ...item.data(),
-                    }))
-                    .filter(
-                        (item) =>
-                            item?.profissionalId === profissionalId ||
-                            item?.clinicaId === profissionalId ||
-                            item?.colaboradorId === profissionalId
-                    );
-
+                const q = query(avaliacoesRef, where('profissionalId', '==', profissionalId));
+                const avaliacoesSnap = await getDocs(q);
+                const listaAvaliacoes = avaliacoesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setAvaliacoes(listaAvaliacoes);
             } catch (errorAvaliacoes) {
                 console.log('Erro ao carregar avaliações:', errorAvaliacoes);
@@ -488,7 +479,7 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                 </View>
 
                 <View style={isLargeScreen ? styles.headerTextLarge : null}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: isLargeScreen ? 'flex-start' : 'center' }}>
                         <Text style={[styles.nome, isLargeScreen && styles.nomeLarge, { marginBottom: 0 }]}>{getNomeProfissional(perfil)}</Text>
                         {temSeloVerificado(perfil?.planoAtivo) && (
                             <Ionicons name="checkmark-circle" size={24} color="#3498DB" style={{ marginLeft: 6 }} />
@@ -522,20 +513,19 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                     </TouchableOpacity>
 
                     <TouchableOpacity style={[styles.secondaryAction, isLargeScreen && styles.secondaryActionLarge]} onPress={abrirWhatsApp}>
-                        <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                        <Ionicons name="logo-whatsapp" size={20} color="#166534" />
                         <Text style={styles.secondaryActionText}>WhatsApp</Text>
                     </TouchableOpacity>
+                </View>
 
+                {!isLargeScreen && (
                     <TouchableOpacity
-                        style={[styles.favoriteButton, isLargeScreen && styles.favoriteButtonLarge]}
+                        style={styles.favoriteButton}
                         onPress={toggleFavorito}
                         disabled={loadingFavorito}
                     >
                         {loadingFavorito ? (
-                            <ActivityIndicator
-                                size="small"
-                                color={favorito ? '#E63946' : colors.primary}
-                            />
+                            <ActivityIndicator size="small" color={favorito ? '#E63946' : colors.primary} />
                         ) : (
                             <>
                                 <Ionicons
@@ -543,20 +533,36 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                                     size={18}
                                     color={favorito ? '#E63946' : colors.primary}
                                 />
-                                {!isLargeScreen && (
-                                    <Text
-                                        style={[
-                                            styles.favoriteButtonText,
-                                            { color: favorito ? '#E63946' : colors.primary },
-                                        ]}
-                                    >
-                                        Favoritar
-                                    </Text>
-                                )}
+                                <Text
+                                    style={[
+                                        styles.favoriteButtonText,
+                                        { color: favorito ? '#E63946' : colors.primary },
+                                    ]}
+                                >
+                                    {favorito ? 'Favoritado' : 'Favoritar profissional'}
+                                </Text>
                             </>
                         )}
                     </TouchableOpacity>
-                </View>
+                )}
+
+                {isLargeScreen && (
+                    <TouchableOpacity
+                        style={styles.favoriteButtonLarge}
+                        onPress={toggleFavorito}
+                        disabled={loadingFavorito}
+                    >
+                        {loadingFavorito ? (
+                            <ActivityIndicator size="small" color={favorito ? '#E63946' : colors.primary} />
+                        ) : (
+                                <Ionicons
+                                    name={favorito ? 'heart' : 'heart-outline'}
+                                    size={22}
+                                    color={favorito ? '#E63946' : colors.primary}
+                                />
+                        )}
+                    </TouchableOpacity>
+                )}
             </View>
 
             <View style={[styles.cardsGridLarge, isLargeScreen && styles.cardsGridLargeRow]}>
@@ -576,10 +582,12 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                             <View style={styles.infoRow}>
                                 <Ionicons name="location-outline" size={18} color={colors.primary} />
                                 <Text style={styles.infoText}>
-                                    {perfil?.endereco ||
-                                        perfil?.cidade ||
-                                        perfil?.bairro ||
-                                        'Endereço não informado'}
+                                    {[
+                                        perfil?.endereco,
+                                        perfil?.bairro,
+                                        perfil?.cidade,
+                                        perfil?.estado || perfil?.localizacao?.estado
+                                    ].filter(Boolean).join(', ') || 'Localização não informada'}
                                 </Text>
                             </View>
 
@@ -1068,7 +1076,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 12,
         marginTop: 10,
-        width: '100%',
+        backgroundColor: '#F8F9FA',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#E9ECEF',
     },
     favoriteButtonLarge: {
         width: 50,

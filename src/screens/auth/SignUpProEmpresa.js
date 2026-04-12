@@ -35,6 +35,7 @@ import PrimaryButton from "../../components/PrimaryButton";
 import { prepararDadosCategoriaParaProfissional } from "../../utils/categoriaUtils";
 import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
 import DesktopWrapper from '../../components/DesktopWrapper';
+import { validarCPF, validarCNPJ, validarEmail, validarTelefone, verificarDadosDuplicados } from "../../utils/validators";
 
 import logo from '../../../assets/logo.png';
 
@@ -179,6 +180,10 @@ export default function SignUpProEmpresa({ navigation, route }) {
       Alert.alert("Atenção", "Informe o telefone ou WhatsApp.");
       return false;
     }
+    if (!validarTelefone(telefone)) {
+      Alert.alert("Telefone Inválido", "Informe um telefone válido com DDD e 9 dígitos.");
+      return false;
+    }
     if (!cpfCnpj.trim()) {
       Alert.alert(
         "Atenção",
@@ -187,6 +192,17 @@ export default function SignUpProEmpresa({ navigation, route }) {
           : "Informe o CPF."
       );
       return false;
+    }
+    if (tipoCadastro === 'empresa') {
+      if (!validarCNPJ(cpfCnpj)) {
+        Alert.alert("CNPJ Inválido", "O CNPJ informado é inválido. Verifique os números digitados.");
+        return false;
+      }
+    } else {
+      if (!validarCPF(cpfCnpj)) {
+        Alert.alert("CPF Inválido", "O CPF informado é inválido. Verifique os números digitados.");
+        return false;
+      }
     }
     if (!especialidade.trim()) {
       Alert.alert("Atenção", "Informe a especialidade principal.");
@@ -216,6 +232,10 @@ export default function SignUpProEmpresa({ navigation, route }) {
       Alert.alert("Atenção", "Informe o e-mail.");
       return false;
     }
+    if (!validarEmail(email)) {
+      Alert.alert("E-mail Inválido", "O formato do e-mail é inválido.");
+      return false;
+    }
     if (!senha.trim()) {
       Alert.alert("Atenção", "Informe a senha.");
       return false;
@@ -242,6 +262,16 @@ export default function SignUpProEmpresa({ navigation, route }) {
     setLoading(true);
 
     try {
+      const duplicidade = await verificarDadosDuplicados(cpfCnpj.trim(), telefone.trim());
+      if (duplicidade.existe) {
+        setLoading(false);
+        Alert.alert(
+          "Dados já em uso",
+          `O ${duplicidade.tipo === 'documento' ? (tipoCadastro === 'empresa' ? 'CNPJ' : 'CPF') : 'Telefone/WhatsApp'} informado já está vinculado a outra conta.`
+        );
+        return;
+      }
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim().toLowerCase(),
@@ -249,7 +279,18 @@ export default function SignUpProEmpresa({ navigation, route }) {
       );
 
       const user = userCredential.user;
-      const dadosCategoria = await prepararDadosCategoriaParaProfissional(especialidade);
+      let dadosCategoria = {
+        especialidade: especialidade.trim(),
+        categoriaId: 'default',
+        categoriaSlug: 'default',
+        categoriaIcone: 'briefcase-outline'
+      };
+
+      try {
+        dadosCategoria = await prepararDadosCategoriaParaProfissional(especialidade);
+      } catch (categoriaError) {
+        console.log("Erro silencioso ao preparar a categoria (Ignorado):", categoriaError?.message || categoriaError);
+      }
 
       const nomeExibicao =
         tipoCadastro === 'empresa' ? nomeNegocio.trim() : nomeCompleto.trim();
@@ -472,6 +513,103 @@ export default function SignUpProEmpresa({ navigation, route }) {
       </View>
 
       <View style={styles.inputGroup}>
+        <Text style={styles.label}>Resumo / Biografia</Text>
+        <TextInput
+          ref={bioRef}
+          style={[styles.input, styles.textArea]}
+          placeholder="Fale um pouco sobre você, sua experiência e seus serviços..."
+          placeholderTextColor="#999"
+          value={bio}
+          onChangeText={setBio}
+          multiline
+          textAlignVertical="top"
+        />
+      </View>
+
+      <Text style={[styles.sectionTitle, { fontSize: 16, marginTop: 10, textAlign: 'left' }]}>
+        Localização
+      </Text>
+
+      <View style={styles.row}>
+        <View style={styles.halfInputLeft}>
+          <Text style={styles.label}>País *</Text>
+          <View style={styles.pickerOuter}>
+            <Picker
+              selectedValue={pais}
+              onValueChange={(itemValue) => {
+                setPais(itemValue);
+                setEstado('');
+              }}
+              style={styles.picker}
+            >
+              {paises.map((p) => (
+                <Picker.Item key={p} label={p} value={p} style={styles.pickerItem} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.halfInputRight}>
+          <Text style={styles.label}>Estado / Região *</Text>
+          <View style={styles.pickerOuter}>
+            <Picker
+              selectedValue={estado}
+              onValueChange={(itemValue) => setEstado(itemValue)}
+              style={styles.picker}
+            >
+              {estadosParaMostrar.map((est) => (
+                <Picker.Item key={est.value} label={est.label} value={est.value} style={styles.pickerItem} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.row}>
+        <View style={styles.halfInputLeft}>
+          <Text style={styles.label}>Cidade *</Text>
+          <TextInput
+            ref={cidadeRef}
+            style={styles.input}
+            placeholder="Sua cidade"
+            placeholderTextColor="#999"
+            value={cidade}
+            onChangeText={setCidade}
+            returnKeyType="next"
+            onSubmitEditing={() => cepRef.current?.focus()}
+          />
+        </View>
+
+        <View style={styles.halfInputRight}>
+          <Text style={styles.label}>CEP / Código Postal *</Text>
+          <TextInput
+            ref={cepRef}
+            style={styles.input}
+            placeholder="00000-000"
+            placeholderTextColor="#999"
+            value={cep}
+            onChangeText={setCep}
+            returnKeyType="next"
+            onSubmitEditing={() => enderecoRef.current?.focus()}
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Endereço Completo *</Text>
+        <TextInput
+          ref={enderecoRef}
+          style={styles.input}
+          placeholder="Rua, Número, Bairro"
+          placeholderTextColor="#999"
+          value={endereco}
+          onChangeText={setEndereco}
+          returnKeyType="next"
+          onSubmitEditing={() => emailRef.current?.focus()}
+        />
+      </View>
+
+      <View style={styles.inputGroup}>
         <Text style={styles.label}>E-mail de Acesso *</Text>
         <TextInput
           ref={emailRef}
@@ -667,7 +805,7 @@ export default function SignUpProEmpresa({ navigation, route }) {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
       >
         {isWebLarge ? (
           renderWebSplitLayout()
@@ -702,7 +840,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     padding: 24,
-    paddingBottom: 80,
+    paddingBottom: 150,
   },
 
   mobileHeaderArea: {

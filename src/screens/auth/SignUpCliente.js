@@ -34,6 +34,7 @@ import colors from "../../constants/colors";
 import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
 import PrimaryButton from "../../components/PrimaryButton";
 import DesktopWrapper from '../../components/DesktopWrapper';
+import { validarCPF, validarEmail, validarTelefone, verificarDadosDuplicados } from "../../utils/validators";
 
 import logo from '../../../assets/logo.png';
 
@@ -146,6 +147,14 @@ export default function SignUpCliente({ navigation, route }) {
       Alert.alert("Atenção", "Informe seu telefone ou WhatsApp.");
       return false;
     }
+    if (!validarTelefone(telefone)) {
+      Alert.alert("Telefone Inválido", "Informe um telefone válido com DDD e 9 dígitos.");
+      return false;
+    }
+    if (cpf.trim() && !validarCPF(cpf)) {
+      Alert.alert("CPF Inválido", "O CPF informado é inválido. Verifique os números digitados.");
+      return false;
+    }
     if (!pais.trim()) {
       Alert.alert("Atenção", "Informe o país.");
       return false;
@@ -164,6 +173,10 @@ export default function SignUpCliente({ navigation, route }) {
     }
     if (!email.trim()) {
       Alert.alert("Atenção", "Informe o e-mail.");
+      return false;
+    }
+    if (!validarEmail(email)) {
+      Alert.alert("E-mail Inválido", "O formato do e-mail é inválido.");
       return false;
     }
     if (!senha.trim()) {
@@ -192,6 +205,16 @@ export default function SignUpCliente({ navigation, route }) {
     setLoading(true);
 
     try {
+      const duplicidade = await verificarDadosDuplicados(cpf.trim(), telefone.trim());
+      if (duplicidade.existe) {
+        setLoading(false);
+        Alert.alert(
+          "Dados já em uso",
+          `O ${duplicidade.tipo === 'documento' ? 'CPF' : 'Telefone/WhatsApp'} informado já está vinculado a outra conta.`
+        );
+        return;
+      }
+
       const userCert = await createUserWithEmailAndPassword(
         auth,
         email.trim().toLowerCase(),
@@ -567,7 +590,7 @@ export default function SignUpCliente({ navigation, route }) {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
       >
         {isWebLarge ? (
           renderWebSplitLayout()
@@ -602,7 +625,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     padding: 24,
-    paddingBottom: 80,
+    paddingBottom: 150,
   },
 
   mobileHeaderArea: {

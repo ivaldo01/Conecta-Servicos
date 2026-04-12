@@ -434,7 +434,7 @@ export default function LoginScreen({ navigation }) {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
       >
         {isWebLarge ? (
           renderWebSplitLayout()
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
-    paddingBottom: 32,
+    paddingBottom: 80,
   },
 
   mobileHeaderArea: {

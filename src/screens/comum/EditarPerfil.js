@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import Sidebar from '../../components/Sidebar';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { validarCPF, validarCNPJ, validarTelefone, verificarDadosDuplicados } from "../../utils/validators";
 
 function EditarPerfil({ navigation }) {
   const [perfil, setPerfil] = useState(null);
@@ -45,7 +46,12 @@ function EditarPerfil({ navigation }) {
         const perfilSnap = await getDoc(perfilRef);
 
         if (perfilSnap.exists()) {
-          setPerfil(perfilSnap.data());
+          const data = perfilSnap.data();
+          if (!data.endereco && data.localizacao) {
+             const loc = data.localizacao;
+             data.endereco = [loc.endereco || loc.logradouro, loc.cidade, loc.estado].filter(Boolean).join(', ');
+          }
+          setPerfil(data);
         }
       } catch (error) {
         Alert.alert("Erro", "Erro ao carregar perfil: " + error.message);
@@ -62,10 +68,40 @@ function EditarPerfil({ navigation }) {
     if (!user || !perfil) return;
 
     Keyboard.dismiss();
+
+    const telefoneParaValidar = perfil.telefone || perfil.whatsapp || '';
+    if (telefoneParaValidar && !validarTelefone(telefoneParaValidar)) {
+      Alert.alert("Telefone Inválido", "Informe um telefone válido com DDD e 9 dígitos.");
+      return;
+    }
+
+    const cleanCpfCnpj = (perfil.cpfCnpj || perfil.cpf || perfil.cnpj || '').replace(/\D/g, '');
+    if (cleanCpfCnpj) {
+      if (cleanCpfCnpj.length <= 11) {
+        if (!validarCPF(cleanCpfCnpj)) {
+          Alert.alert("CPF Inválido", "O CPF informado é inválido. Verifique os números digitados.");
+          return;
+        }
+      } else {
+        if (!validarCNPJ(cleanCpfCnpj)) {
+          Alert.alert("CNPJ Inválido", "O CNPJ informado é inválido. Verifique os números digitados.");
+          return;
+        }
+      }
+    }
+
     setSalvando(true);
 
     try {
-      const cleanCpfCnpj = (perfil.cpfCnpj || perfil.cpf || perfil.cnpj || '').replace(/\D/g, '');
+      const duplicidade = await verificarDadosDuplicados(cleanCpfCnpj, telefoneParaValidar, user.uid);
+      if (duplicidade.existe) {
+        setSalvando(false);
+        Alert.alert(
+          "Dados já em uso",
+          `O ${duplicidade.tipo === 'documento' ? 'CPF/CNPJ' : 'Telefone/WhatsApp'} informado já está vinculado a outra conta.`
+        );
+        return;
+      }
 
       const dadosUpdate = {
         ...perfil,
@@ -136,12 +172,12 @@ function EditarPerfil({ navigation }) {
       </View>
 
       <View style={[styles.card, isLargeScreen && styles.cardLarge]}>
-        <Text style={styles.label}>Nome Completo / Razão Social</Text>
+        <Text style={styles.label}>{perfil.tipo === 'cliente' ? 'Nome Completo' : 'Nome / Razão Social'}</Text>
         <TextInput
           style={styles.input}
           placeholder="Nome"
-          value={perfil.nome || ''}
-          onChangeText={(text) => setPerfil({ ...perfil, nome: text })}
+          value={perfil.nome || perfil.nomeCompleto || perfil.nomeNegocio || ''}
+          onChangeText={(text) => setPerfil({ ...perfil, nome: text, nomeCompleto: text })}
           returnKeyType="next"
           onSubmitEditing={() => whatsappRef.current?.focus()}
         />
@@ -207,18 +243,22 @@ function EditarPerfil({ navigation }) {
           onSubmitEditing={() => bioRef.current?.focus()}
         />
 
-        <Text style={styles.label}>Sobre / Descrição</Text>
-        <TextInput
-          ref={bioRef}
-          style={[styles.input, styles.bioInput]}
-          placeholder="Fale um pouco sobre seus serviços..."
-          value={perfil.bio || ''}
-          onChangeText={(text) => setPerfil({ ...perfil, bio: text })}
-          multiline
-          textAlignVertical="top"
-          returnKeyType="done"
-          onSubmitEditing={handleUpdate}
-        />
+        { (perfil.tipo === 'profissional' || perfil.perfil === 'profissional' || perfil.tipo === 'clinica') && (
+          <>
+            <Text style={styles.label}>Sobre / Descrição</Text>
+            <TextInput
+              ref={bioRef}
+              style={[styles.input, styles.bioInput]}
+              placeholder="Fale um pouco sobre seus serviços..."
+              value={perfil.bio || ''}
+              onChangeText={(text) => setPerfil({ ...perfil, bio: text })}
+              multiline
+              textAlignVertical="top"
+              returnKeyType="done"
+              onSubmitEditing={handleUpdate}
+            />
+          </>
+        )}
 
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.success }]}

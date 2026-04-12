@@ -72,8 +72,14 @@ function getInitial(nome = '') {
   return String(nome).trim().charAt(0).toUpperCase() || 'P';
 }
 
-function ordenarProfissionais(lista) {
+function ordenarProfissionais(lista, cidadeCliente = '') {
   return [...lista].sort((a, b) => {
+    if (cidadeCliente) {
+      const aMesmaCidade = normalizarTexto(getCidadeProfissional(a)) === normalizarTexto(cidadeCliente);
+      const bMesmaCidade = normalizarTexto(getCidadeProfissional(b)) === normalizarTexto(cidadeCliente);
+      if (aMesmaCidade !== bMesmaCidade) return aMesmaCidade ? -1 : 1;
+    }
+
     const prioridadeA = getPrioridadeBusca(a?.planoAtivo);
     const prioridadeB = getPrioridadeBusca(b?.planoAtivo);
     if (prioridadeB !== prioridadeA) return prioridadeB - prioridadeA;
@@ -127,9 +133,18 @@ export default function BuscaProfissionais({ navigation, route }) {
       const profissionaisBase = await carregarProfissionaisBase();
 
       let favoritosObj = {};
+      let cidadeCliente = '';
       if (user) {
         const favSnap = await getDocs(collection(db, "usuarios", user.uid, "favoritos"));
         favSnap.forEach(d => { favoritosObj[d.id] = true; });
+
+        try {
+          const userSnap = await getDoc(doc(db, "usuarios", user.uid));
+          if (userSnap.exists()) {
+             const ud = userSnap.data();
+             cidadeCliente = ud?.localizacao?.cidade || ud?.cidade || '';
+          }
+        } catch(err) {}
       }
       setFavoritosMap(favoritosObj);
 
@@ -154,7 +169,7 @@ export default function BuscaProfissionais({ navigation, route }) {
         };
       });
 
-      const ordenada = ordenarProfissionais(lista);
+      const ordenada = ordenarProfissionais(lista, cidadeCliente);
       setProfissionais(ordenada);
       if (ordenada.length > 0) setSelectedPro(ordenada[0]);
     } catch (e) {
