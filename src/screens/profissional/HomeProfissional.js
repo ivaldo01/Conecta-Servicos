@@ -24,8 +24,9 @@ import NativeAdCard from '../../components/NativeAdCard';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
-import { temAnuncios } from '../../constants/plans';
-import { getHojeStr as getHojeFiltroStr } from '../../utils/agendamentoUtils';
+import { temAnuncios, getMaxFuncionarios } from '../../constants/plans';
+import { getHojeStr as getHojeFiltroStr, isAtendendoAgora } from '../../utils/agendamentoUtils';
+import { updateDoc } from 'firebase/firestore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_WIDTH = Math.min(SCREEN_WIDTH - 44, 300);
@@ -162,6 +163,9 @@ export default function HomeProfissional({ navigation }) {
     const hojeStr = useMemo(() => getHojeExibicaoStr(), []);
     const hojeFiltro = useMemo(() => getHojeFiltroStr(), []);
 
+    const [configAgenda, setConfigAgenda] = useState(null);
+    const [statusAtendimento, setStatusAtendimento] = useState({ atendendo: false, manual: false });
+
     useEffect(() => {
         const user = auth.currentUser;
         if (!user?.uid) return;
@@ -271,10 +275,92 @@ export default function HomeProfissional({ navigation }) {
 
         carregarDados();
 
+        // Listener para configurações de agenda e status manual
+        const user = auth.currentUser;
+        if (user?.uid) {
+            const unsubAgenda = onSnapshot(doc(db, "usuarios", user.uid, "configuracoes", "agenda"), (snap) => {
+                if (snap.exists()) {
+                    setConfigAgenda(snap.data());
+                }
+            });
+
+            return () => {
+                ativo = false;
+                unsubAgenda();
+            };
+        }
+
         return () => {
             ativo = false;
         };
     }, []);
+
+    // Calcula o status de atendimento em tempo real
+    useEffect(() => {
+        if (!usuario) return;
+
+        const calcularStatus = () => {
+            const manual = usuario.statusManual !== undefined;
+            let atendendo = false;
+
+            if (manual) {
+                atendendo = usuario.statusManual;
+            } else if (configAgenda) {
+                atendendo = isAtendendoAgora(configAgenda);
+            }
+
+            setStatusAtendimento({ atendendo, manual });
+            
+            // Sincroniza o campo 'atendendo' no Firestore para que o cliente veja
+            if (usuario.atendendo !== atendendo) {
+                const userRef = doc(db, 'usuarios', auth.currentUser.uid);
+                updateDoc(userRef, { atendendo }).catch(e => console.log('Erro ao sincronizar status:', e));
+            }
+        };
+
+        calcularStatus();
+        const interval = setInterval(calcularStatus, 60000); // Recalcula a cada minuto
+
+        return () => clearInterval(interval);
+    }, [usuario, configAgenda]);
+
+    const toggleStatusManual = async () => {
+        try {
+            const userRef = doc(db, 'usuarios', auth.currentUser.uid);
+            const novoStatusManual = !statusAtendimento.atendendo;
+            
+            await updateDoc(userRef, {
+                statusManual: novoStatusManual,
+                atendendo: novoStatusManual
+            });
+            
+            // O onSnapshot do carregarDados (ou o do usuario se houvesse) iria atualizar, 
+            // mas como usuario vem de getDoc inicial, vamos atualizar localmente o usuario
+            setUsuario(prev => ({ ...prev, statusManual: novoStatusManual, atendendo: novoStatusManual }));
+        } catch (error) {
+            console.log('Erro ao alternar status manual:', error);
+        }
+    };
+
+    const voltarParaAutomatico = async () => {
+        try {
+            const userRef = doc(db, 'usuarios', auth.currentUser.uid);
+            const { deleteField } = await import('firebase/firestore');
+            
+            await updateDoc(userRef, {
+                statusManual: deleteField(),
+                // O useEffect vai recalcular o 'atendendo' logo em seguida
+            });
+            
+            setUsuario(prev => {
+                const novo = { ...prev };
+                delete novo.statusManual;
+                return novo;
+            });
+        } catch (error) {
+            console.log('Erro ao voltar para automático:', error);
+        }
+    };
 
     const agendamentosHoje = useMemo(() => {
         return agendamentos.filter((item) => item?.dataFiltro === hojeFiltro);
@@ -332,6 +418,15 @@ export default function HomeProfissional({ navigation }) {
                 onPress: () => navigation.navigate('AgendaProfissional'),
             },
             {
+                id: 'configAgenda',
+                titulo: 'Minha Agenda',
+                subtitulo: 'Dias e horários',
+                icon: 'time-outline',
+                cor: '#0F172A',
+                bg: '#F1F5F9',
+                onPress: () => navigation.navigate('ConfigurarAgenda'),
+            },
+            {
                 id: 'servicos',
                 titulo: 'Serviços',
                 subtitulo: 'O que você oferece',
@@ -369,8 +464,10 @@ export default function HomeProfissional({ navigation }) {
             },
         ];
 
-        // Se não for colaborador, adiciona Gerenciar Equipe
-        if (usuario?.perfil !== 'colaborador') {
+        // Se não for colaborador e o plano permitir, adiciona Gerenciar Equipe
+        const limiteEquipe = getMaxFuncionarios(usuario?.planoAtivo);
+        
+        if (usuario?.perfil !== 'colaborador' && limiteEquipe > 0) {
             base.push({
                 id: 'equipe',
                 titulo: 'Minha Equipe',
@@ -421,6 +518,47 @@ export default function HomeProfissional({ navigation }) {
                         </View>
                     )}
                 </TouchableOpacity>
+            </View>
+
+            {/* ── STATUS DE ATENDIMENTO ── */}
+            <View style={styles.statusSection}>
+                <View style={[styles.statusContainer, { backgroundColor: statusAtendimento.atendendo ? '#F0FDF4' : '#FEF2F2' }]}>
+                    <View style={styles.statusInfoArea}>
+                        <View style={[styles.statusIndicator, { backgroundColor: statusAtendimento.atendendo ? '#22C55E' : '#EF4444' }]} />
+                        <View>
+                            <Text style={[styles.statusTitle, { color: statusAtendimento.atendendo ? '#166534' : '#991B1B' }]}>
+                                {statusAtendimento.atendendo ? 'Você está atendendo' : 'Você está fechado'}
+                            </Text>
+                            <Text style={styles.statusDescription}>
+                                {statusAtendimento.manual 
+                                    ? 'Alterado manualmente' 
+                                    : 'Seguindo sua escala automática'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.statusActions}>
+                        <TouchableOpacity 
+                            style={[styles.statusToggle, { backgroundColor: statusAtendimento.atendendo ? '#EF4444' : '#22C55E' }]}
+                            onPress={toggleStatusManual}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.statusToggleText}>
+                                {statusAtendimento.atendendo ? 'Pausar' : 'Abrir'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {statusAtendimento.manual && (
+                            <TouchableOpacity 
+                                style={styles.autoButton}
+                                onPress={voltarParaAutomatico}
+                            >
+                                <Ionicons name="refresh-outline" size={16} color="#64748B" />
+                                <Text style={styles.autoButtonText}>Auto</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -1006,6 +1144,86 @@ const styles = StyleSheet.create({
         color: colors.primary,
         fontWeight: '800',
         fontSize: 13,
+    },
+
+    // ── STATUS DE ATENDIMENTO ──
+    statusSection: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 4,
+    },
+
+    statusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 20,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+    },
+
+    statusInfoArea: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+
+    statusIndicator: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 12,
+    },
+
+    statusTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+    },
+
+    statusDescription: {
+        fontSize: 11,
+        color: '#64748B',
+        marginTop: 2,
+    },
+
+    statusActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+
+    statusToggle: {
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+    },
+
+    statusToggleText: {
+        color: '#FFF',
+        fontWeight: '800',
+        fontSize: 13,
+    },
+
+    autoButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        gap: 4,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+
+    autoButtonText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#64748B',
     },
 
     // ── SEÇÕES GERAIS ──

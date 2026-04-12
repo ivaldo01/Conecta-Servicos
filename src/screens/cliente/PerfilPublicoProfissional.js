@@ -11,7 +11,15 @@ import {
     Alert,
     useWindowDimensions,
     Platform,
+    Animated as RNAnimated,
 } from 'react-native';
+import Animated, { 
+    useAnimatedStyle, 
+    useSharedValue, 
+    withRepeat, 
+    withTiming,
+    interpolate 
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Sidebar from '../../components/Sidebar';
@@ -78,6 +86,38 @@ function getDescricaoProfissional(perfil) {
         perfil?.descricao ||
         perfil?.bio ||
         'Este profissional ainda não adicionou uma descrição pública.'
+    );
+}
+
+function StatusLight({ atendendo }) {
+    const pulse = useSharedValue(0);
+
+    useEffect(() => {
+        if (atendendo) {
+            pulse.value = withRepeat(
+                withTiming(1, { duration: 1500 }),
+                -1,
+                false
+            );
+        } else {
+            pulse.value = 0;
+        }
+    }, [atendendo]);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 2.2]) }],
+            opacity: interpolate(pulse.value, [0, 1], [0.6, 0]),
+        };
+    });
+
+    return (
+        <View style={styles.statusLightWrapper}>
+            <View style={[styles.statusLightInner, { backgroundColor: atendendo ? '#22C55E' : '#94A3B8' }]} />
+            {atendendo && (
+                <Animated.View style={[styles.statusLightPulse, animatedStyle]} />
+            )}
+        </View>
     );
 }
 
@@ -479,11 +519,14 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                 </View>
 
                 <View style={isLargeScreen ? styles.headerTextLarge : null}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: isLargeScreen ? 'flex-start' : 'center' }}>
+                    <View style={styles.headerTitleRow}>
                         <Text style={[styles.nome, isLargeScreen && styles.nomeLarge, { marginBottom: 0 }]}>{getNomeProfissional(perfil)}</Text>
-                        {temSeloVerificado(perfil?.planoAtivo) && (
-                            <Ionicons name="checkmark-circle" size={24} color="#3498DB" style={{ marginLeft: 6 }} />
-                        )}
+                        <View style={styles.nameBadges}>
+                            <StatusLight atendendo={perfil?.atendendo} />
+                            {temSeloVerificado(perfil?.planoAtivo) && (
+                                <Ionicons name="checkmark-circle" size={24} color="#3498DB" />
+                            )}
+                        </View>
                     </View>
 
                     <Text style={[styles.subInfo, isLargeScreen && styles.subInfoLarge, { marginTop: 4 }]}>
@@ -1328,5 +1371,37 @@ const styles = StyleSheet.create({
         color: '#F57C00',
         marginTop: 2,
     },
-
+    headerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        paddingHorizontal: 20,
+        gap: 8,
+    },
+    nameBadges: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    statusLightWrapper: {
+        width: 14,
+        height: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    statusLightInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        zIndex: 2,
+    },
+    statusLightPulse: {
+        position: 'absolute',
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#22C55E',
+        zIndex: 1,
+    },
 });

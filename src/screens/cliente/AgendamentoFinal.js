@@ -302,7 +302,7 @@ export default function AgendamentoFinal({ route, navigation }) {
                 collection(db, "agendamentos"),
                 where("clinicaId", "==", clinicaId),
                 where("dataFiltro", "==", dataFiltro),
-                where("status", "in", ["pendente", "confirmado", "concluido"])
+                where("status", "in", ["pendente", "confirmado"])
             );
             const snap = await getDocs(q);
             const agendados = snap.docs.map(d => ({

@@ -325,9 +325,28 @@ export default function GerenciarColaboradores({ navigation }) {
                     showsVerticalScrollIndicator={false}
                 >
                     <Text style={styles.headerTitle}>Minha Equipe</Text>
-
-                    {/* Card mostrando limite de funcionários do plano */}
-                    {!carregandoPlano && planoUsuario && (
+                    
+                    {getLimiteFuncionarios() === 0 ? (
+                        <View style={styles.premiumLockCard}>
+                            <View style={styles.lockIconCircle}>
+                                <Ionicons name="lock-closed" size={40} color={colors.primary} />
+                            </View>
+                            <Text style={styles.lockTitle}>Funcionalidade Premium</Text>
+                            <Text style={styles.lockSubtitle}>
+                                O gerenciamento de equipe e subcontas está disponível apenas nos planos Conecta VIP (Profissional, Empresa e Franquia).
+                            </Text>
+                            <TouchableOpacity 
+                                style={styles.upgradeBtn}
+                                onPress={() => navigation.navigate("PremiumScreen")}
+                            >
+                                <Text style={styles.upgradeBtnText}>CONHECER PLANOS VIP</Text>
+                                <Ionicons name="star" size={16} color="#FFF" />
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <>
+                            {/* Card mostrando limite de funcionários do plano */}
+                            {!carregandoPlano && planoUsuario && (
                         <View style={{
                             backgroundColor: getInfoLimite().atingiuLimite ? '#FFEBEE' : '#E3F2FD',
                             padding: 12,
@@ -498,6 +517,8 @@ export default function GerenciarColaboradores({ navigation }) {
                                 </View>
                             </View>
                         ))
+                    )}
+                    </>
                     )}
                 </ScrollView>
             </TouchableWithoutFeedback>
@@ -813,5 +834,63 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#6B7280',
         marginTop: 4,
-    }
+    },
+
+    // ── PREMIUM LOCK ──
+    premiumLockCard: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 30,
+        alignItems: 'center',
+        marginTop: 40,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+    },
+
+    lockIconCircle: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#EEF2FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+
+    lockTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1E293B',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+
+    lockSubtitle: {
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 24,
+    },
+
+    upgradeBtn: {
+        backgroundColor: colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        borderRadius: 14,
+        gap: 8,
+    },
+
+    upgradeBtnText: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
 });

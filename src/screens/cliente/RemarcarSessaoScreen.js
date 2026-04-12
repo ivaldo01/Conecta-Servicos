@@ -94,7 +94,7 @@ export default function RemarcarSessaoScreen({ route, navigation }) {
     const q = query(
       collection(db, 'agendamentos'),
       where('profissionalId', '==', profissionalId),
-      where('status', 'in', ['agendado', 'confirmado'])
+      where('status', 'in', ['pendente', 'confirmado'])
     );
 
     const snapshot = await getDocs(q);

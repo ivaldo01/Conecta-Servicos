@@ -62,3 +62,40 @@ export function ordenarAgendamentosPorCriacao(dados) {
         return dataB - dataA;
     });
 }
+
+/**
+ * Verifica se o profissional está em horário de atendimento baseado na escala.
+ * @param {Object} configAgenda - Objeto de configuração da agenda (usuarios/{uid}/configuracoes/agenda)
+ * @returns {Boolean}
+ */
+export function isAtendendoAgora(configAgenda) {
+    if (!configAgenda || !configAgenda.dias || !configAgenda.horaInicio || !configAgenda.horaFim) {
+        return false;
+    }
+
+    const agora = new Date();
+    const diaSemana = agora.getDay(); // 0 (Dom) a 6 (Sab)
+    
+    // 1. Verifica se hoje é um dia de atendimento
+    if (!configAgenda.dias.includes(diaSemana)) {
+        return false;
+    }
+
+    // 2. Verifica se o horário atual está dentro da faixa
+    const horaAtual = agora.getHours();
+    const minAtual = agora.getMinutes();
+    const tempoAtual = horaAtual * 60 + minAtual;
+
+    const [hIni, mIni] = configAgenda.horaInicio.split(':').map(Number);
+    const [hFim, mFim] = configAgenda.horaFim.split(':').map(Number);
+
+    const tempoInicio = hIni * 60 + mIni;
+    let tempoFim = hFim * 60 + mFim;
+
+    // Se o fim for 00:00, considerar como 24:00 (final do dia)
+    if (tempoFim === 0) {
+        tempoFim = 24 * 60;
+    }
+
+    return tempoAtual >= tempoInicio && tempoAtual <= tempoFim;
+}

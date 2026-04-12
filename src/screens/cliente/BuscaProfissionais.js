@@ -281,6 +281,12 @@ export default function BuscaProfissionais({ navigation, route }) {
                 <Ionicons name="location-outline" size={12} color={colors.primary} />
                 <Text style={styles.infoBadgeText}>{getCidadeProfissional(item)}</Text>
               </View>
+              <View style={[styles.infoBadge, { backgroundColor: item?.atendendo ? '#DCFCE7' : '#F1F5F9' }]}>
+                <View style={[styles.statusDotSmall, { backgroundColor: item?.atendendo ? '#22C55E' : '#94A3B8' }]} />
+                <Text style={[styles.infoBadgeText, { color: item?.atendendo ? '#166534' : '#64748B', fontWeight: 'bold' }]}>
+                  {item?.atendendo ? 'Online' : 'Offline'}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -366,6 +372,12 @@ const styles = StyleSheet.create({
   badgesRow: { flexDirection: 'row', marginTop: 5 },
   infoBadge: { flexDirection: 'row', alignItems: 'center', marginRight: 10, backgroundColor: '#F0F0F0', padding: 4, borderRadius: 5 },
   infoBadgeText: { fontSize: 11, marginLeft: 3, color: '#555' },
+  statusDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
   proCard: { backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 20 },
   proName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
   proSpec: { color: '#EEE', fontSize: 14, marginTop: 5 },

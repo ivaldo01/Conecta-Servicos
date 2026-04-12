@@ -363,7 +363,7 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
             await updateDoc(doc(db, "agendamentos", agendamentoAtual.id), dadosUpdate);
             setAgendamentoAtual((prev) => ({ ...prev, ...dadosUpdate, status: novoStatus }));
 
-            if (novoStatus === 'cancelado' || novoStatus === 'recusado') {
+            if (novoStatus === 'cancelado' || novoStatus === 'recusado' || novoStatus === 'concluido') {
                 await tentarLiberarHorario();
             }
 
