@@ -341,6 +341,10 @@ export default function AgendamentoFinal({ route, navigation }) {
                     horarios: clinicaAgendaSnap.data().horarios || [],
                     dias: clinicaAgendaSnap.data().dias || [],
                     agendaAtiva: clinicaAgendaSnap.data().agendaAtiva !== false,
+                    configAlmoco: clinicaAgendaSnap.data().configAlmoco || {},
+                    atenderFeriados: clinicaAgendaSnap.data().atenderFeriados || false,
+                    horaInicio: clinicaAgendaSnap.data().horaInicio || "08:00",
+                    horaFim: clinicaAgendaSnap.data().horaFim || "18:00",
                 }
                 : {
                     horarios: [],
@@ -403,6 +407,10 @@ export default function AgendamentoFinal({ route, navigation }) {
                             horarios: aSnap.data().horarios || [],
                             dias: aSnap.data().dias || [],
                             agendaAtiva: aSnap.data().agendaAtiva !== false,
+                            configAlmoco: aSnap.data().configAlmoco || {},
+                            atenderFeriados: aSnap.data().atenderFeriados || false,
+                            horaInicio: aSnap.data().horaInicio || "08:00",
+                            horaFim: aSnap.data().horaFim || "18:00",
                         }
                         : null,
                     ehDono: false,
@@ -433,6 +441,85 @@ export default function AgendamentoFinal({ route, navigation }) {
             : agendaClinica;
     };
 
+    const FERIADOS_BR = [
+        "01-01", // Confraternização Universal
+        "21-04", // Tiradentes
+        "01-05", // Dia do Trabalho
+        "07-09", // Independência
+        "12-10", // Nossa Sra Aparecida
+        "02-11", // Finados
+        "15-11", // Proclamação da República
+        "20-11", // Dia da Consciência Negra
+        "25-12", // Natal
+    ];
+
+    const ehFeriado = (data) => {
+        if (!data) return false;
+        const diaMes = `${String(data.getDate()).padStart(2, '0')}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+        return FERIADOS_BR.includes(diaMes);
+    };
+
+    const estaNoHorarioDeAlmoco = (agenda, horario, diaIdx) => {
+        const config = agenda?.configAlmoco?.[diaIdx];
+        if (!config || !config.ativo || !config.inicio || !config.fim || !horario) return false;
+
+        try {
+            const [h, m] = horario.split(':').map(Number);
+            const [hIni, mIni] = config.inicio.split(':').map(Number);
+            const [hFim, mFim] = config.fim.split(':').map(Number);
+
+            if (isNaN(h) || isNaN(hIni) || isNaN(hFim)) return false;
+
+            const atual = h * 60 + m;
+            const inicio = hIni * 60 + mIni;
+            const fim = hFim * 60 + mFim;
+
+            return atual >= inicio && atual < fim;
+        } catch (e) {
+            console.log("Erro ao calcular horário de almoço:", e);
+            return false;
+        }
+    };
+
+    const estaForaDoExpediente = (agenda, horario, diaIdx, data) => {
+        if (!agenda || !horario) return false;
+        
+        const config = agenda?.configAlmoco?.[diaIdx];
+        const feriado = ehFeriado(data);
+        
+        // Se for feriado e o profissional NÃO atende em feriados, está fora do expediente
+        if (feriado && !agenda.atenderFeriados) return true;
+
+        let hInicioStr = agenda.horaInicio;
+        let hFimStr = agenda.horaFim;
+
+        if (config?.usarHorarioDiferenciado && config?.inicioExpediente) {
+            hInicioStr = config.inicioExpediente;
+            hFimStr = config.fimExpediente;
+        }
+
+        // Se for feriado e atende em feriados, usamos o expediente base ou um especial se configurado?
+        // O usuário pediu "mesma logica que fim de semana". 
+        // Para simplificar, usamos o horário geral se não houver override no dia, 
+        // ou o override do dia se houver.
+
+        if (!hInicioStr || !hFimStr) return false;
+
+        try {
+            const [h, m] = horario.split(':').map(Number);
+            const [hIniExp, mIniExp] = hInicioStr.split(':').map(Number);
+            const [hFimExp, mFimExp] = hFimStr.split(':').map(Number);
+
+            const atual = h * 60 + m;
+            const inicio = hIniExp * 60 + mIniExp;
+            const fim = hFimExp * 60 + mFimExp;
+
+            return atual < inicio || atual >= (hFimStr === "00:00" ? 1440 : fim);
+        } catch (e) {
+            return false;
+        }
+    };
+
     const colaboradorPodeAtenderNoHorario = (colab, horario) => {
         const agenda = agendaDoColaborador(colab);
 
@@ -446,7 +533,10 @@ export default function AgendamentoFinal({ route, navigation }) {
             a => a.horario === horario && a.colaboradorId === colab.id
         );
 
-        return Boolean(trabalhaDia && trabalhaHora && fazServicos && !jaAgendado);
+        const noAlmoco = estaNoHorarioDeAlmoco(agenda, horario, diaSemanaSelecionado);
+        const foraExpediente = estaForaDoExpediente(agenda, horario, diaSemanaSelecionado, date);
+
+        return Boolean(trabalhaDia && trabalhaHora && fazServicos && !jaAgendado && !noAlmoco && !foraExpediente);
     };
 
     const existeAlgumProfissionalDisponivelNoDia = useMemo(() => {
@@ -506,8 +596,11 @@ export default function AgendamentoFinal({ route, navigation }) {
     // Estado de cada horário baseado EXCLUSIVAMENTE no profissional selecionado
     const getEstadoHorario = (h) => {
         if (horarioJaPassouHoje(h)) return 'passado';
-
         if (!colaboradorEscolhido) return 'passado';
+
+        const agenda = agendaDoColaborador(colaboradorEscolhido);
+        const noAlmoco = estaNoHorarioDeAlmoco(agenda, h, diaSemanaSelecionado);
+        if (noAlmoco) return 'passado';
 
         const livre = colaboradorPodeAtenderNoHorario(colaboradorEscolhido, h);
         return livre ? 'livre' : 'ocupado';
@@ -1034,6 +1127,10 @@ export default function AgendamentoFinal({ route, navigation }) {
                         </View>
                         <View style={styles.legendaItem}>
                             <View style={[styles.legendaDot, { backgroundColor: '#E2E8F0' }]} />
+                            <Text style={styles.legendaText}>Indisponível</Text>
+                        </View>
+                        <View style={styles.legendaItem}>
+                            <View style={[styles.legendaDot, { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' }]} />
                             <Text style={styles.legendaText}>Ocupado</Text>
                         </View>
                     </View>

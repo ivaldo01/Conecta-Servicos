@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,13 @@ export default function ConfigurarAgenda({ route }) {
   const [horaInicio, setHoraInicio] = useState("08:00");
   const [horaFim, setHoraFim] = useState("18:00");
   const [intervaloMinutos, setIntervaloMinutos] = useState(60);
+  const [configAlmoco, setConfigAlmoco] = useState({}); // { "1": { ativo: true, inicio, fim, usarHorarioDiferenciado, ... } }
+  
+  // Estado para templates da UI (não salvos diretamente, mas usados para atualizar a config)
+  const [almocoTemplate, setAlmocoTemplate] = useState({ inicio: '12:00', fim: '13:00' });
+  const [especialTemplate, setEspecialTemplate] = useState({ ativo: true, inicio: '08:00', fim: '12:00' });
+  const [atenderFeriados, setAtenderFeriados] = useState(false);
+  const [exibirPrevia, setExibirPrevia] = useState(false);
 
   const user = auth.currentUser;
   const ehColaborador = perfilUsuario?.perfil === 'colaborador' && !colaboradorId;
@@ -44,6 +51,17 @@ export default function ConfigurarAgenda({ route }) {
     }
     return horarios;
   }, []);
+
+  const pickerItems = useMemo(() => {
+    return listaHorariosDisponiveis.map(h => (
+      <Picker.Item 
+        key={h} 
+        label={h} 
+        value={h} 
+        color={Platform.OS === 'android' ? '#222' : '#222'}
+      />
+    ));
+  }, [listaHorariosDisponiveis]);
 
   const gerarHorarios = (inicio, fim, intervalo) => {
     const [hIni, mIni] = inicio.split(':').map(Number);
@@ -108,6 +126,8 @@ export default function ConfigurarAgenda({ route }) {
         setHoraInicio(data.horaInicio || "08:00");
         setHoraFim(data.horaFim || "18:00");
         setIntervaloMinutos(data.intervaloMinutos || 60);
+        setConfigAlmoco(data.configAlmoco || {});
+        setAtenderFeriados(data.atenderFeriados || false);
       }
     } catch (e) {
       console.log("Erro ao carregar agenda:", e);
@@ -137,6 +157,62 @@ export default function ConfigurarAgenda({ route }) {
 
   const limparDias = () => {
     setDiasSelecionados([]);
+    setConfigAlmoco({});
+  };
+
+  const toggleAlmocoDia = (idx) => {
+    const diaKey = String(idx);
+    setConfigAlmoco(prev => {
+      const configAtual = prev[diaKey] || { 
+        ativo: false, 
+        inicio: almocoTemplate.inicio, 
+        fim: almocoTemplate.fim,
+        usarHorarioDiferenciado: false,
+        inicioExpediente: horaInicio,
+        fimExpediente: horaFim
+      };
+      
+      return {
+        ...prev,
+        [diaKey]: {
+          ...configAtual,
+          ativo: !configAtual.ativo,
+          inicio: almocoTemplate.inicio,
+          fim: almocoTemplate.fim
+        }
+      };
+    });
+  };
+
+  const toggleEspecialDia = (idx) => {
+    const diaKey = String(idx);
+    setConfigAlmoco(prev => {
+      const configAtual = prev[diaKey] || { 
+        ativo: false, 
+        inicio: almocoTemplate.inicio, 
+        fim: almocoTemplate.fim,
+        usarHorarioDiferenciado: false,
+        inicioExpediente: especialTemplate.inicio,
+        fimExpediente: especialTemplate.fim
+      };
+      
+      const novoStatus = !configAtual.usarHorarioDiferenciado;
+      
+      // Se tiver ativando especial e estiver em modo "Não Atendo", removemos o dia da agenda principal
+      if (novoStatus && !especialTemplate.ativo) {
+        setDiasSelecionados(prev => prev.filter(d => d !== idx));
+      }
+
+      return {
+        ...prev,
+        [diaKey]: {
+          ...configAtual,
+          usarHorarioDiferenciado: novoStatus,
+          inicioExpediente: especialTemplate.inicio,
+          fimExpediente: especialTemplate.fim
+        }
+      };
+    });
   };
 
   const salvarAgenda = async () => {
@@ -172,14 +248,33 @@ export default function ConfigurarAgenda({ route }) {
         ? doc(db, "usuarios", user.uid, "colaboradores", colaboradorId, "configuracoes", "agenda")
         : doc(db, "usuarios", user.uid, "configuracoes", "agenda");
 
+      // Calcula a união de todos os horários possíveis para garantir que 
+      // qualquer slot de qualquer dia esteja no array principal
+      let todosHoras = new Set();
+      
+      // Adiciona horários do expediente geral
+      gerarHorarios(horaInicio, horaFim, intervaloMinutos).forEach(h => todosHoras.add(h));
+      
+      // Adiciona horários de expedientes customizados
+      Object.values(configAlmoco).forEach(conf => {
+        if (conf.usarHorarioDiferenciado && conf.inicioExpediente && conf.fimExpediente) {
+          gerarHorarios(conf.inicioExpediente, conf.fimExpediente, intervaloMinutos)
+            .forEach(h => todosHoras.add(h));
+        }
+      });
+
+      const horariosFinais = Array.from(todosHoras).sort();
+
       await setDoc(
         docRef,
         {
           dias: [...diasSelecionados].sort((a, b) => a - b),
-          horarios: horariosGerados,
+          horarios: horariosFinais,
           horaInicio,
           horaFim,
           intervaloMinutos,
+          configAlmoco,
+          atenderFeriados,
           agendaAtiva: true,
           nomeReferencia: colaboradorNome || "Empresa",
           ultimaAtualizacao: serverTimestamp(),
@@ -303,6 +398,7 @@ export default function ConfigurarAgenda({ route }) {
             dropdownIconColor={colors.primary}
             itemStyle={styles.pickerItem}
             enabled={!ehColaborador}
+            mode="dropdown"
           >
             {listaHorariosDisponiveis.map((hora) => (
               <Picker.Item
@@ -324,6 +420,7 @@ export default function ConfigurarAgenda({ route }) {
             dropdownIconColor={colors.primary}
             itemStyle={styles.pickerItem}
             enabled={!ehColaborador}
+            mode="dropdown"
           >
             {listaHorariosDisponiveis.map((hora) => (
               <Picker.Item
@@ -345,6 +442,7 @@ export default function ConfigurarAgenda({ route }) {
             dropdownIconColor={colors.primary}
             itemStyle={styles.pickerItem}
             enabled={!ehColaborador}
+            mode="dropdown"
           >
             {intervalosDisponiveis.map((intervalo) => (
               <Picker.Item
@@ -358,30 +456,178 @@ export default function ConfigurarAgenda({ route }) {
         </View>
       </View>
 
+      {/* Card de Almoço Simplificado */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>
-          <Ionicons name="list" size={18} /> Prévia dos Horários Gerados
+          <Ionicons name="restaurant-outline" size={18} /> Pausas e Almoço
         </Text>
-
-        <View style={styles.previewInfo}>
-          <Text style={styles.previewInfoText}>
-            {horariosGerados.length} horário(s) gerado(s)
-          </Text>
+        <Text style={styles.smallSubtitle}>Ajuste os horários e toque nos dias para aplicar a pausa.</Text>
+        
+        <View style={styles.templatePickerRow}>
+          <View style={styles.templateInputBox}>
+            <Text style={styles.breakLabel}>Início</Text>
+            <View style={styles.miniPickerContainer}>
+              <Picker
+                selectedValue={almocoTemplate.inicio}
+                onValueChange={(v) => setAlmocoTemplate(prev => ({ ...prev, inicio: v }))}
+                style={styles.miniPicker}
+                enabled={!ehColaborador}
+                mode="dropdown"
+              >
+                {pickerItems}
+              </Picker>
+            </View>
+          </View>
+          <View style={styles.templateInputBox}>
+            <Text style={styles.breakLabel}>Fim</Text>
+            <View style={styles.miniPickerContainer}>
+              <Picker
+                selectedValue={almocoTemplate.fim}
+                onValueChange={(v) => setAlmocoTemplate(prev => ({ ...prev, fim: v }))}
+                style={styles.miniPicker}
+                enabled={!ehColaborador}
+                mode="dropdown"
+              >
+                {pickerItems}
+              </Picker>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.horariosGrid}>
-          {horariosGerados.length > 0 ? (
-            horariosGerados.map((h) => (
-              <View key={h} style={styles.horaPreview}>
-                <Text style={styles.horaPreviewText}>{h}</Text>
+        <View style={styles.diasGrid}>
+          {diasSemana.map((dia, idx) => {
+            const ativo = configAlmoco[String(idx)]?.ativo;
+            return (
+              <TouchableOpacity
+                key={`almoco-${dia}`}
+                style={[styles.diaSquare, ativo && styles.diaSquareActive]}
+                onPress={() => toggleAlmocoDia(idx)}
+                disabled={ehColaborador}
+              >
+                <Text style={[styles.diaSquareText, ativo && styles.diaSquareTextActive]}>{dia}</Text>
+                {ativo && <Ionicons name="checkmark-circle" size={12} color="#FFF" style={styles.checkIcon} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Card de Fim de Semana e Feriados */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="calendar-outline" size={18} /> Fins de Semana e Feriados
+        </Text>
+        
+        <View style={styles.statusButtonsRow}>
+          <TouchableOpacity 
+            style={[styles.statusBtn, especialTemplate.ativo && styles.statusBtnAtendo]}
+            onPress={() => setEspecialTemplate(prev => ({ ...prev, ativo: true }))}
+          >
+            <Text style={[styles.statusBtnText, especialTemplate.ativo && styles.statusBtnTextActive]}>ATENDO</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.statusBtn, !especialTemplate.ativo && styles.statusBtnNaoAtendo]}
+            onPress={() => setEspecialTemplate(prev => ({ ...prev, ativo: false }))}
+          >
+            <Text style={[styles.statusBtnText, !especialTemplate.ativo && styles.statusBtnTextActive]}>NÃO ATENDO</Text>
+          </TouchableOpacity>
+        </View>
+
+        {especialTemplate.ativo && (
+          <View style={styles.templatePickerRow}>
+            <View style={styles.templateInputBox}>
+              <Text style={styles.breakLabel}>Abrir às</Text>
+              <View style={styles.miniPickerContainer}>
+                <Picker
+                  selectedValue={especialTemplate.inicio}
+                  onValueChange={(v) => setEspecialTemplate(prev => ({ ...prev, inicio: v }))}
+                  style={styles.miniPicker}
+                  mode="dropdown"
+                >
+                  {pickerItems}
+                </Picker>
               </View>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>
-              Ajuste início, fim e intervalo para gerar horários válidos.
-            </Text>
-          )}
+            </View>
+            <View style={styles.templateInputBox}>
+              <Text style={styles.breakLabel}>Fechar às</Text>
+              <View style={styles.miniPickerContainer}>
+                <Picker
+                  selectedValue={especialTemplate.fim}
+                  onValueChange={(v) => setEspecialTemplate(prev => ({ ...prev, fim: v }))}
+                  style={styles.miniPicker}
+                  mode="dropdown"
+                >
+                  {pickerItems}
+                </Picker>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <Text style={styles.labelGrid}>Aplicar esta regra aos dias:</Text>
+        <View style={styles.diasGrid}>
+          {diasSemana.map((dia, idx) => {
+            const especial = configAlmoco[String(idx)]?.usarHorarioDiferenciado;
+            return (
+              <TouchableOpacity
+                key={`especial-${dia}`}
+                style={[styles.diaSquare, especial && (especialTemplate.ativo ? styles.diaSquareActive : styles.diaSquareInactive)]}
+                onPress={() => toggleEspecialDia(idx)}
+                disabled={ehColaborador}
+              >
+                <Text style={[styles.diaSquareText, especial && styles.diaSquareTextActive]}>{dia}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+
+        <TouchableOpacity 
+          style={styles.holidayToggle} 
+          onPress={() => setAtenderFeriados(!atenderFeriados)}
+        >
+          <Ionicons 
+            name={atenderFeriados ? "checkbox" : "square-outline"} 
+            size={24} 
+            color={atenderFeriados ? colors.primary : "#CCC"} 
+          />
+          <Text style={styles.holidayToggleText}>Aplicar horários especiais aos feriados nacionais</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.previewToggleHeader} 
+          onPress={() => setExibirPrevia(!exibirPrevia)}
+        >
+          <Text style={styles.sectionTitleNoBorder}>
+            <Ionicons name="list" size={18} /> Prévia dos Horários Gerados
+          </Text>
+          <Ionicons name={exibirPrevia ? "chevron-up" : "chevron-down"} size={20} color="#999" />
+        </TouchableOpacity>
+
+        {exibirPrevia && (
+          <>
+            <View style={styles.previewInfo}>
+              <Text style={styles.previewInfoText}>
+                {horariosGerados.length} horário(s) gerado(s) baseado no expediente geral
+              </Text>
+            </View>
+
+            <View style={styles.horariosGrid}>
+              {horariosGerados.length > 0 ? (
+                horariosGerados.map((h) => (
+                  <View key={h} style={styles.horaPreview}>
+                    <Text style={styles.horaPreviewText}>{h}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  Ajuste início, fim e intervalo para gerar horários válidos.
+                </Text>
+              )}
+            </View>
+          </>
+        )}
       </View>
 
       {!ehColaborador && (
@@ -400,6 +646,7 @@ export default function ConfigurarAgenda({ route }) {
     </ScrollView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
@@ -437,7 +684,6 @@ const styles = StyleSheet.create({
   noticeCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
     backgroundColor: '#FFF',
     marginHorizontal: 15,
     marginTop: 15,
@@ -618,10 +864,208 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     elevation: 3,
   },
-
   btnText: {
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // Novos estilos para almoço
+  smallSubtitle: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 15,
+    marginTop: -10,
+  },
+  breakDayRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  breakDayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  breakDayName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+  },
+  miniToggle: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+  },
+  miniToggleActive: {
+    backgroundColor: colors.primary + '15',
+  },
+  miniToggleText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#999',
+  },
+
+  miniToggleTextActive: {
+    color: colors.primary,
+  },
+
+  breakInputs: {
+    flexDirection: 'row',
+  },
+  breakInputBox: {
+    flex: 1,
+    marginRight: 15,
+  },
+
+  breakLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 4,
+  },
+
+  miniPickerContainer: {
+    borderWidth: 1,
+    borderColor: '#EEE',
+    borderRadius: 8,
+    backgroundColor: '#FAFAFA',
+    height: 40,
+    justifyContent: 'center',
+  },
+
+  miniPicker: {
+    height: 45,
+    width: '100%',
+  },
+  templatePickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  templateInputBox: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  diasGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  diaSquare: {
+    width: '13%',
+    aspectRatio: 1,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  diaSquareActive: {
+    backgroundColor: colors.primary,
+  },
+  diaSquareInactive: {
+    backgroundColor: '#FFEBEE',
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
+  diaSquareText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  diaSquareTextActive: {
+    color: '#FFF',
+  },
+  checkIcon: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+  },
+  statusButtonsRow: {
+    flexDirection: 'row',
+    marginBottom: 15,
+  },
+  statusBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#EEE',
+    marginHorizontal: 5,
+  },
+  statusBtnAtendo: {
+    backgroundColor: '#E8F5E9',
+    borderColor: '#4CAF50',
+  },
+  statusBtnNaoAtendo: {
+    backgroundColor: '#FFEBEE',
+    borderColor: '#F44336',
+  },
+  statusBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#999',
+  },
+  statusBtnTextActive: {
+    color: '#333',
+  },
+  labelGrid: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  holidayToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 15,
+    backgroundColor: '#F9F9F9',
+    padding: 12,
+    borderRadius: 12,
+  },
+  holidayToggleText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 13,
+    color: '#444',
+    fontWeight: '600',
+  },
+  breakHeaderWithActions: {
+    flexDirection: 'column',
+    marginBottom: 10,
+  },
+  btnReplicate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F7FF',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 5,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#D0E6FF',
+  },
+  btnReplicateText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  previewToggleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  sectionTitleNoBorder: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.textDark,
   },
 });

@@ -40,6 +40,7 @@ export default function RemarcarSessaoScreen({ route, navigation }) {
   const [contrato, setContrato] = useState(null);
   const [agendamentoAtual, setAgendamentoAtual] = useState(null);
   const [horariosOcupados, setHorariosOcupados] = useState([]);
+  const [agendaConfig, setAgendaConfig] = useState(null);
   
   const [semanaSelecionada, setSemanaSelecionada] = useState(0);
   const [dataSelecionada, setDataSelecionada] = useState(null);
@@ -73,6 +74,13 @@ export default function RemarcarSessaoScreen({ route, navigation }) {
       const contratoDoc = await getDoc(doc(db, 'contratosRecorrentes', contratoId));
       if (contratoDoc.exists) {
         setContrato(contratoDoc.data());
+      }
+
+      // Carregar configuração de agenda (incluindo almoço)
+      const agendaRef = doc(db, 'usuarios', profissionalId, 'configuracoes', 'agenda');
+      const agendaSnap = await getDoc(agendaRef);
+      if (agendaSnap.exists()) {
+        setAgendaConfig(agendaSnap.data());
       }
 
       // Buscar horários ocupados do profissional
@@ -128,10 +136,69 @@ export default function RemarcarSessaoScreen({ route, navigation }) {
   };
 
   const isHorarioDisponivel = (data, hora) => {
-    return !horariosOcupados.some(ag => {
+    // 1. Verifica agendamentos existentes
+    const jaOcupado = horariosOcupados.some(ag => {
       const dataAg = ag.dataAgendamento?.toDate?.() || new Date(ag.dataAgendamento);
       return isSameDay(dataAg, data) && ag.horaInicio === hora;
     });
+
+    if (jaOcupado) return false;
+
+    // --- Lógica de Feriados ---
+    const FERIADOS_BR = [
+      "01-01", "21-04", "01-05", "07-09", "12-10", "02-11", "15-11", "20-11", "25-12"
+    ];
+    const diaMes = `${String(data.getDate()).padStart(2, '0')}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+    const ehFeriado = FERIADOS_BR.includes(diaMes);
+
+    if (ehFeriado && !agendaConfig?.atenderFeriados) return false;
+
+    // 2. Verifica horário de almoço flexível
+    if (agendaConfig?.configAlmoco) {
+      const diaIdx = data.getDay();
+      const config = agendaConfig.configAlmoco[diaIdx];
+      
+      // Checa Almoço
+      if (config?.ativo && config.inicio && config.fim && hora) {
+        try {
+          const [h, m] = hora.split(':').map(Number);
+          const [hIni, mIni] = config.inicio.split(':').map(Number);
+          const [hFim, mFim] = config.fim.split(':').map(Number);
+
+          if (!isNaN(h) && !isNaN(hIni) && !isNaN(hFim)) {
+            const atual = h * 60 + m;
+            const inicio = hIni * 60 + mIni;
+            const fim = hFim * 60 + mFim;
+
+            if (atual >= inicio && atual < fim) return false;
+          }
+        } catch (e) {
+          console.log("Erro no calculo de almoço (Remarcar):", e);
+        }
+      }
+
+      // Checa Expediente Diferenciado (Meio Período)
+      const hInicioStr = config?.usarHorarioDiferenciado ? config.inicioExpediente : agendaConfig.horaInicio;
+      const hFimStr = config?.usarHorarioDiferenciado ? config.fimExpediente : agendaConfig.horaFim;
+
+      if (hInicioStr && hFimStr && hora) {
+        try {
+          const [h, m] = hora.split(':').map(Number);
+          const [hIniExp, mIniExp] = hInicioStr.split(':').map(Number);
+          const [hFimExp, mFimExp] = hFimStr.split(':').map(Number);
+
+          const atual = h * 60 + m;
+          const inicio = hIniExp * 60 + mIniExp;
+          const fim = hFimExp * 60 + mFimExp;
+
+          if (atual < inicio || atual >= (hFimStr === "00:00" ? 1440 : fim)) return false;
+        } catch (e) {
+           console.log("Erro no calculo de expediente (Remarcar):", e);
+        }
+      }
+    }
+
+    return true;
   };
 
   const confirmarRemarcacao = async () => {
