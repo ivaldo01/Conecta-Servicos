@@ -171,16 +171,24 @@ export default function HomeProfissional({ navigation }) {
     const [statusAtendimento, setStatusAtendimento] = useState({ atendendo: false, manual: false });
 
     // Cálculos para o resumo do dia
-    const pendentes = useMemo(() => 
+    const pendentes = useMemo(() =>
         agendamentos.filter(a => a.status === 'pendente').length
-    , [agendamentos]);
+        , [agendamentos]);
 
-    const confirmadosHoje = useMemo(() => 
+    const confirmadosHoje = useMemo(() =>
         agendamentos.filter(a => a.status === 'confirmado' && a.dataFiltro === hojeFiltro).length
+        , [agendamentos, hojeFiltro]);
+
+    const concluidos = useMemo(() =>
+        agendamentos.filter(a => a.status === 'concluido').length
+        , [agendamentos]);
+
+    const agendamentosHoje = useMemo(() => 
+        agendamentos.filter(a => a.dataFiltro === hojeFiltro)
     , [agendamentos, hojeFiltro]);
 
-    const concluidos = useMemo(() => 
-        agendamentos.filter(a => a.status === 'concluido').length
+    const faturamentoTotal = useMemo(() => 
+        getResumoFinanceiro(agendamentos)
     , [agendamentos]);
 
     useEffect(() => {
@@ -245,9 +253,9 @@ export default function HomeProfissional({ navigation }) {
         }
 
         carregarDono();
-
         const user = auth.currentUser;
-        let unsubAgendamentos;
+        let unsubAgendamentos = null;
+        let unsubAgenda = null;
 
         if (user?.uid) {
             const q = query(
@@ -288,29 +296,21 @@ export default function HomeProfissional({ navigation }) {
                 console.log('Erro no listener de agendamentos:', error);
                 if (ativo) setLoading(false);
             });
-        } else {
-            setLoading(false);
-        }
-
-        // Listener para configurações de agenda e status manual
-        const user = auth.currentUser;
-        if (user?.uid) {
-            const unsubAgenda = onSnapshot(doc(db, "usuarios", user.uid, "configuracoes", "agenda"), (snap) => {
+            unsubAgenda = onSnapshot(doc(db, "usuarios", user.uid, "configuracoes", "agenda"), (snap) => {
                 if (snap.exists()) {
                     setConfigAgenda(snap.data());
                 }
             });
-
-            return () => {
-                ativo = false;
-                if (unsubAgenda) unsubAgenda();
-                if (unsubAgendamentos) unsubAgendamentos();
-            };
+        } else {
+            setLoading(false);
         }
 
         return () => {
             ativo = false;
+            if (unsubAgenda) unsubAgenda();
+            if (unsubAgendamentos) unsubAgendamentos();
         };
+
     }, []);
 
     // Calcula o status de atendimento em tempo real
@@ -328,7 +328,7 @@ export default function HomeProfissional({ navigation }) {
             }
 
             setStatusAtendimento({ atendendo, manual });
-            
+
             // Sincroniza o campo 'atendendo' no Firestore para que o cliente veja
             if (usuario.atendendo !== atendendo) {
                 const userRef = doc(db, 'usuarios', auth.currentUser.uid);
@@ -353,17 +353,17 @@ export default function HomeProfissional({ navigation }) {
                 "Isso irá liberar todos os horários que podem estar 'travados' indevidamente por tentativas de agendamento não concluídas. Deseja continuar?",
                 [
                     { text: "Cancelar", style: "cancel" },
-                    { 
-                        text: "Sim, Limpar", 
+                    {
+                        text: "Sim, Limpar",
                         onPress: async () => {
                             setLoading(true);
                             try {
                                 const q = query(
-                                    collection(db, 'agenda_ocupada'), 
+                                    collection(db, 'agenda_ocupada'),
                                     where('clinicaId', '==', user.uid)
                                 );
                                 const snap = await getDocs(q);
-                                
+
                                 if (snap.empty) {
                                     Alert.alert("Info", "Não foram encontrados horários travados.");
                                     setLoading(false);
@@ -373,7 +373,7 @@ export default function HomeProfissional({ navigation }) {
                                 const batch = writeBatch(db);
                                 snap.forEach(d => batch.delete(d.ref));
                                 await batch.commit();
-                                
+
                                 Alert.alert("Sucesso", `${snap.size} horário(s) foram liberados com sucesso!`);
                             } catch (err) {
                                 console.log('Erro ao limpar horários:', err);
@@ -394,12 +394,12 @@ export default function HomeProfissional({ navigation }) {
         try {
             const userRef = doc(db, 'usuarios', auth.currentUser.uid);
             const novoStatusManual = !statusAtendimento.atendendo;
-            
+
             await updateDoc(userRef, {
                 statusManual: novoStatusManual,
                 atendendo: novoStatusManual
             });
-            
+
             // O onSnapshot do carregarDados (ou o do usuario se houvesse) iria atualizar, 
             // mas como usuario vem de getDoc inicial, vamos atualizar localmente o usuario
             setUsuario(prev => ({ ...prev, statusManual: novoStatusManual, atendendo: novoStatusManual }));
@@ -412,12 +412,12 @@ export default function HomeProfissional({ navigation }) {
         try {
             const userRef = doc(db, 'usuarios', auth.currentUser.uid);
             const { deleteField } = await import('firebase/firestore');
-            
+
             await updateDoc(userRef, {
                 statusManual: deleteField(),
                 // O useEffect vai recalcular o 'atendendo' logo em seguida
             });
-            
+
             setUsuario(prev => {
                 const novo = { ...prev };
                 delete novo.statusManual;
@@ -428,25 +428,6 @@ export default function HomeProfissional({ navigation }) {
         }
     };
 
-    const agendamentosHoje = useMemo(() => {
-        return agendamentos.filter((item) => item?.dataFiltro === hojeFiltro);
-    }, [agendamentos, hojeFiltro]);
-
-    const pendentes = useMemo(() => {
-        return agendamentos.filter((item) => item?.status === 'pendente').length;
-    }, [agendamentos]);
-
-    const confirmadosHoje = useMemo(() => {
-        return agendamentosHoje.filter((item) => item?.status === 'confirmado').length;
-    }, [agendamentosHoje]);
-
-    const concluidos = useMemo(() => {
-        return agendamentos.filter((item) => item?.status === 'concluido').length;
-    }, [agendamentos]);
-
-    const faturamentoTotal = useMemo(() => {
-        return getResumoFinanceiro(agendamentos);
-    }, [agendamentos]);
 
     const heroItems = useMemo(() => ([
         { tipo: 'hero', id: 'hero-main' },
@@ -532,7 +513,7 @@ export default function HomeProfissional({ navigation }) {
 
         // Se não for colaborador e o plano permitir, adiciona Gerenciar Equipe
         const limiteEquipe = getMaxFuncionarios(usuario?.planoAtivo);
-        
+
         if (usuario?.perfil !== 'colaborador' && limiteEquipe > 0) {
             base.push({
                 id: 'equipe',
@@ -596,15 +577,15 @@ export default function HomeProfissional({ navigation }) {
                                 {statusAtendimento.atendendo ? 'Você está atendendo' : 'Você está fechado'}
                             </Text>
                             <Text style={styles.statusDescription}>
-                                {statusAtendimento.manual 
-                                    ? 'Alterado manualmente' 
+                                {statusAtendimento.manual
+                                    ? 'Alterado manualmente'
                                     : 'Seguindo sua escala automática'}
                             </Text>
                         </View>
                     </View>
 
                     <View style={styles.statusActions}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.fixButton}
                             onPress={limparHorariosPresos}
                             activeOpacity={0.7}
@@ -612,7 +593,7 @@ export default function HomeProfissional({ navigation }) {
                             <Ionicons name="build-outline" size={18} color="#64748B" />
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.statusToggle, { backgroundColor: statusAtendimento.atendendo ? '#EF4444' : '#22C55E' }]}
                             onPress={toggleStatusManual}
                             activeOpacity={0.8}
@@ -623,7 +604,7 @@ export default function HomeProfissional({ navigation }) {
                         </TouchableOpacity>
 
                         {statusAtendimento.manual && (
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.autoButton}
                                 onPress={voltarParaAutomatico}
                             >
