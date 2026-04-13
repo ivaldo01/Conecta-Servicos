@@ -1,0 +1,253 @@
+/* ============================================================
+   HOME CLIENTE — PREMIUM ENTERPRISE REFINEMENT
+   ============================================================ */
+
+.home-cliente {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* --- BANNERS SUPERIORES --- */
+.hc-banners {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.hc-banner-card {
+    flex: 1;
+    background: #fff;
+    padding: 32px 24px;
+    border-radius: 28px;
+    border: 1px solid rgba(226, 232, 240, 0.7);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Cores específicas para cada banner */
+.hc-banner-card:nth-child(1) { border-bottom: 4px solid #3B82F6; }
+.hc-banner-card:nth-child(2) { border-bottom: 4px solid #10B981; }
+.hc-banner-card:nth-child(3) { border-bottom: 4px solid #F59E0B; }
+
+.hc-banner-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.hc-banner-card:nth-child(1):hover { background: #EFF6FF; }
+.hc-banner-card:nth-child(2):hover { background: #ECFDF5; }
+.hc-banner-card:nth-child(3):hover { background: #FFFBEB; }
+
+.hc-banner-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+/* Ícones coloridos */
+.hc-banner-card:nth-child(1) .hc-banner-icon { background: #DBEAFE; color: #3B82F6; }
+.hc-banner-card:nth-child(2) .hc-banner-icon { background: #D1FAE5; color: #10B981; }
+.hc-banner-card:nth-child(3) .hc-banner-icon { background: #FEF3C7; color: #F59E0B; }
+
+.hc-banner-text {
+    font-size: 15px;
+    font-weight: 800;
+    color: #1E293B;
+}
+
+/* --- CATEGORIAS --- */
+.hc-categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.hc-category-card {
+    background: #fff;
+    padding: 24px 16px;
+    border-radius: 24px;
+    border: 1px solid rgba(226, 232, 240, 0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.hc-category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px -10px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    border-color: #1E293B;
+}
+
+.hc-category-icon {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+    color: #3B82F6;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+/* Efeito de cor individual no hover se quiser, ou deixar o navy elegante */
+.hc-category-card:hover .hc-category-icon {
+    background: #3B82F6;
+    color: #fff;
+    transform: rotate(10deg);
+}
+
+.hc-category-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #475569;
+    transition: color 0.3s;
+}
+
+/* --- CARDS DE PROFISSIONAIS (GRID) --- */
+.hc-profs-grid-premium {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 32px;
+}
+
+.hc-prof-card-enterprise {
+    background: #fff;
+    border-radius: 32px;
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hc-prof-card-enterprise:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 30px 60px -12px rgba(59, 130, 246, 0.25);
+    border-color: #3B82F6;
+}
+
+.hc-prof-card-banner {
+    height: 120px;
+    width: 100%;
+    position: relative;
+}
+
+.hc-prof-card-banner::after {
+    content: "";
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 50%;
+    background: linear-gradient(to top, rgba(0,0,0,0.4), transparent);
+}
+
+.hc-prof-card-banner img { width: 100%; height: 100%; object-fit: cover; }
+.hc-banner-placeholder-gradient { width: 100%; height: 100%; background: linear-gradient(135deg, #1E293B 0%, #3B82F6 100%); }
+
+.hc-prof-card-content {
+    padding: 0 28px 28px 28px;
+    margin-top: -34px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.hc-prof-avatar-overlap {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: #fff;
+    border: 4px solid #fff;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    margin-bottom: 16px;
+}
+
+.hc-prof-avatar-overlap img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
+.hc-avatar-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #3B82F6; background: #F1F5F9; border-radius: 16px; }
+
+.hc-badge-verified-mini {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    background: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.hc-prof-core-info { margin-bottom: 24px; }
+.hc-prof-name-premium { 
+    font-size: 20px; 
+    font-weight: 900; 
+    color: #0F172A; 
+    margin-bottom: 6px; 
+    letter-spacing: -0.5px;
+}
+
+.hc-prof-spec-tag { 
+    font-size: 11px; 
+    font-weight: 800; 
+    color: #fff; 
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); 
+    padding: 4px 14px; 
+    border-radius: 8px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.8px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.hc-prof-loc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748B;
+    margin-top: 12px;
+}
+
+.hc-prof-loc-row svg {
+    color: #EF4444; /* Vermelho vibrante para localização */
+}
+
+.hc-prof-footer-premium {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+    border-top: 1px solid #F1F5F9;
+}
+
+.hc-prof-rating-box { display: flex; align-items: center; gap: 6px; }
+.hc-rating-val { font-size: 15px; font-weight: 800; color: #1E293B; }
+.hc-rating-count { font-size: 13px; color: #94A3B8; }
+
+.hc-prof-price-box { text-align: right; }
+.hc-price-label { font-size: 10px; font-weight: 800; color: #94A3B8; text-transform: uppercase; }
+.hc-price-val { font-size: 16px; font-weight: 900; color: #3B82F6; }
+
+@media (max-width: 900px) {
+    .hc-banners { grid-template-columns: 1fr; }
+    .hc-categories-grid { grid-template-columns: repeat(3, 1fr); }
+}

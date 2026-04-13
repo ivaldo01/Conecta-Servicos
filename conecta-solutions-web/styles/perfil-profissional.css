@@ -1,0 +1,449 @@
+/* ============================================================
+   PERFIL PROFISSIONAL PÚBLICO — PREMIUM ENTERPRISE
+   ============================================================ */
+
+.prof-page-enterprise {
+    min-height: 100vh;
+    background-color: #F8FAFC;
+    padding-bottom: 80px;
+}
+
+.prof-container-premium {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+/* --- HERO SECTION --- */
+.prof-hero-premium {
+    background: #fff;
+    border-radius: 0 0 40px 40px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.1);
+    margin-bottom: 48px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-top: none;
+}
+
+.prof-banner-wrap {
+    height: 320px;
+    width: 100%;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    position: relative;
+}
+
+.prof-banner-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.prof-banner-placeholder {
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(45deg, #0f172a, #0f172a 20px, #162035 20px, #162035 40px);
+}
+
+.prof-identity-header {
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+    padding: 0 60px 40px 60px;
+    margin-top: -60px;
+    position: relative;
+    z-index: 10;
+}
+
+.prof-avatar-wrap-xl {
+    width: 180px;
+    height: 180px;
+    border-radius: 40px;
+    background: #fff;
+    border: 8px solid #fff;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.prof-avatar-wrap-xl img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.prof-avatar-fallback-xl {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    font-weight: 800;
+    background: #F1F5F9;
+    color: #3B82F6;
+}
+
+.prof-main-info-enterprise {
+    flex: 1;
+    padding-bottom: 10px;
+}
+
+.prof-badges-top {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.badge-verified {
+    background: #DBEAFE;
+    color: #1E40AF;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 50px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-category {
+    background: #F1F5F9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 50px;
+    text-transform: uppercase;
+}
+
+.prof-name-huge {
+    font-size: 42px;
+    font-weight: 900;
+    color: #1E293B;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+}
+
+.prof-metrics-strip {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.metric-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #475569;
+    font-size: 14px;
+}
+
+.metric-item strong {
+    font-size: 16px;
+    color: #1E293B;
+}
+
+.metric-divider {
+    width: 1px;
+    height: 16px;
+    background: #E2E8F0;
+}
+
+.prof-action-header {
+    margin-bottom: 10px;
+}
+
+.btn-primary-enterprise {
+    background: #1971C2;
+    color: #fff;
+    padding: 16px 32px;
+    border-radius: 16px;
+    border: none;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(25, 113, 194, 0.2);
+    transition: all 0.3s;
+}
+
+.btn-primary-enterprise:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 30px rgba(25, 113, 194, 0.3);
+    background: #1864AB;
+}
+
+/* --- BIO SECTION --- */
+.prof-bio-enterprise {
+    background: #fff;
+    padding: 48px;
+    border-radius: 32px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.section-title-enterprise {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1E293B;
+    margin-bottom: 20px;
+    position: relative;
+    padding-left: 16px;
+}
+
+.section-title-enterprise::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 4px; height: 100%;
+    background: #3B82F6;
+    border-radius: 4px;
+}
+
+.bio-text-enterprise {
+    font-size: 16px;
+    color: #475569;
+    line-height: 1.8;
+}
+
+/* --- SERVICES & REVIEWS SECTION --- */
+.prof-servicos-section, .prof-avaliacoes-section {
+    background: #fff;
+    padding: 48px;
+    border-radius: 32px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.prof-section-header {
+    margin-bottom: 32px;
+}
+
+.prof-section-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #1E293B;
+}
+
+.prof-section-sub {
+    font-size: 14px;
+    color: #64748B;
+    margin-top: 4px;
+}
+
+.prof-servicos-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.prof-servico-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 32px;
+    background: #F8FAFC;
+    border-radius: 20px;
+    border: 1px solid #E2E8F0;
+    transition: all 0.2s;
+}
+
+.prof-servico-card:hover {
+    border-color: #3B82F6;
+    background: #fff;
+    transform: translateX(8px);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+}
+
+.prof-servico-nome {
+    font-size: 18px;
+    font-weight: 800;
+    color: #1E293B;
+    margin-bottom: 4px;
+}
+
+.prof-servico-desc {
+    font-size: 14px;
+    color: #64748B;
+    margin-bottom: 12px;
+}
+
+.prof-servico-meta {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.btn-agendar-serv {
+    background: #fff;
+    color: #1E293B;
+    border: 2px solid #E2E8F0;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-agendar-serv:hover {
+    background: #1E293B;
+    color: #fff;
+    border-color: #1E293B;
+}
+
+/* --- REVIEWS SECTION REDESIGN --- */
+.prof-avaliacoes-section-premium {
+    background: #fff;
+    padding: 48px;
+    border-radius: 32px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.prof-avaliacoes-grid-premium {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+.prof-avaliacao-card-premium {
+    background: #F8FAFC;
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: all 0.2s;
+}
+
+.prof-avaliacao-card-premium:hover {
+    background: #fff;
+    border-color: #3B82F6;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+}
+
+.av-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.av-autor-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.av-avatar-small {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #E2E8F0;
+}
+
+.av-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.av-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 800;
+    color: #64748B;
+}
+
+.av-nome {
+    font-size: 14px;
+    font-weight: 800;
+    color: #1E293B;
+}
+
+.av-servico-tag {
+    font-size: 11px;
+    font-weight: 600;
+    color: #3B82F6;
+    text-transform: uppercase;
+}
+
+.av-nota-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.av-stars-row {
+    display: flex;
+    gap: 2px;
+}
+
+.av-nota-text {
+    font-size: 10px;
+    font-weight: 800;
+    color: #1E293B;
+    background: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #E2E8F0;
+}
+
+.av-comentario-premium {
+    font-size: 14px;
+    color: #475569;
+    font-style: italic;
+    line-height: 1.5;
+}
+
+.av-footer-premium {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #E2E8F0;
+}
+
+.av-data-tag {
+    font-size: 12px;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.av-verified-badge {
+    font-size: 10px;
+    font-weight: 800;
+    color: #10B981;
+    background: #DCFCE7;
+    padding: 2px 8px;
+    border-radius: 50px;
+}
+
+.prof-vazio-premium {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    color: #94A3B8;
+}
+
+@media (max-width: 900px) {
+    .prof-identity-header { flex-direction: column; align-items: center; text-align: center; padding: 0 20px 40px 20px; }
+    .prof-metrics-strip { justify-content: center; }
+    .prof-avatar-wrap-xl { width: 140px; height: 140px; border-width: 4px; }
+    .prof-name-huge { font-size: 32px; }
+    .prof-servico-card { flex-direction: column; gap: 20px; text-align: center; }
+}

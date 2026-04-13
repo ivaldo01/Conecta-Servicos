@@ -1,0 +1,98 @@
+{
+  "name": "conecta-solutions-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Conecta Solutions — Plataforma web e desktop de gestão de serviços",
+  "author": "Conecta Solutions",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "electron:build:win": "next build && next export -o out && electron-builder --win --x64",
+    "electron:build:mac": "next build && next export -o out && electron-builder --mac",
+    "electron:build": "next build && next export -o out && electron-builder --win --mac"
+  },
+  "build": {
+    "appId": "br.com.conectasolutions.app",
+    "productName": "Conecta Solutions",
+    "copyright": "Copyright © 2025 Conecta Solutions",
+    "icon": "public/logo.png",
+    "files": [
+      "out/**/*",
+      "electron/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/logo.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/logo.png",
+      "shortcutName": "Conecta Solutions",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.business",
+      "icon": "public/logo.png"
+    },
+    "dmg": {
+      "title": "Conecta Solutions ${version}",
+      "icon": "public/logo.png"
+    },
+    "directories": {
+      "output": "dist-electron"
+    }
+  },
+  "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
+    "chart.js": "^4.5.1",
+    "firebase": "^12.12.0",
+    "lucide-react": "^1.8.0",
+    "next": "16.2.3",
+    "react": "19.2.4",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.3",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wait-on": "^9.0.5"
+  }
+}

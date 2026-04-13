@@ -1,0 +1,582 @@
+/* ============================================================
+   EQUIPE — Gerenciamento de colaboradores
+   
+   ÍNDICE:
+   1. Container e corpo
+   2. Cards de resumo (KPIs)
+   3. Seções e grade de cards
+   4. Card do colaborador
+   5. Avatar e informações
+   6. Status badge
+   7. Tags de serviços
+   8. Barra de ações
+   9. Modal (overlay + caixa)
+   10. Estado vazio
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONTAINER E CORPO
+   ============================================================ */
+.eq-page { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg-page); }
+.eq-body  { padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-xl); }
+
+
+/* ============================================================
+   2. CARDS DE RESUMO (KPIs)
+   ============================================================ */
+.eq-resumo {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+@media (max-width: 768px) { .eq-resumo { grid-template-columns: 1fr; } }
+
+.eq-resumo-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.eq-resumo-card--azul  { border-top: 3px solid var(--color-primary);    color: var(--color-primary); }
+.eq-resumo-card--verde { border-top: 3px solid var(--color-secondary);   color: var(--color-secondary); }
+.eq-resumo-card--cinza { border-top: 3px solid #868E96;                  color: #868E96; }
+
+.eq-resumo-num   { font-size: 26px; font-weight: 800; color: var(--text-primary); line-height: 1; }
+.eq-resumo-label { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+
+/* ============================================================
+   3. SEÇÕES E GRADE DE CARDS
+   ============================================================ */
+.eq-secao { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.eq-secao-titulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.eq-icon--verde { color: var(--color-secondary); }
+
+.eq-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+@media (max-width: 1100px) { .eq-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .eq-grid { grid-template-columns: 1fr; } }
+
+
+/* ============================================================
+   4. CARD DO COLABORADOR
+   ============================================================ */
+.eq-card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  transition: var(--transition-fast);
+  animation: fadeInUp 0.3s ease both;
+}
+.eq-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+/* Card inativo — aparência desbotada */
+.eq-card--inativo { opacity: 0.6; }
+
+
+/* ============================================================
+   5. AVATAR E INFORMAÇÕES
+   ============================================================ */
+.eq-card-topo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+/* Avatar com iniciais */
+.eq-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Foto de perfil real */
+.eq-avatar-foto {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.eq-card-info   { flex: 1; overflow: hidden; }
+.eq-card-nome   { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.eq-card-cargo  { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-primary); margin-top: 3px; }
+.eq-card-contato { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+
+/* ============================================================
+   6. STATUS BADGE
+   ============================================================ */
+.eq-status {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.eq-status--ativo   { background: #D3F9D8; color: #2F9E44; }
+.eq-status--inativo { background: #F1F3F5; color: #868E96; }
+
+
+/* ============================================================
+   7. TAGS DE SERVIÇOS
+   ============================================================ */
+.eq-servicos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.eq-servico-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+
+/* ============================================================
+   8. BARRA DE AÇÕES
+   ============================================================ */
+.eq-acoes {
+  display: flex;
+  gap: 6px;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-icon--warn {
+  color: var(--color-warning);
+  background: #FFF9DB;
+  border: 1px solid #FFE066;
+}
+.btn-icon--warn:hover { background: #FFE066; }
+
+
+/* ============================================================
+   9. MODAL
+   ============================================================ */
+
+/* Fundo escurecido */
+.eq-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-lg);
+  animation: fadeIn 0.2s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Caixa do modal */
+.eq-modal {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 520px;
+  animation: fadeInUp 0.25s ease both;
+  overflow: hidden;
+}
+
+.eq-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid #F1F5F9;
+  background: #fff;
+}
+.eq-modal-header h3 { font-size: 18px; font-weight: 800; color: #1E293B; }
+
+.eq-modal-body {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.eq-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 32px;
+  border-top: 1px solid #F1F5F9;
+  background: #F8FAFC;
+}
+
+/* --- ESTILO DOS CAMPOS (PREMIUM) --- */
+.campo-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campo-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.campo-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid #F1F5F9;
+  background: #F8FAFC;
+  color: #1E293B;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.campo-input:focus {
+  border-color: var(--color-primary);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.campo-input::placeholder {
+  color: #94A3B8;
+  font-weight: 400;
+}
+
+.campo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 600px) { .campo-row { grid-template-columns: 1fr; } }
+
+/* --- UPLOAD DE FOTO REFORMULADO --- */
+.eq-foto-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 20px;
+  background: linear-gradient(to bottom, #F8FAFC, #fff);
+  border-radius: 20px;
+  border: 1px dashed #E2E8F0;
+}
+
+.eq-foto-preview {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 28px;
+  box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
+}
+
+.eq-foto-preview img {
+  width: 100%;
+  height: 100%;
+  border-radius: 28px;
+  object-fit: cover;
+}
+
+.eq-foto-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 28px;
+  background: #E2E8F0;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.eq-foto-btn {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  border: 4px solid #fff;
+  transition: all 0.2s;
+}
+
+.eq-foto-btn:hover { transform: scale(1.1); background: #2563EB; }
+
+.eq-foto-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+}
+
+/* --- BOTÕES DO MODAL --- */
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary {
+  background: #fff;
+  color: #64748B;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid #E2E8F0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { background: #F1F5F9; color: #1E293B; }
+
+/* --- SELETOR DE SERVIÇOS (CHIPS) --- */
+.eq-servicos-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 10px;
+  background: #fff;
+  border: 2px solid #F1F5F9;
+  border-radius: 14px;
+}
+
+.eq-servico-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.eq-servico-chip:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  transform: translateY(-1px);
+}
+
+.eq-servico-chip--active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.eq-servico-chip--active span {
+  font-weight: 800;
+}
+
+
+/* ============================================================
+   10. ESTADO VAZIO
+   ============================================================ */
+.eq-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+/* ============================================================
+   11. LEGENDA DE PERMISSÕES
+   ============================================================ */
+.eq-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+}
+.eq-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.eq-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   12. NÍVEL DE ACESSO E ID ÚNICO
+   ============================================================ */
+.eq-nivel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1.5px solid;
+  width: fit-content;
+  letter-spacing: 0.3px;
+}
+
+.eq-uid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: fit-content;
+  transition: var(--transition-fast);
+}
+.eq-uid-badge:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ============================================================
+   13. UPLOAD DE FOTO NO MODAL
+   ============================================================ */
+.eq-foto-upload {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.eq-foto-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.eq-foto-preview img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.eq-foto-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eq-foto-btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-fast);
+}
+.eq-foto-btn:hover { background: var(--color-primary-dark, #1864AB); }
+
+.eq-foto-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}

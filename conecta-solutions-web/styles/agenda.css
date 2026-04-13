@@ -1,0 +1,313 @@
+/* ============================================================
+   AGENDA CORPORATIVA — PREMIUM ENTERPRISE
+   ============================================================ */
+
+.agenda-page-enterprise {
+    min-height: 100vh;
+    background: #F8FAFC;
+    padding-bottom: 60px;
+}
+
+.agenda-container-premium {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 40px;
+    display: grid;
+    grid-template-columns: 450px 1fr;
+    gap: 32px;
+}
+
+/* --- COLUNA: CALENDÁRIO --- */
+.calendario-enterprise-panel {
+    background: #fff;
+    border-radius: 32px;
+    padding: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.02);
+    height: fit-content;
+}
+
+.calendario-header-premium {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+
+.mes-titulo-premium {
+    font-size: 24px;
+    font-weight: 900;
+    color: #1E293B;
+}
+
+.mes-titulo-premium span {
+    color: #94A3B8;
+    font-weight: 500;
+}
+
+.nav-btns-premium {
+    display: flex;
+    gap: 8px;
+}
+
+.nav-btns-premium button {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    background: #fff;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-btns-premium button:hover {
+    background: #1E293B;
+    color: #fff;
+    border-color: #1E293B;
+}
+
+.calendario-grid-premium {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+
+.grid-header-cell-premium {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #94A3B8;
+    text-transform: uppercase;
+    padding-bottom: 16px;
+}
+
+.cell-premium {
+    aspect-ratio: 1/1;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.cell-premium:hover {
+    background: #F1F5F9;
+    transform: scale(1.05);
+}
+
+.cell-premium.is-hoje {
+    background: #DBEAFE;
+    color: #3B82F6;
+    font-weight: 800;
+}
+
+.cell-premium.is-selecionado {
+    background: #1E293B;
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 10px 15px -3px rgba(30, 41, 59, 0.3);
+}
+
+.cell-vazio {
+    cursor: default;
+}
+
+.cell-vazio:hover {
+    background: none;
+}
+
+.dia-num {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #3B82F6;
+    margin-top: 4px;
+}
+
+.cell-premium.is-selecionado .event-dot {
+    background: #fff;
+}
+
+.calendario-summary-premium {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #F1F5F9;
+}
+
+.summary-item {
+    font-size: 14px;
+    color: #64748B;
+}
+
+.summary-item strong {
+    color: #1E293B;
+}
+
+/* --- COLUNA: TIMELINE --- */
+.timeline-enterprise-panel {
+    background: #fff;
+    border-radius: 32px;
+    padding: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.02);
+}
+
+.timeline-header-premium {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+}
+
+.dia-titulo-premium {
+    font-size: 20px;
+    font-weight: 900;
+    color: #1E293B;
+}
+
+.dia-subtitulo-premium {
+    font-size: 14px;
+    color: #94A3B8;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.dia-status-badge {
+    background: #F1F5F9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 6px 12px;
+    border-radius: 50px;
+}
+
+.timeline-list-premium {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    position: relative;
+}
+
+.agenda-item-premium {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 20px;
+}
+
+.item-time-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.time-val {
+    font-size: 14px;
+    font-weight: 800;
+    color: #1E293B;
+}
+
+.status-line {
+    width: 2px;
+    flex: 1;
+    background: #E2E8F0;
+    border-radius: 2px;
+}
+
+.item-card-premium {
+    background: #F8FAFC;
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid #E2E8F0;
+    transition: all 0.2s;
+}
+
+.agenda-item-premium:hover .item-card-premium {
+    background: #fff;
+    border-color: #3B82F6;
+    transform: translateX(8px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.servico-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #1E293B;
+}
+
+.status-badge-premium {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-badge-premium.confirmado, .status-badge-premium.concluido { background: #DCFCE7; color: #10B981; }
+.status-badge-premium.pendente { background: #FEF3C7; color: #D97706; }
+.status-badge-premium.cancelado { background: #FEE2E2; color: #EF4444; }
+
+.card-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-info-premium {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-avatar-mini {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+}
+
+.user-name-premium {
+    font-size: 14px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.price-tag-premium {
+    font-size: 14px;
+    font-weight: 800;
+    color: #1E293B;
+}
+
+@media (max-width: 1100px) {
+    .agenda-container-premium { grid-template-columns: 1fr; }
+}

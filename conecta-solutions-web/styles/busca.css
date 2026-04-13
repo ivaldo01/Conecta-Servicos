@@ -1,0 +1,242 @@
+/* ============================================================
+   PÁGINA DE BUSCA — PREMIUM ENTERPRISE
+   ============================================================ */
+
+.busca-page {
+    min-height: 100vh;
+    background-color: #F8FAFC;
+    padding-bottom: 100px;
+}
+
+.busca-body {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px;
+}
+
+/* --- BARRA DE BUSCA --- */
+.busca-hero {
+    background: #fff;
+    padding: 32px;
+    border-radius: 32px;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
+    margin-bottom: 40px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.busca-inputs {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.busca-campo-wrap {
+    flex: 1;
+    position: relative;
+}
+
+.busca-campo-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+}
+
+.busca-campo {
+    width: 100%;
+    padding: 16px 16px 16px 48px;
+    background: #F1F5F9;
+    border: 2px solid transparent;
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1E293B;
+    transition: all 0.3s;
+}
+
+.busca-campo:focus {
+    background: #fff;
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+.busca-categorias {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.busca-categorias-icon {
+    color: #64748B;
+    margin-right: 8px;
+}
+
+.busca-categoria-btn {
+    padding: 8px 16px;
+    border-radius: 50px;
+    background: #fff;
+    border: 1px solid #E2E8F0;
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.busca-categoria-btn:hover {
+    border-color: #3B82F6;
+    color: #3B82F6;
+}
+
+.busca-categoria-btn--ativo {
+    background: #1E293B;
+    color: #fff;
+    border-color: #1E293B;
+}
+
+/* --- GRID DE CARDS --- */
+.busca-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 32px;
+}
+
+.prof-card-enterprise-container {
+    position: relative;
+}
+
+.prof-card-enterprise-body {
+    background: #fff;
+    border-radius: 32px;
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.prof-card-enterprise-body:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
+}
+
+.prof-card-enterprise-banner {
+    height: 100px;
+    width: 100%;
+    position: relative;
+    background: #1E293B;
+}
+
+.prof-card-enterprise-banner img {
+    width: 100%; height: 100%; object-fit: cover;
+}
+
+.prof-banner-placeholder-premium {
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+}
+
+.vip-gold-badge {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 50px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.prof-card-enterprise-content {
+    padding: 0 24px 24px 24px;
+    margin-top: -30px;
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.prof-card-avatar-overlap-premium {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    background: #fff;
+    border: 3px solid #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.prof-card-img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 15px;
+}
+
+.prof-card-initials {
+    width: 100%; height: 100%; border-radius: 15px;
+    background: #F1F5F9; color: #3B82F6;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 20px;
+}
+
+.verified-check-mini {
+    position: absolute; bottom: -2px; right: -2px;
+    background: #fff; border-radius: 50%; padding: 2px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.prof-card-name-premium {
+    font-size: 18px; font-weight: 800; color: #1E293B; margin-bottom: 4px;
+}
+
+.prof-card-spec-badge {
+    font-size: 11px; font-weight: 800; color: #3B82F6;
+    background: #EFF6FF; padding: 2px 10px; border-radius: 50px;
+    text-transform: uppercase; display: inline-block; margin-bottom: 12px;
+}
+
+.prof-card-meta-row {
+    display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;
+}
+
+.prof-meta-item {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748B;
+}
+
+.prof-meta-item strong { color: #1E293B; font-weight: 800; }
+
+.prof-card-action-bar {
+    margin-top: auto;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 16px; border-top: 1px solid #F1F5F9;
+}
+
+.btn-view-profile {
+    font-size: 13px; font-weight: 800; color: #3B82F6;
+    background: none; border: none; cursor: pointer;
+}
+
+.arrow-icon-premium { color: #94A3B8; }
+
+/* Favoritar */
+.prof-card-fav-premium {
+    position: absolute;
+    bottom: 20px; right: 24px;
+    background: none; border: none; cursor: pointer;
+    transition: transform 0.2s;
+    z-index: 10;
+}
+
+.prof-card-fav-premium:hover { transform: scale(1.2); }
+
+@media (max-width: 600px) {
+    .busca-inputs { flex-direction: column; }
+    .busca-body { padding: 20px; }
+}

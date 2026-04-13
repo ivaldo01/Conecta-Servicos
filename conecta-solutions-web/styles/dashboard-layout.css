@@ -1,0 +1,64 @@
+/* ============================================================
+   DASHBOARD LAYOUT — Estrutura principal do painel
+   
+   ÍNDICE:
+   1. Container raiz (sidebar + conteúdo)
+   2. Área de conteúdo
+   3. Loading state
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONTAINER RAIZ
+   Divide a tela em: [Sidebar Fixa] | [Conteúdo Scrollável]
+   ============================================================ */
+.dashboard-root {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+}
+
+
+/* ============================================================
+   2. ÁREA DE CONTEÚDO
+   Ocupa o espaço restante ao lado da sidebar
+   ============================================================ */
+.dashboard-content {
+  /* Empurra para além da sidebar */
+  margin-left: var(--sidebar-width);
+
+  /* Ocupa o restante da tela */
+  flex: 1;
+  min-height: 100vh;
+  overflow-y: auto;
+
+  /* Animação de entrada suave */
+  animation: fadeInUp 0.3s ease both;
+}
+
+
+/* ============================================================
+   3. LOADING STATE
+   Tela de carregamento enquanto verifica a sessão
+   ============================================================ */
+.dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 14px;
+  background-color: var(--bg-page);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Spinner circular animado */
+.dashboard-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-primary-light);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

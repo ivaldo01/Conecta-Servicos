@@ -1,0 +1,245 @@
+/* ============================================================
+   FINANCEIRO CORPORATIVO — PREMIUM ENTERPRISE
+   ============================================================ */
+
+.financeiro-page-premium {
+    min-height: 100vh;
+    background: #F8FAFC;
+    padding-bottom: 80px;
+}
+
+.financeiro-container-premium {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 40px;
+}
+
+/* --- ANALYTICS GRID (KPIs) --- */
+.fin-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+
+.fin-kpi-enterprise-card {
+    background: #fff;
+    border-radius: 32px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+}
+
+.fin-kpi-enterprise-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+.kpi-icon-wrap {
+    width: 60px;
+    height: 60px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    background: #F8FAFC;
+    color: #1E293B;
+}
+
+.kpi-content {
+    z-index: 2;
+}
+
+.kpi-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #94A3B8;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-value-main {
+    font-size: 24px;
+    font-weight: 900;
+    color: #1E293B;
+    letter-spacing: -1px;
+}
+
+.btn-saque-premium {
+    margin-top: 12px;
+    background: #1E293B;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-saque-premium:hover {
+    background: #3B82F6;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(59, 130, 246, 0.2);
+}
+
+.kpi-accent-bg {
+    position: absolute;
+    right: -20px;
+    bottom: -20px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    opacity: 0.05;
+    z-index: 1;
+}
+
+.kpi-accent-bg.azul { background: #3B82F6; }
+.kpi-accent-bg.verde { background: #10B981; }
+.kpi-accent-bg.vermelho { background: #EF4444; }
+.kpi-accent-bg.roxo { background: #8B5CF6; }
+
+/* --- DASHBOARD LAYOUT --- */
+.fin-business-dashboard {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 32px;
+}
+
+.fin-chart-enterprise-panel, .fin-history-enterprise-panel {
+    background: #fff;
+    border-radius: 32px;
+    padding: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03);
+}
+
+.panel-header-premium {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+}
+
+.panel-title-premium {
+    font-size: 18px;
+    font-weight: 900;
+    color: #1E293B;
+    margin-bottom: 2px;
+}
+
+.panel-hint-premium {
+    font-size: 13px;
+    color: #94A3B8;
+}
+
+/* TABS DE PERÍODO */
+.period-tabs-premium {
+    display: flex;
+    background: #F1F5F9;
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.tab-btn-premium {
+    padding: 8px 16px;
+    border-radius: 10px;
+    border: none;
+    background: none;
+    font-size: 12px;
+    font-weight: 800;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn-premium.active {
+    background: #fff;
+    color: #3B82F6;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* --- HISTÓRICO --- */
+.history-list-premium {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.transaction-row-premium {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border-radius: 20px;
+    background: #F8FAFC;
+    transition: all 0.2s;
+}
+
+.transaction-row-premium:hover {
+    background: #F1F5F9;
+    transform: scale(1.02);
+}
+
+.status-marker {
+    width: 4px;
+    height: 32px;
+    border-radius: 2px;
+}
+
+.status-marker.in { background: #10B981; }
+.status-marker.out { background: #EF4444; }
+
+.row-main-info {
+    flex: 1;
+}
+
+.row-desc-premium {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1E293B;
+    margin-bottom: 2px;
+}
+
+.row-meta-premium {
+    font-size: 12px;
+    color: #94A3B8;
+}
+
+.row-value-premium {
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.row-value-premium.positive { color: #10B981; }
+.row-value-premium.negative { color: #EF4444; }
+
+.loading-chart-skeleton {
+    height: 320px;
+    background: linear-gradient(90deg, #F1F5F9 25%, #F8FAFC 50%, #F1F5F9 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 24px;
+}
+
+@keyframes loading {
+    to { background-position: -200% 0; }
+}
+
+@media (max-width: 1100px) {
+    .fin-business-dashboard { grid-template-columns: 1fr; }
+}

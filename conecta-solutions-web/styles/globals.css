@@ -1,0 +1,251 @@
+@import "tailwindcss";
+
+/* ============================================================
+   CONECTA SOLUTIONS — GLOBAL CSS
+   Arquivo principal de estilos do sistema web
+   
+   ÍNDICE:
+   1. Variáveis / Design Tokens
+   2. Reset e Base
+   3. Scrollbar personalizada
+   4. Animações globais
+   5. Utilitários globais
+   ============================================================ */
+
+
+/* ============================================================
+   1. VARIÁVEIS / DESIGN TOKENS
+   Modifique aqui para alterar cores e tamanhos globalmente
+   ============================================================ */
+:root {
+
+  /* --- CORES PRIMÁRIAS --- */
+  --color-primary:       #1971C2;  /* Azul principal */
+  --color-primary-dark:  #1864AB;  /* Azul hover */
+  --color-primary-light: #D0EBFF;  /* Azul claro (fundos) */
+
+  /* --- CORES SECUNDÁRIAS --- */
+  --color-secondary:       #2F9E44;  /* Verde */
+  --color-secondary-dark:  #2B8A3E;  /* Verde hover */
+  --color-secondary-light: #D3F9D8;  /* Verde claro */
+
+  /* --- CORES DE ALERTA --- */
+  --color-danger:   #E03131;  /* Vermelho (erros) */
+  --color-warning:  #F08C00;  /* Laranja (avisos) */
+  --color-success:  #2F9E44;  /* Verde (sucesso) */
+  --color-info:     #1971C2;  /* Azul (informações) */
+
+  /* --- SIDEBAR --- */
+  --sidebar-bg:           #1A1B2E;  /* Fundo da barra lateral */
+  --sidebar-border:       #2D2E45;  /* Borda dos itens */
+  --sidebar-text:         #94A3B8;  /* Texto inativo */
+  --sidebar-text-active:  #FFFFFF;  /* Texto do item ativo */
+  --sidebar-hover:        #252640;  /* Hover dos itens */
+  --sidebar-active:       #1971C2;  /* Fundo do item ativo */
+  --sidebar-width:        260px;    /* Largura da sidebar */
+
+  /* --- TOPBAR --- */
+  --topbar-bg:     #FFFFFF;
+  --topbar-border: #E9ECEF;
+  --topbar-height: 64px;
+
+  /* --- FUNDOS --- */
+  --bg-page:   #F1F3F5;  /* Fundo da página */
+  --bg-card:   #FFFFFF;  /* Fundo dos cards */
+  --bg-muted:  #F8F9FA;  /* Fundo de áreas secundárias */
+
+  /* --- TEXTO --- */
+  --text-primary:   #1A1B2E;  /* Títulos */
+  --text-secondary: #495057;  /* Texto normal */
+  --text-muted:     #868E96;  /* Texto suave */
+  --text-disabled:  #ADB5BD;  /* Texto desabilitado */
+
+  /* --- BORDAS --- */
+  --border-color:  #E9ECEF;
+  --border-radius: 10px;
+  --border-radius-lg: 14px;
+
+  /* --- SOMBRAS --- */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
+
+  /* --- ESPAÇAMENTOS --- */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+
+  /* --- TRANSIÇÕES --- */
+  --transition-fast:   all 0.15s ease;
+  --transition-normal: all 0.25s ease;
+  --transition-slow:   all 0.4s ease;
+}
+
+
+/* ============================================================
+   2. RESET E BASE
+   Estilos base aplicados em toda a aplicação
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+a {
+  text-decoration: none;
+  color: var(--color-primary);
+  transition: var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-primary-dark);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+}
+
+
+/* ============================================================
+   3. SCROLLBAR PERSONALIZADA
+   Aplica a todos os elementos com overflow scroll
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CED4DA;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ADB5BD;
+}
+
+
+/* ============================================================
+   4. ANIMAÇÕES GLOBAIS
+   Keyframes disponíveis em todo o sistema
+   ============================================================ */
+
+/* Fade e subida suave — usado nos cards e modais */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse — usado nos loaders */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* Spin — loader circular */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Slide da sidebar no mobile */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+/* Entrada vindo de cima — usado no logo do painel de login */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+
+/* ============================================================
+   5. UTILITÁRIOS GLOBAIS
+   Classes auxiliares disponíveis em todo o sistema
+   ============================================================ */
+
+/* Animação de entrada padrão */
+.animate-fade-up {
+  animation: fadeInUp 0.3s ease both;
+}
+
+/* Skeleton loader — substitui conteúdo enquanto carrega */
+.skeleton {
+  background: linear-gradient(90deg, #F1F3F5 25%, #E9ECEF 50%, #F1F3F5 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s infinite;
+  border-radius: var(--border-radius);
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Texto truncado com reticências */
+.text-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Centralizar elemento com flexbox */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Separador visual */
+.divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: var(--space-md) 0;
+}

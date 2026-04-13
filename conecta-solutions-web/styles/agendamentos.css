@@ -1,0 +1,252 @@
+/* ============================================================
+   AGENDAMENTOS — Tabela de todos os agendamentos
+   
+   ÍNDICE:
+   1. Container e corpo
+   2. Barra de ferramentas (busca + filtros)
+   3. Filtros de status
+   4. Card da tabela
+   5. Tabela de dados
+   6. Células especiais (avatar, data, badge, ações)
+   7. Estado vazio e contador
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONTAINER E CORPO
+   ============================================================ */
+.ags-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-page);
+}
+
+.ags-body {
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  flex: 1;
+}
+
+
+/* ============================================================
+   2. BARRA DE FERRAMENTAS
+   ============================================================ */
+.ags-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.ags-busca-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.ags-busca-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.ags-busca {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 38px;
+  font-size: 14px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  outline: none;
+  transition: var(--transition-fast);
+  font-family: inherit;
+}
+
+.ags-busca:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-light); }
+.ags-busca::placeholder { color: var(--text-disabled); }
+
+
+/* ============================================================
+   3. FILTROS DE STATUS
+   ============================================================ */
+.ags-filtros {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+}
+
+.ags-filtro-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1.5px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-family: inherit;
+}
+
+.ags-filtro-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Filtro ativo */
+.ags-filtro-btn--ativo {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #FFFFFF;
+}
+
+
+/* ============================================================
+   4. CARD DA TABELA
+   ============================================================ */
+.ags-table-card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.ags-loading {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+
+/* ============================================================
+   5. TABELA DE DADOS
+   ============================================================ */
+.ags-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+/* Cabeçalho */
+.ags-table thead tr {
+  background: var(--bg-muted);
+  border-bottom: 1.5px solid var(--border-color);
+}
+
+.ags-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+/* Linhas do corpo */
+.ags-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: var(--transition-fast);
+}
+
+.ags-table tbody tr:last-child { border-bottom: none; }
+.ags-table tbody tr:hover { background: var(--bg-muted); }
+
+.ags-table td {
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+
+/* ============================================================
+   6. CÉLULAS ESPECIAIS
+   ============================================================ */
+/* Célula do nome com avatar */
+.ags-td-nome {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+.ags-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* Data com ícone de relógio */
+.ags-data {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Valor em verde */
+.ags-valor { font-weight: 600; color: var(--color-secondary); }
+
+/* Badge de status */
+.ags-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  text-transform: capitalize;
+}
+
+.ags-badge--confirmado { background: #D3F9D8; color: #2F9E44; }
+.ags-badge--pendente   { background: #FFE8CC; color: #E8590C; }
+.ags-badge--concluido  { background: #D0EBFF; color: #1971C2; }
+.ags-badge--cancelado  { background: #FFE3E3; color: #E03131; }
+
+/* Coluna de ações */
+.ags-acoes { display: flex; gap: 6px; }
+
+
+/* ============================================================
+   7. ESTADO VAZIO E CONTADOR
+   ============================================================ */
+.ags-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.ags-contador {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}

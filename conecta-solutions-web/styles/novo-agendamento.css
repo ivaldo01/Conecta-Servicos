@@ -1,0 +1,203 @@
+/* ============================================================
+   PÁGINA: NOVO AGENDAMENTO
+   ============================================ */
+
+.book-page {
+    padding: 24px;
+    max-width: 1000px;
+    margin: 0 auto;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.book-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 400px;
+    color: #868e96;
+}
+
+.btn-back {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    color: #868e96;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 24px;
+    transition: color 0.2s;
+}
+
+.btn-back:hover { color: var(--primary-color); }
+
+.book-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 32px;
+}
+
+@media (max-width: 800px) {
+    .book-grid { grid-template-columns: 1fr; }
+}
+
+/* --- RESUMO --- */
+.book-summary {
+    background: #ffffff;
+    padding: 24px;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    height: fit-content;
+    position: sticky;
+    top: 24px;
+}
+
+.book-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1a1a1a;
+}
+
+.book-serv-card {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.book-serv-icon {
+    width: 48px;
+    height: 48px;
+    background: #ebfbee;
+    color: #2f9e44;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.book-serv-info h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 2px 0;
+}
+
+.book-serv-info p {
+    font-size: 13px;
+    color: #868e96;
+    margin-bottom: 8px;
+}
+
+.book-serv-pills {
+    display: flex;
+    gap: 8px;
+}
+
+.book-serv-pills span {
+    background: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid #dee2e6;
+    color: #495057;
+}
+
+/* --- SELEÇÃO --- */
+.book-selection {
+    background: #ffffff;
+    padding: 32px;
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.book-step {
+    margin-bottom: 32px;
+}
+
+.book-step-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 16px;
+}
+
+.book-date-input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #dee2e6;
+    font-size: 15px;
+    color: #212529;
+    font-family: inherit;
+}
+
+.book-date-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.book-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+}
+
+.book-slot {
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1.5px solid #e9ecef;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.book-slot:hover {
+    border-color: var(--primary-color);
+    background: #e7f5ff;
+    color: var(--primary-color);
+}
+
+.book-slot--active {
+    background: #1971c2 !important;
+    color: #ffffff !important;
+    border-color: #1971c2 !important;
+    box-shadow: 0 4px 12px rgba(25, 113, 194, 0.3);
+}
+
+.btn-confirm-booking {
+    width: 100%;
+    background: #1971c2 !important;
+    color: #ffffff !important;
+    border: none;
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 16px;
+}
+
+.btn-confirm-booking:hover:not(:disabled) {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(25, 113, 194, 0.25);
+}
+
+.btn-confirm-booking:disabled {
+    background: #e9ecef;
+    color: #adb5bd;
+    cursor: not-allowed;
+}

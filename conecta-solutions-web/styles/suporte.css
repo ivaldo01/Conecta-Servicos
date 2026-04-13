@@ -1,0 +1,392 @@
+/* ============================================================
+   SUPORTE — Chat de atendimento
+   
+   ÍNDICE:
+   1. Container e corpo
+   2. Painel de tickets (lista lateral)
+   3. Header da lista + form de novo ticket
+   4. Item individual de ticket
+   5. Badge de status do ticket
+   6. Área do chat (coluna principal)
+   7. Cabeçalho do chat
+   8. Área de mensagens
+   9. Bolhas de mensagem (minha / deles)
+   10. Input de envio de mensagem
+   11. Estados vazios
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONTAINER E CORPO
+   ============================================================ */
+.suporte-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-page);
+}
+
+.suporte-body {
+  padding: var(--space-xl);
+  display: grid;
+  grid-template-columns: 300px 1fr;  /* lista lateral | chat */
+  gap: var(--space-xl);
+  flex: 1;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .suporte-body { grid-template-columns: 1fr; }
+}
+
+
+/* ============================================================
+   2. PAINEL DE TICKETS (coluna esquerda)
+   ============================================================ */
+.suporte-tickets-panel {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--space-xl));
+}
+
+
+/* ============================================================
+   3. HEADER DA LISTA + FORM DE NOVO TICKET
+   ============================================================ */
+.suporte-tickets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.suporte-tickets-titulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.suporte-novo-ticket {
+  display: flex;
+  gap: 8px;
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.suporte-novo-ticket .campo-input { font-size: 13px; }
+
+.suporte-tickets-lista {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+
+/* ============================================================
+   4. ITEM INDIVIDUAL DE TICKET
+   ============================================================ */
+.suporte-ticket-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-fast);
+  gap: 8px;
+  margin-bottom: 2px;
+  font-family: inherit;
+}
+
+.suporte-ticket-item:hover { background: var(--bg-muted); }
+
+/* Ticket selecionado */
+.suporte-ticket-item--ativo {
+  background: var(--color-primary-light);
+}
+
+.suporte-ticket-titulo {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ============================================================
+   5. BADGE DE STATUS DO TICKET
+   ============================================================ */
+.suporte-ticket-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.suporte-ticket-badge--aberto    { background: #D3F9D8; color: #2F9E44; }
+.suporte-ticket-badge--fechado   { background: #F1F3F5; color: #868E96; }
+.suporte-ticket-badge--aguardando { background: #FFE8CC; color: #E8590C; }
+
+
+/* ============================================================
+   6. ÁREA DO CHAT (coluna principal)
+   ============================================================ */
+.suporte-chat {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  height: 580px;
+  overflow: hidden;
+}
+
+
+/* ============================================================
+   7. CABEÇALHO DO CHAT
+   ============================================================ */
+.suporte-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-xl);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-muted);
+}
+
+.suporte-chat-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+
+/* ============================================================
+   8. ÁREA DE MENSAGENS
+   ============================================================ */
+.suporte-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.suporte-chat-vazio {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: auto;
+}
+
+
+/* ============================================================
+   9. BOLHAS DE MENSAGEM
+   ============================================================ */
+.suporte-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+}
+
+/* Minha mensagem — alinhada à direita */
+.suporte-msg--minha {
+  align-items: flex-end;
+  align-self: flex-end;
+}
+
+/* Mensagem deles — alinhada à esquerda */
+.suporte-msg--deles {
+  align-items: flex-start;
+  align-self: flex-start;
+}
+
+.suporte-msg-bubble {
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.suporte-msg--minha .suporte-msg-bubble {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-bottom-right-radius: 4px;
+}
+
+.suporte-msg--deles .suporte-msg-bubble {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.suporte-msg-hora {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  padding: 0 4px;
+}
+
+
+/* ============================================================
+   10. INPUT DE ENVIO
+   ============================================================ */
+.suporte-chat-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.suporte-input {
+  flex: 1;
+  height: 42px;
+  padding: 0 14px;
+  font-size: 14px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 21px;
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  outline: none;
+  transition: var(--transition-fast);
+  font-family: inherit;
+}
+
+.suporte-input:focus { border-color: var(--color-primary); background: var(--bg-card); }
+.suporte-input::placeholder { color: var(--text-disabled); }
+
+.suporte-send-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.suporte-send-btn:hover:not(:disabled) { background: var(--color-primary-dark); transform: scale(1.05); }
+.suporte-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+
+/* ============================================================
+   11. ESTADOS VAZIOS
+   ============================================================ */
+.suporte-vazio,
+.suporte-chat-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  flex: 1;
+}
+
+/* ============================================================
+   12. ESTILOS PARA ANEXOS (IMAGENS E ARQUIVOS)
+   ============================================================ */
+
+/* Container de Imagem no Chat */
+.suporte-msg-image {
+  margin-bottom: 8px;
+  max-width: 240px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.05);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.suporte-msg-image:hover { transform: scale(1.02); }
+.suporte-msg-image img { width: 100%; display: block; height: auto; }
+
+/* Card de Arquivo/PDF */
+.suporte-msg-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255,255,255,0.1);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  cursor: pointer;
+  margin-bottom: 8px;
+  min-width: 200px;
+  transition: background 0.2s;
+}
+.suporte-msg--deles .suporte-msg-file {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+.suporte-msg-file:hover { background: rgba(255,255,255,0.2); }
+.suporte-msg-file .file-info { display: flex; flex-direction: column; flex: 1; }
+.suporte-msg-file .file-name { font-size: 12px; font-weight: 700; line-height: 1.2; word-break: break-all; }
+.suporte-msg-file .file-hint { font-size: 10px; opacity: 0.8; }
+
+/* Botão de Anexo */
+.suporte-attach-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.suporte-attach-btn:hover:not(:disabled) {
+  background: var(--bg-muted);
+  color: var(--color-primary);
+}
+
+/* Pulse de Upload */
+.suporte-upload-pulse {
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: 700;
+  padding: 4px 16px;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+.suporte-chat-input-area {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+.hidden { display: none; }

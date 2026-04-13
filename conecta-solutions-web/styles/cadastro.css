@@ -1,0 +1,210 @@
+/* ============================================================
+   CADASTRO — Tela de criação de conta
+   
+   ÍNDICE:
+   1. Container raiz (dois painéis)
+   2. Painel esquerdo — Marca
+   3. Logo da marca
+   4. Seletor de tipo de conta (Profissional / Cliente)
+   5. Painel direito — Formulário
+   6. Card do formulário
+   7. Header do form e logo mobile
+   ============================================================ */
+
+
+/* ============================================================
+   1. CONTAINER RAIZ — Mesma estrutura da tela de login
+   ============================================================ */
+.cadastro-root {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+}
+
+
+/* ============================================================
+   2. PAINEL ESQUERDO — Marca
+   ============================================================ */
+.cadastro-brand {
+  flex: 0 0 42%;
+  background: linear-gradient(160deg, #1A1B2E 0%, #0F1729 60%, #1A3A6B 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl) var(--space-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Círculo decorativo de fundo */
+.cadastro-brand::before {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 158, 68, 0.15), transparent 70%);
+  bottom: -100px;
+  left: -100px;
+  pointer-events: none;
+}
+
+.cadastro-brand-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 360px;
+}
+
+
+/* ============================================================
+   3. LOGO DA MARCA (painel esquerdo)
+   ============================================================ */
+.cadastro-brand-logo-wrap {
+  margin-bottom: var(--space-xl);
+}
+
+/* Exibe as cores originais do logo (sem filtro branco) */
+.cadastro-brand-logo-img {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+  max-width: 180px;
+  height: auto;
+}
+
+.cadastro-brand-headline {
+  font-size: 24px;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1.3;
+  margin-bottom: var(--space-md);
+}
+
+.cadastro-brand-desc {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.7;
+  margin-bottom: var(--space-xl);
+}
+
+
+/* ============================================================
+   4. SELETOR DE TIPO DE CONTA
+   Dois cards clicáveis: Profissional | Cliente
+   ============================================================ */
+.cadastro-tipo-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cadastro-tipo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-align: center;
+}
+
+.cadastro-tipo-card span {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+
+.cadastro-tipo-card small {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.4;
+}
+
+/* Card selecionado */
+.cadastro-tipo-card--ativo {
+  border-color: var(--color-primary);
+  background: rgba(25, 113, 194, 0.25);
+  color: #FFFFFF;
+}
+
+.cadastro-tipo-card--ativo span {
+  color: #FFFFFF;
+}
+
+.cadastro-tipo-card:hover:not(.cadastro-tipo-card--ativo) {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.3);
+}
+
+
+/* ============================================================
+   5. PAINEL DIREITO — Área do formulário
+   ============================================================ */
+.cadastro-form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  background: var(--bg-page);
+  overflow-y: auto;
+}
+
+
+/* ============================================================
+   6. CARD DO FORMULÁRIO
+   ============================================================ */
+.cadastro-form-card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 420px;
+  animation: fadeInUp 0.35s ease both;
+}
+
+.cadastro-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+
+/* ============================================================
+   7. LOGO MOBILE E HEADER DO FORM
+   ============================================================ */
+.cadastro-card-logo {
+  display: none;
+  justify-content: center;
+  margin-bottom: var(--space-lg);
+}
+
+@media (max-width: 768px) {
+  .cadastro-brand { display: none; }
+  .cadastro-card-logo { display: flex; }
+  .cadastro-form-card { box-shadow: none; border: none; padding: var(--space-xl) var(--space-md); }
+}
+
+.cadastro-form-header { margin-bottom: var(--space-md); }
+
+.cadastro-form-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.cadastro-form-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.cadastro-form-subtitle strong {
+  color: var(--color-primary);
+}

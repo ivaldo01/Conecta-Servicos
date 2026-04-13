@@ -1,0 +1,105 @@
+/* ============================================================
+   TOPBAR — PREMIUM ENTERPRISE REDESIGN
+   ============================================================ */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  height: 80px; /* Um pouco mais alta p/ luxo */
+  z-index: 50;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+}
+
+/* --- TITLE AREA --- */
+.topbar-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topbar-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1E293B;
+  letter-spacing: -0.5px;
+}
+
+.topbar-subtitle {
+  font-size: 13px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+/* --- ACTIONS AREA --- */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.topbar-icon-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  background: #fff;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.topbar-icon-btn:hover {
+  background: #F8FAFC;
+  border-color: #3B82F6;
+  color: #3B82F6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.topbar-notification-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #EF4444;
+  border: 2px solid #fff;
+}
+
+/* --- USER GREETING --- */
+.topbar-user {
+  display: flex;
+  align-items: center;
+  padding-left: 24px;
+  border-left: 1px solid #E2E8F0;
+}
+
+.topbar-greeting {
+  font-size: 14px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.topbar-greeting strong {
+  color: #1E293B;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+  .topbar { padding: 0 20px; height: 70px; }
+  .topbar-greeting { display: none; }
+  .topbar-title { font-size: 17px; }
+}
