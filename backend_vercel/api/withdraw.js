@@ -5,6 +5,19 @@ const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 
 module.exports = async (req, res) => {
+    // ✅ CONFIGURAÇÃO DE CORS PARA PERMITIR ACESSO WEB
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    // ✅ Garante que toda resposta seja sempre JSON
+    res.setHeader('Content-Type', 'application/json');
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
     }
