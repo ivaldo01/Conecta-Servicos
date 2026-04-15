@@ -23,6 +23,8 @@ import { MultiSelect } from 'react-native-element-dropdown';
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import { getMaxFuncionarios, podeCadastrarFuncionario, getPlanoProfissional } from "../../constants/plans";
+import { gerarConectaIdUnico } from "../../utils/idUtils";
+
 
 export default function GerenciarColaboradores({ navigation }) {
     const [nome, setNome] = useState('');
@@ -211,8 +213,12 @@ export default function GerenciarColaboradores({ navigation }) {
             );
 
             const novoColabId = userCredential.user.uid;
+            
+            // Gerar CID Único
+            const cid = await gerarConectaIdUnico();
 
             // 2. Gravar no Firestore (usando o Auth principal do gestor)
+
             const batch = writeBatch(db);
 
             // Perfil principal do colaborador
@@ -225,10 +231,12 @@ export default function GerenciarColaboradores({ navigation }) {
                 tipo: "profissional",
                 perfil: "colaborador",
                 clinicaId: userDono.uid,
+                conectaId: cid,
                 servicosHabilitados: servicosSelecionados,
                 ativo: true,
                 createdAt: serverTimestamp(),
             });
+
 
             // Referência na equipe da empresa
             const subcolabRef = doc(db, "usuarios", userDono.uid, "colaboradores", novoColabId);
@@ -236,10 +244,12 @@ export default function GerenciarColaboradores({ navigation }) {
                 id: novoColabId,
                 nome: nome.trim(),
                 email: email.trim().toLowerCase(),
+                conectaId: cid,
                 servicosHabilitados: servicosSelecionados,
                 ativo: true,
                 dataCriacao: serverTimestamp(),
             });
+
 
             // Saldo inicial
             const saldoRef = doc(db, "saldos", novoColabId);
@@ -477,7 +487,14 @@ export default function GerenciarColaboradores({ navigation }) {
                                         )}
                                     </View>
                                     <Text style={styles.colabEmail}>{item.email}</Text>
+                                    {item.conectaId && (
+                                        <View style={styles.cidBadge}>
+                                            <Ionicons name="id-card-outline" size={12} color="#FFF" />
+                                            <Text style={styles.cidBadgeText}>{item.conectaId}</Text>
+                                        </View>
+                                    )}
                                     <View style={styles.badge}>
+
                                         <Text style={styles.badgeText}>
                                             {item.servicosHabilitados?.length || 0} serviço(s) liberado(s)
                                         </Text>
@@ -740,7 +757,26 @@ const styles = StyleSheet.create({
         color: '#666'
     },
 
+    cidBadge: {
+        backgroundColor: colors.primary,
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+        marginTop: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4
+    },
+
+    cidBadgeText: {
+        fontSize: 11,
+        color: '#FFF',
+        fontWeight: 'bold'
+    },
+
     serviceSummaryText: {
+
         marginTop: 8,
         fontSize: 12,
         lineHeight: 18,

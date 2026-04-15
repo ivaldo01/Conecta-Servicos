@@ -198,8 +198,12 @@ export default function AgendaProfissional({ navigation }) {
         // 1. Filtro de Aba (Minha vs Equipe)
         if (ehChefe) {
             if (abaAtiva === 'minha') {
-                // Mostra apenas agendamentos onde o GESTOR é o profissional
-                filtrados = filtrados.filter(a => a.colaboradorId === auth.currentUser?.uid || (!a.colaboradorId && a.clinicaId === auth.currentUser?.uid));
+                // Aba do GESTOR: Seus próprios agendamentos + PENDENTES da clínica
+                filtrados = filtrados.filter(a => 
+                    a.colaboradorId === auth.currentUser?.uid || 
+                    (!a.colaboradorId && a.clinicaId === auth.currentUser?.uid) ||
+                    (a.status === 'pendente' && a.clinicaId === auth.currentUser?.uid)
+                );
             } else {
                 // Aba Equipe: Mostra agendamentos de COLABORADORES
                 filtrados = filtrados.filter(a => a.colaboradorId && a.colaboradorId !== auth.currentUser?.uid);
@@ -209,6 +213,9 @@ export default function AgendaProfissional({ navigation }) {
                     filtrados = filtrados.filter(a => a.colaboradorId === filtroColaborador);
                 }
             }
+        } else {
+            // Colaborador comum vê apenas a sua agenda
+            filtrados = filtrados.filter(a => a.colaboradorId === auth.currentUser?.uid);
         }
 
         // 2. Filtro de Status

@@ -29,7 +29,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from "../../services/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, runTransaction } from "firebase/firestore";
 import colors from "../../constants/colors";
 import PrimaryButton from "../../components/PrimaryButton";
 import { prepararDadosCategoriaParaProfissional } from "../../utils/categoriaUtils";
@@ -295,41 +295,58 @@ export default function SignUpProEmpresa({ navigation, route }) {
       const nomeExibicao =
         tipoCadastro === 'empresa' ? nomeNegocio.trim() : nomeCompleto.trim();
 
-      await setDoc(doc(db, "usuarios", user.uid), {
-        uid: user.uid,
-        tipo: 'profissional',
-        perfil: 'profissional',
-        tipoCadastroProfissional: tipoCadastro,
+      // 2. Grava o perfil com Transação para Gerar ID Sequencial
+      const userRef = doc(db, "usuarios", user.uid);
+      const counterRef = doc(db, 'config', 'contadores');
 
-        nome: nomeExibicao,
-        nomeCompleto: nomeCompleto.trim(),
-        nomeNegocio: nomeNegocio.trim(),
-        responsavel: nomeCompleto.trim(),
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        let currentCount = 1;
+        
+        if (counterDoc.exists()) {
+          currentCount = (counterDoc.data().usuarios || 0) + 1;
+        }
 
-        telefone: telefone.trim(),
-        whatsapp: telefone.trim(),
-        cpfCnpj: cpfCnpj.trim(),
+        const codigoConecta = `CS-BR-${String(currentCount).padStart(6, '0')}`;
+        
+        transaction.set(counterRef, { usuarios: currentCount }, { merge: true });
+        transaction.set(userRef, {
+          uid: user.uid,
+          tipo: 'profissional',
+          perfil: 'profissional',
+          tipoCadastroProfissional: tipoCadastro,
 
-        email: email.trim().toLowerCase(),
-        bio: bio.trim(),
-        fotoPerfil: '',
-        pushToken: '',
+          nome: nomeExibicao,
+          nomeCompleto: nomeCompleto.trim(),
+          nomeNegocio: nomeNegocio.trim(),
+          responsavel: nomeCompleto.trim(),
 
-        endereco: endereco.trim(),
-        localizacao: {
-          pais: pais.trim(),
-          estado,
-          cidade: cidade.trim(),
-          cep: cep.trim(),
-        },
+          telefone: telefone.trim(),
+          whatsapp: telefone.trim(),
+          cpfCnpj: cpfCnpj.trim(),
 
-        avaliacaoMedia: 0,
-        totalAvaliacoes: 0,
-        verificado: false,
-        criadoEm: serverTimestamp(),
-        dataCriacao: serverTimestamp(),
+          email: email.trim().toLowerCase(),
+          bio: bio.trim(),
+          fotoPerfil: '',
+          pushToken: '',
 
-        ...dadosCategoria,
+          endereco: endereco.trim(),
+          localizacao: {
+            pais: pais.trim(),
+            estado,
+            cidade: cidade.trim(),
+            cep: cep.trim(),
+          },
+
+          avaliacaoMedia: 0,
+          totalAvaliacoes: 0,
+          verificado: false,
+          codigoConecta: codigoConecta, // ID OFICIAL GERADO
+          criadoEm: serverTimestamp(),
+          dataCriacao: serverTimestamp(),
+
+          ...dadosCategoria,
+        });
       });
 
       await registrarPushTokenUsuario(user.uid);

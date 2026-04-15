@@ -555,8 +555,8 @@ export default function HomeScreen({ navigation }) {
 
   const renderProfissionalCard = (profissional) => {
     const favorito = favoritosIds.includes(profissional.id);
-    const fotoPerfil = profissional?.fotoPerfil || profissional?.foto || null;
-    const banner = profissional?.banner || profissional?.capa || profissional?.bannerPerfil || profissional?.capaPerfil || profissional?.bannerUrl || profissional?.imagemBanner || null;
+    const fotoPerfil = profissional?.fotoPerfil || profissional?.foto || profissional?.avatar || profissional?.fotoUrl || profissional?.photoUrl || profissional?.imageUrl || null;
+    const banner = profissional?.banner || profissional?.capa || profissional?.bannerPerfil || profissional?.capaPerfil || profissional?.bannerUrl || profissional?.imagemBanner || profissional?.fotoBanner || null;
     const avaliacao = parseNumero(profissional?.avaliacaoMedia);
     const totalAvaliacoes = parseNumero(profissional?.totalAvaliacoes);
 
@@ -803,8 +803,8 @@ export default function HomeScreen({ navigation }) {
                     >
                        <View style={{ width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: colors.primary, padding: 2, marginBottom: 6 }}>
                           <View style={{ flex: 1, backgroundColor: '#E2E8F0', borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                             {prof.fotoPerfil ? (
-                                <Image source={{ uri: prof.fotoPerfil }} style={{ width: '100%', height: '100%' }} />
+                             {(prof.fotoPerfil || prof.foto || prof.avatar || prof.fotoUrl || prof.imageUrl) ? (
+                                <Image source={{ uri: (prof.fotoPerfil || prof.foto || prof.avatar || prof.fotoUrl || prof.imageUrl) }} style={{ width: '100%', height: '100%' }} />
                              ) : (
                                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#64748B' }}>{prof.nome?.charAt(0).toUpperCase()}</Text>
                              )}

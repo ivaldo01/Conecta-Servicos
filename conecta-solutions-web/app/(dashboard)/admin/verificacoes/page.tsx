@@ -9,16 +9,12 @@ import {
   FileText, 
   Check, 
   X, 
-  ExternalLink,
-  Clock,
-  User,
-  Info,
-  ChevronRight
+  User
 } from 'lucide-react';
 import '@/styles/admin.css';
 
 export default function AdminVerificacoesPage() {
-  const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
+  const [solicitacoes, setSolicitacoes] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -94,11 +90,11 @@ export default function AdminVerificacoesPage() {
                   </div>
                   
                   <div className="v-docs-section">
-                    <p><FileText size={16} /> Documentos Enviados</p>
+                    <p><FileText size={16} /> Documentos</p>
                     <div className="v-docs-list">
-                      <button className="btn-doc-link">RG Frontal <ExternalLink size={12} /></button>
-                      <button className="btn-doc-link">RG Verso <ExternalLink size={12} /></button>
-                      <button className="btn-doc-link">Comprovante <ExternalLink size={12} /></button>
+                      <span className="btn-doc-link disabled" style={{opacity: 0.5, cursor: 'not-allowed'}}>
+                        Upload de documentos em breve
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -42,21 +42,29 @@ function formatCurrency(value) {
 function formatDateBR(value) {
   if (!value) return '—';
 
+  // Se for um objeto com seconds e nanoseconds (Firestore Timestamp), converte
+  if (value && typeof value === 'object' && 'seconds' in value && 'nanoseconds' in value) {
+    try {
+      const date = new Date(value.seconds * 1000);
+      return date.toLocaleString('pt-BR');
+    } catch (e) {
+      return '—';
+    }
+  }
+
   try {
     if (typeof value?.toDate === 'function') {
       return value.toDate().toLocaleString('pt-BR');
     }
-
     if (value instanceof Date) {
       return value.toLocaleString('pt-BR');
     }
-
-    if (typeof value === 'string') {
-      return value;
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+      return '—';
     }
-
-    return '—';
-  } catch {
+    return date.toLocaleString('pt-BR');
+  } catch (e) {
     return '—';
   }
 }
@@ -1252,111 +1260,123 @@ export default function FinanceiroPro({ navigation }) {
           </View>
         ))}
 
-      {!ehColaborador && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Saques recentes</Text>
+        {!ehColaborador && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Saques recentes</Text>
 
-          {ultimosSaques.length === 0 ? (
+            {ultimosSaques.length === 0 ? (
+              <EmptyState
+                icon="cash-outline"
+                title="Nenhum saque solicitado"
+                subtitle="Quando você solicitar um saque, ele aparecerá aqui."
+              />
+            ) : (
+              ultimosSaques.map((item) => {
+                const statusColor = getSaqueStatusColor(String(item?.status || '').toLowerCase());
+
+                return (
+                  <View key={item.id} style={styles.saqueCard}>
+                    <View style={styles.saqueLeft}>
+                      <View style={[styles.saqueIconWrap, { backgroundColor: `${statusColor}15` }]}>
+                        <Ionicons name="arrow-up-circle-outline" size={18} color={statusColor} />
+                      </View>
+
+                      <View style={styles.saqueTextBox}>
+                        <Text style={styles.saqueTitle}>
+                          {formatCurrency(
+                            item?.valor ??
+                            item?.valorSolicitado ??
+                            item?.valorAprovado ??
+                            0
+                          )}
+                        </Text>
+                        <Text style={styles.saqueSubtitle}>
+                          {item?.pixAddressKey || item?.chavePix
+                            ? `Chave Pix: ${item?.pixAddressKey || item?.chavePix}`
+                            : 'Chave Pix não informada'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.saqueRight}>
+                      <Text style={[styles.saqueStatus, { color: statusColor }]}>
+                        {getSaqueStatusLabel(String(item?.status || '').toLowerCase())}
+                      </Text>
+                      <Text style={styles.saqueDate}>
+                        {formatDateBR(item?.solicitadoEm || item?.criadoEm || item?.atualizadoEm)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Últimas cobranças</Text>
+
+          {ultimasCobrancas.length === 0 ? (
             <EmptyState
-              icon="cash-outline"
-              title="Nenhum saque solicitado"
-              subtitle="Quando você solicitar um saque, ele aparecerá aqui."
+              icon="receipt-outline"
+              title="Nenhuma cobrança encontrada"
+              subtitle="Quando você gerar cobranças, elas aparecerão aqui."
             />
           ) : (
-            ultimosSaques.map((item) => {
-              const statusColor = getSaqueStatusColor(String(item?.status || '').toLowerCase());
-
-              return (
-                <View key={item.id} style={styles.saqueCard}>
-                  <View style={styles.saqueLeft}>
-                    <View style={[styles.saqueIconWrap, { backgroundColor: `${statusColor}15` }]}>
-                      <Ionicons name="arrow-up-circle-outline" size={18} color={statusColor} />
-                    </View>
-
-                    <View style={styles.saqueTextBox}>
-                      <Text style={styles.saqueTitle}>
-                        {formatCurrency(
-                          item?.valor ??
-                          item?.valorSolicitado ??
-                          item?.valorAprovado ??
-                          0
-                        )}
-                      </Text>
-                      <Text style={styles.saqueSubtitle}>
-                        {item?.pixAddressKey || item?.chavePix
-                          ? `Chave Pix: ${item?.pixAddressKey || item?.chavePix}`
-                          : 'Chave Pix não informada'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.saqueRight}>
-                    <Text style={[styles.saqueStatus, { color: statusColor }]}>
-                      {getSaqueStatusLabel(String(item?.status || '').toLowerCase())}
-                    </Text>
-                    <Text style={styles.saqueDate}>
-                      {formatDateBR(item?.solicitadoEm || item?.criadoEm)}
-                    </Text>
-                  </View>
+            ultimasCobrancas.map((item) => (
+              <View key={item.id} style={styles.atendimentoCard}>
+                <View style={styles.atendimentoAvatar}>
+                  <Ionicons name="person-outline" size={18} color={colors.primary} />
                 </View>
-              );
-            })
+
+                <View style={styles.atendimentoContent}>
+                  <Text style={styles.atendimentoCliente}>
+                    {item?.clienteNome || 'Cliente'}
+                  </Text>
+                  <Text style={styles.atendimentoInfo}>
+                    {typeof (item?.data) === 'string' ? item.data : typeof (item?.dataAgendamento) === 'string' ? item.dataAgendamento : formatDateBR(item?.data || item?.dataAgendamento)} às{' '}
+                    {item?.horario || item?.horarioAgendamento || '--:--'}
+                  </Text>
+                  <Text style={styles.atendimentoMeta}>
+                    {(item?.formaPagamentoLabel || item?.formaPagamento || 'Pix')} • {getStatusPagamento(item)}
+                  </Text>
+
+                  {(getStatusPagamento(item) === 'pago' || getStatusPagamento(item) === 'received' || getStatusPagamento(item) === 'confirmed') ? (
+                    <Text style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
+                      Bruto: {formatCurrency(getValorBruto(item))} •
+                      <Text style={{ color: '#d32f2f' }}> Taxa: -{formatCurrency(item.taxaPlataforma || (getValorBruto(item) - getValorLiquido(item)))}</Text>
+                    </Text>
+                  ) : null}
+                </View>
+
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.atendimentoValor}>
+                    {formatCurrency(ehColaborador ? getValorLiquido(item) : getValorBruto(item))}
+                  </Text>
+                  {ehColaborador && (
+                    <Text style={{ fontSize: 9, color: '#27AE60', fontWeight: 'bold' }}>LÍQUIDO</Text>
+                  )}
+                </View>
+              </View>
+            ))
           )}
         </View>
-      )}
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Últimas cobranças</Text>
-
-        {ultimasCobrancas.length === 0 ? (
-          <EmptyState
-            icon="receipt-outline"
-            title="Nenhuma cobrança encontrada"
-            subtitle="Quando você gerar cobranças, elas aparecerão aqui."
-          />
-        ) : (
-          ultimasCobrancas.map((item) => (
-            <View key={item.id} style={styles.atendimentoCard}>
-              <View style={styles.atendimentoAvatar}>
-                <Ionicons name="person-outline" size={18} color={colors.primary} />
-              </View>
-
-              <View style={styles.atendimentoContent}>
-                <Text style={styles.atendimentoCliente}>
-                  {item?.clienteNome || 'Cliente'}
-                </Text>
-                <Text style={styles.atendimentoInfo}>
-                  {item?.data || item?.dataAgendamento || 'Data não informada'} às{' '}
-                  {item?.horario || item?.horarioAgendamento || '--:--'}
-                </Text>
-                <Text style={styles.atendimentoMeta}>
-                  {(item?.formaPagamentoLabel || item?.formaPagamento || 'Pix')} • {getStatusPagamento(item)}
-                </Text>
-              </View>
-
-              <Text style={styles.atendimentoValor}>
-                {formatCurrency(getValorBruto(item))}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.tipCard}>
-        <Ionicons name="bulb-outline" size={22} color="#856404" />
-        <Text style={styles.tipText}>
-          {ehColaborador ? (
-            'Esta subconta mostra apenas os seus rendimentos, atualizados automaticamente conforme os pagamentos recebidos nos serviços concluídos por você. Saques e saldo principal seguem sob gestão da conta superior.'
-          ) : (
-            <>
-              Agora o financeiro usa o documento de saldo como fonte principal. Quando o pagamento
-              for confirmado pelo webhook, o valor líquido deve aparecer em
-              <Text style={styles.tipBold}> saldo disponível</Text>.
-            </>
-          )}
-        </Text>
-      </View>
-    </ScrollView >
+        <View style={styles.tipCard}>
+          <Ionicons name="bulb-outline" size={22} color="#856404" />
+          <Text style={styles.tipText}>
+            {ehColaborador ? (
+              'Esta subconta mostra apenas os seus rendimentos, atualizados automaticamente conforme os pagamentos recebidos nos serviços concluídos por você. Saques e saldo principal seguem sob gestão da conta superior.'
+            ) : (
+              <>
+                Agora o financeiro usa o documento de saldo como fonte principal. Quando o pagamento
+                for confirmado pelo webhook, o valor líquido deve aparecer em
+                <Text style={styles.tipBold}> saldo disponível</Text>.
+              </>
+            )}
+          </Text>
+        </View>
+      </ScrollView >
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
@@ -1513,38 +1533,38 @@ export default function FinanceiroPro({ navigation }) {
         <View style={styles.modalBg}>
           <View style={styles.modalCard}>
             <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#F1C40F20', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginBottom: 16 }}>
-               <Ionicons name="star" size={32} color="#F1C40F" />
+              <Ionicons name="star" size={32} color="#F1C40F" />
             </View>
 
             <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Seu Plano Atual</Text>
             <Text style={[styles.modalSubtitle, { textAlign: 'center', marginBottom: 20 }]}>
-              Você está utilizando o <Text style={{fontWeight: 'bold', color: '#222'}}>{objetoPlano.name}</Text>.
+              Você está utilizando o <Text style={{ fontWeight: 'bold', color: '#222' }}>{objetoPlano.name}</Text>.
             </Text>
 
             <View style={{ backgroundColor: '#F8F9FA', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                 <Text style={{ color: '#666' }}>Taxa sobre Serviço (Plataforma):</Text>
-                 <Text style={{ fontWeight: 'bold', color: '#E74C3C' }}>{taxaComissaoPercentual}%</Text>
-               </View>
-               <View style={{ height: 1, backgroundColor: '#EEE', marginBottom: 12 }} />
-               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                 <Text style={{ color: '#666' }}>Taxa Fixa de Saque:</Text>
-                 <Text style={{ fontWeight: 'bold', color: isTaxaZero ? '#27AE60' : '#E74C3C' }}>
-                    {isTaxaZero ? 'GRÁTIS' : formatCurrency(taxaSaque)}
-                 </Text>
-               </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text style={{ color: '#666' }}>Taxa sobre Serviço (Plataforma):</Text>
+                <Text style={{ fontWeight: 'bold', color: '#E74C3C' }}>{taxaComissaoPercentual}%</Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: '#EEE', marginBottom: 12 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: '#666' }}>Taxa Fixa de Saque:</Text>
+                <Text style={{ fontWeight: 'bold', color: isTaxaZero ? '#27AE60' : '#E74C3C' }}>
+                  {isTaxaZero ? 'GRÁTIS' : formatCurrency(taxaSaque)}
+                </Text>
+              </View>
             </View>
 
             <View style={{ marginBottom: 24 }}>
-               {objetoPlano.features.slice(0, 3).map((feat, index) => (
-                  <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                     <Ionicons name="checkmark-circle" size={18} color="#27AE60" style={{ marginRight: 8 }} />
-                     <Text style={{ fontSize: 13, color: '#444' }}>{feat}</Text>
-                  </View>
-               ))}
-               <Text style={{ fontSize: 12, color: '#999', marginTop: 4, fontStyle: 'italic' }}>
-                 E muitos outros benefícios exclusivos...
-               </Text>
+              {objetoPlano.features.slice(0, 3).map((feat, index) => (
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Ionicons name="checkmark-circle" size={18} color="#27AE60" style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 13, color: '#444' }}>{feat}</Text>
+                </View>
+              ))}
+              <Text style={{ fontSize: 12, color: '#999', marginTop: 4, fontStyle: 'italic' }}>
+                E muitos outros benefícios exclusivos...
+              </Text>
             </View>
 
             <TouchableOpacity

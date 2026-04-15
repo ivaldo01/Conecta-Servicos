@@ -334,7 +334,8 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
             perfil?.capaPerfil ||
             perfil?.capa ||
             perfil?.bannerUrl ||
-            perfil?.imagemBanner
+            perfil?.imagemBanner ||
+            perfil?.fotoBanner
         );
     }, [perfil]);
 
@@ -344,7 +345,9 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
             perfil?.foto ||
             perfil?.avatar ||
             perfil?.photoURL ||
-            perfil?.photoUrl
+            perfil?.photoUrl ||
+            perfil?.fotoUrl ||
+            perfil?.imageUrl
         );
     }, [perfil]);
 

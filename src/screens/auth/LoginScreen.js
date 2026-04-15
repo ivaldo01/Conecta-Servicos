@@ -33,6 +33,8 @@ import { doc, getDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firesto
 import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
 import DesktopWrapper from '../../components/DesktopWrapper';
+import { getEmailFromCid } from '../../utils/idUtils';
+
 
 import logo from '../../../assets/logo.png';
 
@@ -112,11 +114,23 @@ export default function LoginScreen({ navigation }) {
     try {
       setLoading(true);
 
+      let loginEmail = email.trim().toLowerCase();
+
+      // Implementação do Login Híbrido (CID ou Email)
+      if (loginEmail.startsWith('cs')) {
+        const foundEmail = await getEmailFromCid(loginEmail);
+        if (!foundEmail) {
+          throw new Error('ConectaID não encontrado ou inválido.');
+        }
+        loginEmail = foundEmail;
+      }
+
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email.trim().toLowerCase(),
+        loginEmail,
         senha
       );
+
 
       const user = userCredential.user;
 
@@ -256,7 +270,12 @@ export default function LoginScreen({ navigation }) {
           onChangeText={setEmail}
           onSubmitEditing={() => senhaInputRef.current?.focus()}
         />
+        <View style={styles.inputHint}>
+          <Ionicons name="information-circle-outline" size={12} color={colors.secondary} />
+          <Text style={styles.inputHintText}>Use seu e-mail ou seu ConectaID (CID)</Text>
+        </View>
       </View>
+
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Senha</Text>
@@ -738,4 +757,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.secondary,
   },
+
+  inputHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+
+  inputHintText: {
+    fontSize: 10,
+    color: colors.secondary,
+  },
 });
+

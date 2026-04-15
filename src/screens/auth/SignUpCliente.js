@@ -29,7 +29,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from "../../services/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, runTransaction } from "firebase/firestore";
 import colors from "../../constants/colors";
 import { registrarPushTokenUsuario } from "../../utils/pushTokenUtils";
 import PrimaryButton from "../../components/PrimaryButton";
@@ -221,25 +221,42 @@ export default function SignUpCliente({ navigation, route }) {
         senha
       );
 
-      await setDoc(doc(db, "usuarios", userCert.user.uid), {
-        uid: userCert.user.uid,
-        nome: nome.trim(),
-        nomeCompleto: nome.trim(),
-        telefone: telefone.trim(),
-        whatsapp: telefone.trim(),
-        cpf: cpf.trim(),
-        localizacao: {
-          pais: pais.trim(),
-          estado,
-          cidade: cidade.trim(),
-          cep: cep.trim(),
-        },
-        email: email.trim().toLowerCase(),
-        tipo: 'cliente',
-        perfil: 'cliente',
-        pushToken: '',
-        fotoPerfil: '',
-        dataCriacao: serverTimestamp(),
+      // 2. Grava o perfil com Transação para Gerar ID Sequencial
+      const userRef = doc(db, "usuarios", userCert.user.uid);
+      const counterRef = doc(db, 'config', 'contadores');
+
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        let currentCount = 1;
+        
+        if (counterDoc.exists()) {
+          currentCount = (counterDoc.data().usuarios || 0) + 1;
+        }
+
+        const codigoConecta = `CS-BR-${String(currentCount).padStart(6, '0')}`;
+        
+        transaction.set(counterRef, { usuarios: currentCount }, { merge: true });
+        transaction.set(userRef, {
+          uid: userCert.user.uid,
+          nome: nome.trim(),
+          nomeCompleto: nome.trim(),
+          telefone: telefone.trim(),
+          whatsapp: telefone.trim(),
+          cpf: cpf.trim(),
+          localizacao: {
+            pais: pais.trim(),
+            estado,
+            cidade: cidade.trim(),
+            cep: cep.trim(),
+          },
+          email: email.trim().toLowerCase(),
+          tipo: 'cliente',
+          perfil: 'cliente',
+          codigoConecta: codigoConecta, // ID OFICIAL GERADO
+          pushToken: '',
+          fotoPerfil: '',
+          dataCriacao: serverTimestamp(),
+        });
       });
 
       await registrarPushTokenUsuario(userCert.user.uid);

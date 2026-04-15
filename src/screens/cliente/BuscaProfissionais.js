@@ -45,11 +45,11 @@ function getNomeProfissional(profissional) {
 }
 
 function getAvatarUri(profissional) {
-  return profissional?.fotoPerfil || profissional?.foto || profissional?.avatar || profissional?.photoURL || profissional?.photoUrl || null;
+  return profissional?.fotoPerfil || profissional?.foto || profissional?.avatar || profissional?.photoURL || profissional?.photoUrl || profissional?.fotoUrl || profissional?.imageUrl || null;
 }
 
 function getBannerUri(profissional) {
-  return profissional?.bannerPerfil || profissional?.banner || profissional?.capaPerfil || profissional?.capa || profissional?.bannerUrl || profissional?.imagemBanner || null;
+  return profissional?.bannerPerfil || profissional?.banner || profissional?.capaPerfil || profissional?.capa || profissional?.bannerUrl || profissional?.imagemBanner || profissional?.fotoBanner || null;
 }
 
 function getCidadeProfissional(item) {

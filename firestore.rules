@@ -51,8 +51,8 @@ service cloud.firestore {
       }
 
       match /servicos/{servicoId} {
-        allow read: if estaLogado();
-        allow write: if ehDono(userId);
+        allow read: if request.auth != null;
+        allow write: if ehDono(userId) || ehAdmin();
       }
 
       match /configuracoes/{configId} {
@@ -172,11 +172,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /suporte/{userId} {
-      allow read, write: if estaLogado() && (request.auth.uid == userId || ehAdmin());
-      
+    // SUPORTE — Regras para tickets e mensagens
+    match /suporte/{ticketId} {
+      // O usuário pode ler/escrever se o ticketId for o UID dele (estilo antigo)
+      // OU se o campo usuarioId for igual ao UID dele (estilo novo)
+      allow read: if estaLogado() && (ticketId == uidAtual() || resource.data.usuarioId == uidAtual() || ehAdmin());
+      allow create: if estaLogado() && (ticketId == uidAtual() || request.resource.data.usuarioId == uidAtual());
+      allow update: if estaLogado() && (ticketId == uidAtual() || resource.data.usuarioId == uidAtual() || ehAdmin());
+      allow delete: if ehAdmin();
+
       match /mensagens/{msgId} {
-        allow read, write: if estaLogado() && (request.auth.uid == userId || ehAdmin());
+        allow read, write: if estaLogado() && (ticketId == uidAtual() || get(/databases/$(database)/documents/suporte/$(ticketId)).data.usuarioId == uidAtual() || ehAdmin());
       }
     }
 
@@ -185,6 +191,32 @@ service cloud.firestore {
       allow create: if estaLogado();
       allow delete: if estaLogado();
       allow update: if false;
+    }
+
+    // Transações financeiras — usada pela página Financeiro (web/desktop)
+    // Leitura: autenticado (a query filtra por profissionalId)
+    // Escrita: só o profissional dono da transação
+    match /transacoes/{transacaoId} {
+      allow read: if estaLogado();
+      allow create: if estaLogado()
+        && request.resource.data.profissionalId == uidAtual();
+      allow update, delete: if estaLogado()
+        && resource.data.profissionalId == uidAtual();
+    }
+
+    // Colaboradores (coleção raiz) — usada pela versão web/desktop
+    // A versão mobile usa subcoleção /usuarios/{id}/colaboradores (regra já existe acima)
+    match /colaboradores/{colabId} {
+      // Leitura: qualquer autenticado (a query já filtra por profissionalId)
+      allow read: if estaLogado();
+
+      // Criação: só se o profissionalId do documento for o próprio usuário
+      allow create: if estaLogado()
+        && request.resource.data.profissionalId == uidAtual();
+
+      // Edição e exclusão: só o profissional dono do colaborador
+      allow update, delete: if estaLogado()
+        && resource.data.profissionalId == uidAtual();
     }
 
     match /{document=**} {

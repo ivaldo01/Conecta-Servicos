@@ -170,7 +170,9 @@ export default function PerfilScreen({ navigation }) {
       perfil?.foto ||
       perfil?.avatar ||
       perfil?.photoURL ||
-      perfil?.photoUrl
+      perfil?.photoUrl ||
+      perfil?.fotoUrl ||
+      perfil?.imageUrl
     );
   }, [perfil]);
 
@@ -181,7 +183,8 @@ export default function PerfilScreen({ navigation }) {
       perfil?.capaPerfil ||
       perfil?.capa ||
       perfil?.bannerUrl ||
-      perfil?.imagemBanner
+      perfil?.imagemBanner ||
+      perfil?.fotoBanner
     );
   }, [perfil]);
 
@@ -617,7 +620,19 @@ export default function PerfilScreen({ navigation }) {
               {perfil?.endereco || "Não informado"}
             </Text>
           </View>
+
+          {perfil?.conectaId && (
+            <View style={styles.dadoItem}>
+              <Ionicons name="id-card-outline" size={18} color={colors.primary} />
+              <Text style={styles.dadoLabel}>ConectaID (CID)</Text>
+              <Text style={[styles.dadoValor, { fontWeight: 'bold', color: colors.primary }]}>
+                {perfil.conectaId}
+              </Text>
+            </View>
+          )}
         </View>
+
+
       </View>
 
       <View style={styles.menuContainer}>
@@ -645,7 +660,7 @@ export default function PerfilScreen({ navigation }) {
 
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => navigation.navigate("FinanceiroPro")}
+              onPress={() => navigation.navigate("Financeiro")}
             >
               <View style={[styles.iconBox, { backgroundColor: '#E8F5E9' }]}>
                 <Ionicons name="wallet-outline" size={22} color="#2E7D32" />

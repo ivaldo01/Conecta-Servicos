@@ -22,6 +22,7 @@ import {
     query,
     runTransaction,
     where,
+    onSnapshot,
 } from "firebase/firestore";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -295,8 +296,12 @@ export default function AgendamentoFinal({ route, navigation }) {
     };
 
     const carregarAgendamentosDoDia = async () => {
-        if (!clinicaId) return;
-        try {
+        // A lógica agora é gerada automaticamente pelo useEffect com onSnapshot
+        // Mantemos a função apenas para compatibilidade de chamadas legadas
+    };
+
+    useEffect(() => {
+        if (!loadingInicial && clinicaId) {
             const dataFiltro = formatarDataFiltro(date);
             const q = query(
                 collection(db, "agendamentos"),
@@ -304,22 +309,21 @@ export default function AgendamentoFinal({ route, navigation }) {
                 where("dataFiltro", "==", dataFiltro),
                 where("status", "in", ["pendente", "confirmado"])
             );
-            const snap = await getDocs(q);
-            const agendados = snap.docs.map(d => ({
-                horario: d.data().horario,
-                colaboradorId: d.data().colaboradorId
-            }));
-            setAgendamentosExistentes(agendados);
-        } catch (e) {
-            console.log("Erro ao carregar agendamentos do dia:", e);
-        }
-    };
 
-    useEffect(() => {
-        if (!loadingInicial) {
-            carregarAgendamentosDoDia();
+            const unsubscribe = onSnapshot(q, (snap) => {
+                const agendados = snap.docs.map(d => ({
+                    horario: d.data().horario,
+                    colaboradorId: d.data().colaboradorId,
+                    status: d.data().status
+                }));
+                setAgendamentosExistentes(agendados);
+            }, (error) => {
+                console.log("Erro no listener de agendamentos:", error);
+            });
+
+            return () => unsubscribe();
         }
-    }, [date]);
+    }, [date, loadingInicial, clinicaId]);
 
     const carregarDadosIniciais = async () => {
         try {
@@ -530,7 +534,10 @@ export default function AgendamentoFinal({ route, navigation }) {
         );
 
         const jaAgendado = agendamentosExistentes.some(
-            a => a.horario === horario && a.colaboradorId === colab.id
+            a => a.horario === horario && 
+                 a.colaboradorId === colab.id && 
+                 a.status !== 'cancelado' && 
+                 a.status !== 'concluido'
         );
 
         const noAlmoco = estaNoHorarioDeAlmoco(agenda, horario, diaSemanaSelecionado);
@@ -550,7 +557,10 @@ export default function AgendamentoFinal({ route, navigation }) {
 
             const temHorarioLivre = (agenda?.horarios || []).some(h => {
                 const jaAgendado = agendamentosExistentes.some(
-                    a => a.horario === h && a.colaboradorId === colab.id
+                    a => a.horario === h && 
+                         a.colaboradorId === colab.id && 
+                         a.status !== 'cancelado' && 
+                         a.status !== 'concluido'
                 );
                 return !jaAgendado;
             });
@@ -858,9 +868,11 @@ export default function AgendamentoFinal({ route, navigation }) {
                     menorParentesco: tipoAtendimento === 'menor' ? menorSelecionado?.parentesco || null : null,
                     observacoesMenor: tipoAtendimento === 'menor' ? observacoesMenor.trim() || null : null,
 
+                    servico: servicos.map(s => s.nome).join(", "),
                     data: dataExibicao,
                     dataFiltro,
                     horario: horarioSelecionado,
+                    dataHora: date,
                     status: "pendente",
 
                     valorTotal: valorTotalAgendamento,
@@ -882,9 +894,11 @@ export default function AgendamentoFinal({ route, navigation }) {
                     profissionalOrigemFoto:
                         profissionalRoute?.fotoPerfil ||
                         profissionalRoute?.foto ||
+                        profissionalRoute?.fotoUrl ||
                         profissionalRoute?.avatar ||
                         clinicaData?.fotoPerfil ||
                         clinicaData?.foto ||
+                        clinicaData?.fotoUrl ||
                         "",
                     origemTela: origemAgendamento === 'perfil_publico'
                         ? 'PerfilPublicoProfissional'

@@ -203,8 +203,7 @@ module.exports = async (req, res) => {
 
                         // Mudar o plano do usuário no Firestore
                         await db.collection('usuarios').doc(userId).update({
-                            planoAtivo: 'premium',
-                            planoId: planoId,
+                            planoAtivo: planoId,
                             assinaturaAtiva: true,
                             dataAssinatura: admin.firestore.FieldValue.serverTimestamp()
                         });
@@ -237,8 +236,7 @@ module.exports = async (req, res) => {
 
                             // Ativar plano no usuário
                             await db.collection('usuarios').doc(userId).update({
-                                planoAtivo: 'premium',
-                                planoId: planoId,
+                                planoAtivo: planoId,
                                 assinaturaAtiva: true,
                                 dataAssinatura: admin.firestore.FieldValue.serverTimestamp()
                             });

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, limit as firestoreLimit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit as firestoreLimit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
@@ -23,7 +23,7 @@ interface Agendamento {
   clienteNome?: string;
   profissionalNome?: string;
   servico?: string;
-  dataHora?: any;
+  dataHora?: Timestamp;
   status?: string;
   valor?: number;
 }
@@ -45,7 +45,7 @@ interface Profissional {
 // DASHBOARD PRINCIPAL
 // ============================================================
 export default function DashboardPage() {
-  const { user, dadosUsuario, ehProfissional } = useAuth();
+  const { user, dadosUsuario, ehProfissional, loading: authLoading } = useAuth();
   const router = useRouter();
   
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
@@ -56,9 +56,9 @@ export default function DashboardPage() {
   const hojeStr = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (authLoading || !user?.uid) return;
 
-    const userId = user.uid; // garante que TypeScript sabe que é string
+    const userId = user.uid;
     let unsubscribe: () => void;
 
     async function carregarDados() {
@@ -78,6 +78,9 @@ export default function DashboardPage() {
             } catch (err) {
               console.error('[Snap Error]', err);
             }
+          }, (err) => {
+            console.error('[Permission Error]', err);
+            setLoading(false);
           });
         } else {
           const qProfs = query(
@@ -97,7 +100,7 @@ export default function DashboardPage() {
     
     carregarDados();
     return () => { if (unsubscribe) unsubscribe(); };
-  }, [user?.uid, ehProfissional]);
+  }, [user?.uid, ehProfissional, authLoading]);
 
   // --- COMPONENTE: HOME DO CLIENTE ---
   const renderHomeCliente = () => (

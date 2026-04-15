@@ -98,12 +98,19 @@ export default function PremiumScreen({ navigation }) {
       setLoading(true);
       console.log('[PremiumScreen] Iniciando assinatura para plano:', planoSelecionado.name, 'via', metodoSelecionado);
 
+      const valorOriginal = planoSelecionado.price;
+      const valorComDesconto = valorOriginal > 0 ? (valorOriginal * 0.5) : 0;
+
       let payload = {
         userId: authUser.uid,
         planoId: planoSelecionado.id,
-        valor: planoSelecionado.price > 0 ? (planoSelecionado.price * 0.5) : 0,
+        valor: valorComDesconto,
         nomePlano: planoSelecionado.name,
-        billingType: metodoSelecionado
+        billingType: metodoSelecionado,
+        discount: valorOriginal > 0 ? {
+          type: 'FIXED',
+          value: valorOriginal * 0.5
+        } : undefined
       };
 
       if (metodoSelecionado === 'CREDIT_CARD') {
@@ -214,11 +221,11 @@ export default function PremiumScreen({ navigation }) {
 
           {/* Banner Animado 50% OFF */}
           <Animated.View style={[styles.promoBanner, { transform: [{ scale: scaleAnim }] }]}>
-             <Ionicons name="gift" size={24} color="#FFF" style={{ marginRight: 8 }} />
-             <View>
-               <Text style={styles.promoBannerTitle}>SUPER LANÇAMENTO 🎉</Text>
-               <Text style={styles.promoBannerText}>50% de Desconto na assinatura inteira!</Text>
-             </View>
+            <Ionicons name="gift" size={24} color="#FFF" style={{ marginRight: 8 }} />
+            <View>
+              <Text style={styles.promoBannerTitle}>SUPER LANÇAMENTO 🎉</Text>
+              <Text style={styles.promoBannerText}>50% de Desconto na assinatura inteira!</Text>
+            </View>
           </Animated.View>
         </View>
 
@@ -591,9 +598,9 @@ export default function PremiumScreen({ navigation }) {
                     {metodoSelecionado === 'PIX' ? 'Gerar Pix' : 'Confirmar Assinatura'}
                   </Text>
                   <Text style={styles.confirmButtonValue}>
-                    {planoSelecionado?.price > 0 
-                       ? `R$ ${(planoSelecionado.price * 0.5).toFixed(2).replace('.', ',')}/mês` 
-                       : 'Grátis'}
+                    {planoSelecionado?.price > 0
+                      ? `R$ ${(planoSelecionado.price * 0.5).toFixed(2).replace('.', ',')}/mês`
+                      : 'Grátis'}
                   </Text>
                 </>
               )}

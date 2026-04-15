@@ -146,28 +146,36 @@ export default function DetalhesAgendamento({ route, navigation }) {
     const { width: windowWidth } = useWindowDimensions();
     const isLargeScreen = Platform.OS === 'web' && windowWidth > 768;
 
-    const { agendamento } = route.params || {};
+    const { agendamento: agendamentoInicial } = route.params || {};
+    const [agendamentoData, setAgendamentoData] = useState(agendamentoInicial);
     const [loadingAcao, setLoadingAcao] = useState(false);
     const [loadingAvaliacao, setLoadingAvaliacao] = useState(true);
     const [jaAvaliado, setJaAvaliado] = useState(false);
     const [statusPagamentoAtual, setStatusPagamentoAtual] = useState(
-        agendamento?.statusPagamento || 'aguardando_cobranca'
+        agendamentoInicial?.statusPagamento || 'aguardando_cobranca'
     );
 
     useEffect(() => {
-        verificarAvaliacao();
-    }, [agendamento?.id]);
+        if (!agendamentoInicial?.id) return;
 
-    useEffect(() => {
-        if (!agendamento?.id) return;
+        // Listener em Tempo Real para o Agendamento (Reflete mudanças da Web/Desktop)
+        const unsubscribeAg = onSnapshot(
+            doc(db, 'agendamentos', agendamentoInicial.id),
+            (snap) => {
+                if (snap.exists()) {
+                    setAgendamentoData({ id: snap.id, ...snap.data() });
+                }
+            }
+        );
 
+        // Listener em Tempo Real para o Pagamento
         const unsubscribePagamento = onSnapshot(
-            doc(db, 'pagamentos', agendamento.id),
+            doc(db, 'pagamentos', agendamentoInicial.id),
             (snap) => {
                 if (snap.exists()) {
                     setStatusPagamentoAtual(snap.data()?.status || 'gerada');
                 } else {
-                    setStatusPagamentoAtual(agendamento?.statusPagamento || 'aguardando_cobranca');
+                    setStatusPagamentoAtual(agendamentoData?.statusPagamento || 'aguardando_cobranca');
                 }
             },
             (error) => {
@@ -175,8 +183,13 @@ export default function DetalhesAgendamento({ route, navigation }) {
             }
         );
 
-        return () => unsubscribePagamento?.();
-    }, [agendamento?.id, agendamento?.statusPagamento]);
+        return () => {
+          unsubscribeAg?.();
+          unsubscribePagamento?.();
+        };
+    }, [agendamentoInicial?.id]);
+
+    const agendamento = agendamentoData || agendamentoInicial;
 
     const verificarAvaliacao = async () => {
         if (!agendamento?.id) {

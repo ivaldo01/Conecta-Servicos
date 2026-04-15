@@ -12,84 +12,83 @@
    5. Utilitários globais
    ============================================================ */
 
-
 /* ============================================================
    1. VARIÁVEIS / DESIGN TOKENS
    Modifique aqui para alterar cores e tamanhos globalmente
    ============================================================ */
 :root {
-
   /* --- CORES PRIMÁRIAS --- */
-  --color-primary:       #1971C2;  /* Azul principal */
-  --color-primary-dark:  #1864AB;  /* Azul hover */
-  --color-primary-light: #D0EBFF;  /* Azul claro (fundos) */
+  --color-primary: #3b82f6; /* Azul principal */
+  --color-primary-dark: #2563eb; /* Azul hover */
+  --color-primary-light: #1e3a5f; /* Azul escuro (fundo cards) */
 
   /* --- CORES SECUNDÁRIAS --- */
-  --color-secondary:       #2F9E44;  /* Verde */
-  --color-secondary-dark:  #2B8A3E;  /* Verde hover */
-  --color-secondary-light: #D3F9D8;  /* Verde claro */
+  --color-secondary: #2f9e44; /* Verde */
+  --color-secondary-dark: #2b8a3e; /* Verde hover */
+  --color-secondary-light: #d3f9d8; /* Verde claro */
 
   /* --- CORES DE ALERTA --- */
-  --color-danger:   #E03131;  /* Vermelho (erros) */
-  --color-warning:  #F08C00;  /* Laranja (avisos) */
-  --color-success:  #2F9E44;  /* Verde (sucesso) */
-  --color-info:     #1971C2;  /* Azul (informações) */
+  --color-danger: #e03131; /* Vermelho (erros) */
+  --color-warning: #f08c00; /* Laranja (avisos) */
+  --color-success: #2f9e44; /* Verde (sucesso) */
+  --color-info: #1971c2; /* Azul (informações) */
 
   /* --- SIDEBAR --- */
-  --sidebar-bg:           #1A1B2E;  /* Fundo da barra lateral */
-  --sidebar-border:       #2D2E45;  /* Borda dos itens */
-  --sidebar-text:         #94A3B8;  /* Texto inativo */
-  --sidebar-text-active:  #FFFFFF;  /* Texto do item ativo */
-  --sidebar-hover:        #252640;  /* Hover dos itens */
-  --sidebar-active:       #1971C2;  /* Fundo do item ativo */
-  --sidebar-width:        260px;    /* Largura da sidebar */
+  --sidebar-bg: #0f1419; /* Fundo da barra lateral */
+  --sidebar-border: #1e293b; /* Borda dos itens */
+  --sidebar-text: #94a3b8; /* Texto inativo */
+  --sidebar-text-active: #ffffff; /* Texto do item ativo */
+  --sidebar-hover: #1e293b; /* Hover dos itens */
+  --sidebar-active: #3b82f6; /* Fundo do item ativo */
+  --sidebar-width: 260px; /* Largura da sidebar */
 
   /* --- TOPBAR --- */
-  --topbar-bg:     #FFFFFF;
-  --topbar-border: #E9ECEF;
+  --topbar-bg: #0b0f1a;
+  --topbar-border: #1e293b;
   --topbar-height: 64px;
 
   /* --- FUNDOS --- */
-  --bg-page:   #F1F3F5;  /* Fundo da página */
-  --bg-card:   #FFFFFF;  /* Fundo dos cards */
-  --bg-muted:  #F8F9FA;  /* Fundo de áreas secundárias */
+  --bg-page: #0b0f1a; /* Fundo da página - Deep Navy */
+  --bg-card: #151925; /* Fundo dos cards */
+  --bg-muted: #1e293b; /* Fundo de áreas secundárias */
 
   /* --- TEXTO --- */
-  --text-primary:   #1A1B2E;  /* Títulos */
-  --text-secondary: #495057;  /* Texto normal */
-  --text-muted:     #868E96;  /* Texto suave */
-  --text-disabled:  #ADB5BD;  /* Texto desabilitado */
+  --text-primary: #ffffff; /* Títulos */
+  --text-secondary: #cbd5e1; /* Texto normal */
+  --text-muted: #94a3b8; /* Texto suave */
+  --text-disabled: #64748b; /* Texto desabilitado */
 
   /* --- BORDAS --- */
-  --border-color:  #E9ECEF;
+  --border-color: #1e293b;
   --border-radius: 10px;
   --border-radius-lg: 14px;
 
   /* --- SOMBRAS --- */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.4);
 
   /* --- ESPAÇAMENTOS --- */
-  --space-xs:  4px;
-  --space-sm:  8px;
-  --space-md:  16px;
-  --space-lg:  24px;
-  --space-xl:  32px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
   --space-2xl: 48px;
 
   /* --- TRANSIÇÕES --- */
-  --transition-fast:   all 0.15s ease;
+  --transition-fast: all 0.15s ease;
   --transition-normal: all 0.25s ease;
-  --transition-slow:   all 0.4s ease;
+  --transition-slow: all 0.4s ease;
 }
-
 
 /* ============================================================
    2. RESET E BASE
    Estilos base aplicados em toda a aplicação
    ============================================================ */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -101,7 +100,12 @@ html {
 }
 
 body {
-  font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    var(--font-inter),
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   background-color: var(--bg-page);
   color: var(--text-secondary);
   line-height: 1.6;
@@ -109,7 +113,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--text-primary);
   font-weight: 700;
   line-height: 1.3;
@@ -136,10 +145,11 @@ button {
   font-family: inherit;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   font-family: inherit;
 }
-
 
 /* ============================================================
    3. SCROLLBAR PERSONALIZADA
@@ -155,14 +165,13 @@ input, textarea, select {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #CED4DA;
+  background: #ced4da;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ADB5BD;
+  background: #adb5bd;
 }
-
 
 /* ============================================================
    4. ANIMAÇÕES GLOBAIS
@@ -183,28 +192,43 @@ input, textarea, select {
 
 /* Pulse — usado nos loaders */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Spin — loader circular */
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Slide da sidebar no mobile */
 @keyframes slideInLeft {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 /* Entrada vindo de cima — usado no logo do painel de login */
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-
-
 
 /* ============================================================
    5. UTILITÁRIOS GLOBAIS
@@ -218,15 +242,19 @@ input, textarea, select {
 
 /* Skeleton loader — substitui conteúdo enquanto carrega */
 .skeleton {
-  background: linear-gradient(90deg, #F1F3F5 25%, #E9ECEF 50%, #F1F3F5 75%);
+  background: linear-gradient(90deg, #f1f3f5 25%, #e9ecef 50%, #f1f3f5 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s infinite;
   border-radius: var(--border-radius);
 }
 
 @keyframes skeleton-shimmer {
-  from { background-position: 200% 0; }
-  to   { background-position: -200% 0; }
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 /* Texto truncado com reticências */
