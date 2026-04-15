@@ -10,7 +10,7 @@ import {
   MoreVertical, 
   UserX, 
   UserCheck, 
-  Shield, 
+  Eye, 
   Mail,
   Smartphone,
   CheckCircle,
@@ -262,7 +262,13 @@ export default function AdminUsuariosPage() {
                   </td>
                   <td className="text-right">
                     <div className="actions-cell-hq" style={{ position: 'relative' }}>
-                      <button className="btn-action-hq" title="Editar Perfil"><Shield size={16} /></button>
+                      <button 
+                        className="btn-action-hq" 
+                        title="Ver Perfil"
+                        onClick={() => window.open(`/perfil-profissional/${u.id}`, '_blank')}
+                      >
+                        <Eye size={16} />
+                      </button>
                       <button 
                         className={`btn-action-hq ${u.status === 'suspenso' ? 'btn-activate' : 'btn-suspend'}`} 
                         onClick={() => toggleStatus(u)}

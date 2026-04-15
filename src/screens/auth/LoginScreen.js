@@ -34,6 +34,7 @@ import { auth, db } from '../../services/firebaseConfig';
 import colors from '../../constants/colors';
 import DesktopWrapper from '../../components/DesktopWrapper';
 import { getEmailFromCid } from '../../utils/idUtils';
+import { logAuth } from '../../services/activityLogger';
 
 
 import logo from '../../../assets/logo.png';
@@ -54,7 +55,7 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Atenção', 'Informe seu e-mail no campo acima para recuperar a senha.');
       return;
     }
-    
+
     try {
       setLoading(true);
       await sendPasswordResetEmail(auth, email.trim().toLowerCase());
@@ -63,9 +64,9 @@ export default function LoginScreen({ navigation }) {
       console.log('Erro ao recuperar senha:', error);
       let mensagem = 'Não foi possível enviar o e-mail de recuperação.';
       if (error.code === 'auth/user-not-found') {
-         mensagem = 'Usuário não cadastrado com esse e-mail.';
+        mensagem = 'Usuário não cadastrado com esse e-mail.';
       } else if (error.code === 'auth/invalid-email') {
-         mensagem = 'O e-mail informado é inválido.';
+        mensagem = 'O e-mail informado é inválido.';
       }
       Alert.alert('Erro', mensagem);
     } finally {
@@ -216,6 +217,21 @@ export default function LoginScreen({ navigation }) {
 
       // Se não estiver marcada para exclusão, deixa o App.js redirecionar normalmente
 
+      // 📝 LOG: Registrar login bem-sucedido
+      if (perfilDoc.exists()) {
+        const perfilData = perfilDoc.data();
+        logAuth(
+          {
+            uid: user.uid,
+            nome: perfilData.nome || perfilData.razaoSocial,
+            email: user.email,
+            tipo: perfilData.tipo || perfilData.perfil
+          },
+          'Login realizado no mobile',
+          { metodo: 'email_senha', plataforma: Platform.OS }
+        );
+      }
+
     } catch (error) {
       console.log('Erro no login:', error);
 
@@ -305,8 +321,8 @@ export default function LoginScreen({ navigation }) {
             />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity 
-          style={styles.forgotPasswordButton} 
+        <TouchableOpacity
+          style={styles.forgotPasswordButton}
           onPress={handleRecuperarSenha}
           disabled={loading}
         >

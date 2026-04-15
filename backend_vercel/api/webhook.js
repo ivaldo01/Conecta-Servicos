@@ -18,12 +18,28 @@ module.exports = async (req, res) => {
 
     const { event, payment } = req.body;
 
+    // 📝 LOG: Registrar webhook recebido para monitoramento
+    const logRef = await db.collection('webhookLogs').add({
+        eventType: event,
+        paymentId: payment?.id,
+        subscriptionId: payment?.subscription,
+        externalReference: payment?.externalReference,
+        paymentStatus: payment?.status,
+        payload: req.body,
+        processed: false,
+        error: null,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    console.log(`[Webhook] Log criado: ${logRef.id}`);
+
     // O externalReference é o ID do agendamento que enviamos ao criar a cobrança
     const agendamentoId = payment.externalReference;
 
     console.log(`[Webhook] Evento: ${event} para o Agendamento: ${agendamentoId}`);
 
     if (!agendamentoId) {
+        // Atualizar log como processado mesmo sem externalReference
+        await logRef.update({ processed: true, error: 'Sem externalReference' });
         return res.status(200).send('Webhook recebido sem externalReference.');
     }
 
@@ -417,6 +433,13 @@ module.exports = async (req, res) => {
                 break;
         }
 
+        // ✅ Atualizar log como processado com sucesso
+        await logRef.update({
+            processed: true,
+            processedAt: admin.firestore.FieldValue.serverTimestamp(),
+            error: null
+        });
+
         console.log('[Webhook] Evento processado com sucesso');
         return res.status(200).json({ success: true });
 
@@ -427,6 +450,14 @@ module.exports = async (req, res) => {
             errorMessage: error.message,
             stack: error.stack,
         });
+
+        // ❌ Atualizar log com erro
+        await logRef.update({
+            processed: true,
+            processedAt: admin.firestore.FieldValue.serverTimestamp(),
+            error: error.message
+        });
+
         return res.status(500).json({ error: 'Erro interno no servidor' });
     }
 };

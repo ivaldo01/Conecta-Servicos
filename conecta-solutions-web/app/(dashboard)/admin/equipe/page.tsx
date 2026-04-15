@@ -57,10 +57,16 @@ export default function EquipeAdminPage() {
 
   useEffect(() => {
     const q = query(collection(db, 'equipeAdmin'), where('status', '!=', 'removido'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as MembroEquipe[];
-      setMembros(data);
-    });
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as MembroEquipe[];
+        setMembros(data);
+      },
+      (error) => {
+        console.error('[Equipe] Erro ao carregar membros:', error);
+        alert('Erro de permissão ao carregar equipe. Verifique se você é admin.');
+      }
+    );
     return () => unsubscribe();
   }, []);
 

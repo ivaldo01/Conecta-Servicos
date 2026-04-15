@@ -28,6 +28,7 @@ import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { auth, db } from '../../services/firebaseConfig';
+import { onSnapshot } from 'firebase/firestore';
 import colors from '../../constants/colors';
 import { temAnuncios, getMaxFuncionarios } from '../../constants/plans';
 import { getHojeStr as getHojeFiltroStr, isAtendendoAgora } from '../../utils/agendamentoUtils';
@@ -183,13 +184,13 @@ export default function HomeProfissional({ navigation }) {
         agendamentos.filter(a => a.status === 'concluido').length
         , [agendamentos]);
 
-    const agendamentosHoje = useMemo(() => 
+    const agendamentosHoje = useMemo(() =>
         agendamentos.filter(a => a.dataFiltro === hojeFiltro)
-    , [agendamentos, hojeFiltro]);
+        , [agendamentos, hojeFiltro]);
 
-    const faturamentoTotal = useMemo(() => 
+    const faturamentoTotal = useMemo(() =>
         getResumoFinanceiro(agendamentos)
-    , [agendamentos]);
+        , [agendamentos]);
 
     useEffect(() => {
         const user = auth.currentUser;
@@ -256,6 +257,7 @@ export default function HomeProfissional({ navigation }) {
         const user = auth.currentUser;
         let unsubAgendamentos = null;
         let unsubAgenda = null;
+        let unsubUsuario = null; // 🔄 Listener para planoAtivo em tempo real
 
         if (user?.uid) {
             const q = query(
@@ -301,6 +303,15 @@ export default function HomeProfissional({ navigation }) {
                     setConfigAgenda(snap.data());
                 }
             });
+
+            // LISTENER TEMPO REAL: Sincroniza planoAtivo (Web/Backend → Mobile)
+            unsubUsuario = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+                if (snap.exists()) {
+                    setUsuario(prev => ({ ...prev, ...snap.data() }));
+                }
+            }, (error) => {
+                console.log('[HomeProfissional] Erro no listener usuario:', error.message);
+            });
         } else {
             setLoading(false);
         }
@@ -309,6 +320,7 @@ export default function HomeProfissional({ navigation }) {
             ativo = false;
             if (unsubAgenda) unsubAgenda();
             if (unsubAgendamentos) unsubAgendamentos();
+            if (unsubUsuario) unsubUsuario(); // Cleanup
         };
 
     }, []);

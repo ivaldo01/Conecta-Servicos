@@ -28,6 +28,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import { getPrioridadeBusca, getPlanoProfissional, temSeloVerificado } from "../../constants/plans";
+import BannerAd from "../../components/ads/BannerAd";
 
 // --- Funções Auxiliares ---
 function parseCoord(valor) {
@@ -141,10 +142,10 @@ export default function BuscaProfissionais({ navigation, route }) {
         try {
           const userSnap = await getDoc(doc(db, "usuarios", user.uid));
           if (userSnap.exists()) {
-             const ud = userSnap.data();
-             cidadeCliente = ud?.localizacao?.cidade || ud?.cidade || '';
+            const ud = userSnap.data();
+            cidadeCliente = ud?.localizacao?.cidade || ud?.cidade || '';
           }
-        } catch(err) {}
+        } catch (err) { }
       }
       setFavoritosMap(favoritosObj);
 
@@ -330,6 +331,12 @@ export default function BuscaProfissionais({ navigation, route }) {
             </View>
           </TouchableOpacity>
         )}
+
+        {/* Anúncio Patrocinado */}
+        <BannerAd
+          tipo="card"
+          style={{ marginBottom: 16 }}
+        />
 
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Resultados ({profissionaisFiltrados.length})</Text>

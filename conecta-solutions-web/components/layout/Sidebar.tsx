@@ -8,7 +8,8 @@ import {
   Activity, Calendar, Settings, Users, Wallet,
   Star, User, MessageCircle, Search, FileText,
   Heart, ChevronRight, LogOut, Crown,
-  Shield, Bell
+  Shield, Bell, Radio, Stethoscope,
+  Megaphone, Building2, Mail
 } from 'lucide-react';
 import '@/styles/sidebar.css';
 
@@ -46,6 +47,8 @@ const navAdmin: NavItem[] = [
   { label: 'Verificações',    href: '/admin/verificacoes',icon: <Shield size={18} /> },
   { label: 'Suporte Master',  href: '/admin/suporte',     icon: <MessageCircle size={18} /> },
   { label: 'Faturamento',     href: '/admin/financeiro',  icon: <Activity size={18} /> },
+  { label: 'Monitor',         href: '/admin/monitor',     icon: <Radio size={18} /> },
+  { label: 'Diagnóstico',     href: '/admin/diagnostico', icon: <Stethoscope size={18} /> },
   { label: 'Campanhas',       href: '/admin/campanhas',   icon: <Bell size={18} /> },
   { label: 'Equipe Adm',      href: '/admin/equipe',      icon: <Users size={18} /> },
   { label: 'Configurações',   href: '/admin/ajustes',     icon: <Settings size={18} /> },
@@ -135,16 +138,50 @@ export default function Sidebar() {
 
         {navItems.map((item) => {
           const isActive = pathname === item.href || (pathname && pathname.startsWith(item.href + '/'));
+          const isCampanhas = item.href === '/admin/campanhas';
+          const isCampanhasSection = pathname?.startsWith('/admin/campanhas');
+          
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item--active' : ''}`}
-            >
-              <span className="sidebar-nav-item-icon">{item.icon}</span>
-              <span className="sidebar-nav-item-label">{item.label}</span>
-              {isActive && <ChevronRight size={14} className="sidebar-nav-item-arrow" />}
-            </Link>
+            <React.Fragment key={item.href}>
+              <Link
+                href={item.href}
+                className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item--active' : ''}`}
+              >
+                <span className="sidebar-nav-item-icon">{item.icon}</span>
+                <span className="sidebar-nav-item-label">{item.label}</span>
+                {isActive && <ChevronRight size={14} className="sidebar-nav-item-arrow" />}
+              </Link>
+              
+              {/* Submenu Campanhas */}
+              {isCampanhas && isCampanhasSection && (
+                <>
+                  <Link
+                    href="/admin/campanhas/anuncios"
+                    className={`sidebar-nav-item sidebar-nav-subitem ${pathname?.startsWith('/admin/campanhas/anuncios') ? 'sidebar-nav-item--active' : ''}`}
+                    style={{ paddingLeft: 40 }}
+                  >
+                    <span className="sidebar-nav-item-icon"><Megaphone size={16} /></span>
+                    <span className="sidebar-nav-item-label">Anúncios</span>
+                  </Link>
+                  <Link
+                    href="/admin/campanhas/anunciantes"
+                    className={`sidebar-nav-item sidebar-nav-subitem ${pathname?.startsWith('/admin/campanhas/anunciantes') ? 'sidebar-nav-item--active' : ''}`}
+                    style={{ paddingLeft: 40 }}
+                  >
+                    <span className="sidebar-nav-item-icon"><Building2 size={16} /></span>
+                    <span className="sidebar-nav-item-label">Anunciantes</span>
+                  </Link>
+                  <Link
+                    href="/admin/campanhas/email"
+                    className={`sidebar-nav-item sidebar-nav-subitem ${pathname?.startsWith('/admin/campanhas/email') ? 'sidebar-nav-item--active' : ''}`}
+                    style={{ paddingLeft: 40 }}
+                  >
+                    <span className="sidebar-nav-item-icon"><Mail size={16} /></span>
+                    <span className="sidebar-nav-item-label">Email</span>
+                  </Link>
+                </>
+              )}
+            </React.Fragment>
           );
         })}
       </nav>

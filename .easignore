@@ -4,6 +4,13 @@ node_modules/
 dist/
 web-build/
 expo-env.d
+
+# --- PROJETO WEB (não necessário para build mobile) ---
+conecta-solutions-web/
+.next/
+
+# --- BACKEND (não necessário para build mobile) ---
+backend_vercel/
 # --- FIREBASE & SEGURANÇA (Importante) ---
 # O arquivo abaixo contém chaves privadas do seu projeto
 .eas/

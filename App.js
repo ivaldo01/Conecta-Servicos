@@ -54,6 +54,8 @@ import NotificacoesScreen from './src/screens/comum/NotificacoesScreen';
 
 import PremiumScreen from './src/screens/comum/PremiumScreen';
 
+import MinhasAssinaturasScreen from './src/screens/comum/MinhasAssinaturasScreen';
+
 
 
 import BuscaProfissionais from './src/screens/cliente/BuscaProfissionais';
@@ -994,6 +996,8 @@ function AppNavigator() {
             <Stack.Screen name="Perfil" component={PerfilScreen} />
 
             <Stack.Screen name="Premium" component={PremiumScreen} />
+
+            <Stack.Screen name="MinhasAssinaturas" component={MinhasAssinaturasScreen} />
 
             <Stack.Screen name="BuscaProfissionais" component={BuscaProfissionais} />
 

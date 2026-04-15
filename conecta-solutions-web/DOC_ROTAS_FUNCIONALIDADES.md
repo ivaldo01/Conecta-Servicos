@@ -1,4 +1,4 @@
-# 📋 Dossiê de Rotas & Funcionalidades - Conecta Solutions
+ # 📋 Dossiê de Rotas & Funcionalidades - Conecta Solutions
 
 ## 🎖️ QUARTEL GENERAL (Painel Administrativo)
 Acesso exclusivo para **Comandante Ivaldo** - controle total da plataforma.

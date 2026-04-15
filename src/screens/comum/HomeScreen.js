@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
+import BannerAd from '../../components/ads/BannerAd';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { Ionicons } from '@expo/vector-icons';
 import NetInfo from "@react-native-community/netinfo";
@@ -405,21 +406,21 @@ export default function HomeScreen({ navigation }) {
     const unsubscribeAgenda = onSnapshot(
       query(collection(db, 'agendamentos'), where('clienteId', '==', user.uid)),
       (snapshot) => {
-         const agendamentosValidos = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(a => String(a.status).toLowerCase() === 'agendado');
+        const agendamentosValidos = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(a => String(a.status).toLowerCase() === 'agendado');
 
-         const agora = new Date();
-         const agendamentosOrdenados = agendamentosValidos.map(a => {
-            const dataBase = typeof a.dataAgendamento?.toDate === 'function' ? a.dataAgendamento.toDate() : new Date(a.dataAgendamento);
-            if (a.horaInicio) {
-              const [h, m] = a.horaInicio.split(':');
-              dataBase.setHours(parseInt(h), parseInt(m), 0, 0);
-            }
-            return { ...a, _dataFechada: dataBase };
-         }).filter(a => a._dataFechada >= agora).sort((a,b) => a._dataFechada - b._dataFechada);
+        const agora = new Date();
+        const agendamentosOrdenados = agendamentosValidos.map(a => {
+          const dataBase = typeof a.dataAgendamento?.toDate === 'function' ? a.dataAgendamento.toDate() : new Date(a.dataAgendamento);
+          if (a.horaInicio) {
+            const [h, m] = a.horaInicio.split(':');
+            dataBase.setHours(parseInt(h), parseInt(m), 0, 0);
+          }
+          return { ...a, _dataFechada: dataBase };
+        }).filter(a => a._dataFechada >= agora).sort((a, b) => a._dataFechada - b._dataFechada);
 
-         setProximoAgendamento(agendamentosOrdenados.length > 0 ? agendamentosOrdenados[0] : null);
+        setProximoAgendamento(agendamentosOrdenados.length > 0 ? agendamentosOrdenados[0] : null);
       },
       (error) => console.log('Erro ao buscar agendamentos HomeScreen:', error)
     );
@@ -770,53 +771,53 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {proximoAgendamento && (
-           <TouchableOpacity 
-             activeOpacity={0.9}
-             style={{ backgroundColor: '#F59E0B', marginHorizontal: 16, marginTop: -10, marginBottom: 20, padding: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#F59E0B', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {height: 4}, elevation: 5 }}
-             onPress={() => navigation.navigate('MeusAgendamentosCliente')}
-           >
-              <View style={{ backgroundColor: '#FFF', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-                 <Ionicons name="time" size={24} color="#F59E0B" />
-              </View>
-              <View style={{ flex: 1 }}>
-                 <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13, textTransform: 'uppercase' }}>Lembrete de Sessão</Text>
-                 <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600', marginTop: 2 }}>
-                    Amanhã / Hoje às {proximoAgendamento.horaInicio}
-                 </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFF" />
-           </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={{ backgroundColor: '#F59E0B', marginHorizontal: 16, marginTop: -10, marginBottom: 20, padding: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', shadowColor: '#F59E0B', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { height: 4 }, elevation: 5 }}
+            onPress={() => navigation.navigate('MeusAgendamentosCliente')}
+          >
+            <View style={{ backgroundColor: '#FFF', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+              <Ionicons name="time" size={24} color="#F59E0B" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 13, textTransform: 'uppercase' }}>Lembrete de Sessão</Text>
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '600', marginTop: 2 }}>
+                Amanhã / Hoje às {proximoAgendamento.horaInicio}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#FFF" />
+          </TouchableOpacity>
         )}
 
         {favoritosIds.length > 0 && profissionais.length > 0 && (
-           <View style={{ marginBottom: 24 }}>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginLeft: 18, marginBottom: 12 }}>
-                 Profissionais Favoritos
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                 {profissionais.filter(p => favoritosIds.includes(p.id)).slice(0, 8).map(prof => (
-                    <TouchableOpacity 
-                       key={prof.id} 
-                       activeOpacity={0.8}
-                       onPress={() => abrirPerfilProfissional(prof)}
-                       style={{ alignItems: 'center', marginRight: 16, width: 72 }}
-                    >
-                       <View style={{ width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: colors.primary, padding: 2, marginBottom: 6 }}>
-                          <View style={{ flex: 1, backgroundColor: '#E2E8F0', borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                             {(prof.fotoPerfil || prof.foto || prof.avatar || prof.fotoUrl || prof.imageUrl) ? (
-                                <Image source={{ uri: (prof.fotoPerfil || prof.foto || prof.avatar || prof.fotoUrl || prof.imageUrl) }} style={{ width: '100%', height: '100%' }} />
-                             ) : (
-                                <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#64748B' }}>{prof.nome?.charAt(0).toUpperCase()}</Text>
-                             )}
-                          </View>
-                       </View>
-                       <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', textAlign: 'center' }} numberOfLines={1}>
-                          {prof.nome?.split(' ')[0]}
-                       </Text>
-                    </TouchableOpacity>
-                 ))}
-              </ScrollView>
-           </View>
+          <View style={{ marginBottom: 24 }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', marginLeft: 18, marginBottom: 12 }}>
+              Profissionais Favoritos
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+              {profissionais.filter(p => favoritosIds.includes(p.id)).slice(0, 8).map(prof => (
+                <TouchableOpacity
+                  key={prof.id}
+                  activeOpacity={0.8}
+                  onPress={() => abrirPerfilProfissional(prof)}
+                  style={{ alignItems: 'center', marginRight: 16, width: 72 }}
+                >
+                  <View style={{ width: 68, height: 68, borderRadius: 34, borderWidth: 2, borderColor: colors.primary, padding: 2, marginBottom: 6 }}>
+                    <View style={{ flex: 1, backgroundColor: '#E2E8F0', borderRadius: 32, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                      {(prof.fotoPerfil || prof.foto || prof.avatar || prof.fotoUrl || prof.imageUrl) ? (
+                        <Image source={{ uri: (prof.fotoPerfil || prof.foto || prof.avatar || prof.fotoUrl || prof.imageUrl) }} style={{ width: '100%', height: '100%' }} />
+                      ) : (
+                        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#64748B' }}>{prof.nome?.charAt(0).toUpperCase()}</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', textAlign: 'center' }} numberOfLines={1}>
+                    {prof.nome?.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         )}
 
         <ScrollView
@@ -880,6 +881,12 @@ export default function HomeScreen({ navigation }) {
 
         <AdBanner enabled={temAnuncios(usuario?.planoAtivo)} />
 
+        {/* Anúncios Patrocinados */}
+        <BannerAd
+          tipo="banner_superior"
+          style={{ marginHorizontal: 0 }}
+        />
+
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionEyebrow}>Explorar</Text>
@@ -926,9 +933,9 @@ export default function HomeScreen({ navigation }) {
             </View>
           )}
         </View>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.featuresScrollContainer}
         >
           <TouchableOpacity

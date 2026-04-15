@@ -27,7 +27,9 @@ import {
   User,
   Briefcase,
   ChevronLeft,
-  RefreshCw
+  RefreshCw,
+  Image as ImageIcon,
+  FileText
 } from 'lucide-react';
 import '@/styles/admin-suporte.css';
 
@@ -70,14 +72,21 @@ export default function SuporteMasterPage() {
       orderBy('dataUltimaMensagem', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const chatsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Chat[];
-      setChats(chatsData);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const chatsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Chat[];
+        setChats(chatsData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('[Suporte] Erro ao carregar chats:', error);
+        alert('Erro de permissão ao carregar tickets de suporte. Verifique se você é admin.');
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
@@ -191,7 +200,7 @@ export default function SuporteMasterPage() {
       {/* Layout Principal */}
       <div className="suporte-layout">
         {/* Sidebar - Lista de Chats */}
-        <div className={`suporte-sidebar ${chatSelecionado ? 'mobile-hidden' : ''}`}>
+        <div className={`suporte-sidebar ${chatSelecionado ? 'sidebar-hidden' : ''}`}>
           {/* Filtros */}
           <div className="suporte-filtros">
             <div className="search-box">
@@ -221,7 +230,10 @@ export default function SuporteMasterPage() {
             {chatsFiltrados.length === 0 ? (
               <div className="empty-state">
                 <MessageCircle size={48} />
-                <p>Nenhum ticket encontrado</p>
+                <p>{busca ? 'Nenhum ticket encontrado para esta busca' : 'Nenhum ticket no momento'}</p>
+                <small style={{ color: '#64748B', marginTop: 8, display: 'block' }}>
+                  {busca ? 'Tente outro termo de busca' : 'Os tickets aparecerão aqui quando usuários iniciarem conversas'}
+                </small>
               </div>
             ) : (
               chatsFiltrados.map((chat) => (
@@ -268,7 +280,7 @@ export default function SuporteMasterPage() {
 
         {/* Área de Chat */}
         {chatSelecionado ? (
-          <div className="chat-area">
+          <div className={`chat-area ${chatSelecionado ? 'chat-open' : ''}`}>
             {/* Header do Chat */}
             <div className="chat-header-bar">
               <button className="btn-voltar" onClick={() => setChatSelecionado(null)}>
@@ -320,7 +332,22 @@ export default function SuporteMasterPage() {
                     className={`message ${msg.senderType === 'admin' ? 'sent' : 'received'}`}
                   >
                     <div className="message-bubble">
-                      <p>{msg.texto}</p>
+                      {msg.anexo && (
+                        <div className="message-attachment">
+                          {msg.anexo.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                            <>
+                              <ImageIcon size={16} />
+                              <span>Imagem anexada</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileText size={16} />
+                              <span>Arquivo anexado</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {msg.texto && <p>{msg.texto}</p>}
                       <span className="message-time">
                         {msg.createdAt?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
@@ -333,16 +360,28 @@ export default function SuporteMasterPage() {
 
             {/* Input de Mensagem */}
             <form className="message-input-bar" onSubmit={enviarMensagem}>
-              <button type="button" className="btn-anexo">
+              <button type="button" className="btn-anexo" title="Anexar arquivo">
                 <Paperclip size={20} />
               </button>
               <input
                 type="text"
-                placeholder="Digite sua mensagem..."
+                placeholder="Digite sua mensagem e pressione Enter..."
                 value={novaMensagem}
                 onChange={(e) => setNovaMensagem(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && novaMensagem.trim()) {
+                    e.preventDefault();
+                    enviarMensagem(e);
+                  }
+                }}
+                autoFocus
               />
-              <button type="submit" className="btn-enviar" disabled={!novaMensagem.trim()}>
+              <button 
+                type="submit" 
+                className="btn-enviar" 
+                disabled={!novaMensagem.trim()}
+                title="Enviar mensagem"
+              >
                 <Send size={20} />
               </button>
             </form>

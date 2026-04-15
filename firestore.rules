@@ -16,8 +16,10 @@ service cloud.firestore {
     }
 
     function ehAdmin() {
-      return estaLogado() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true;
+      return estaLogado() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && (
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true ||
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin' ||
+             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tipo == 'admin');
     }
 
     function participaDoDocumentoFinanceiro(data) {
@@ -217,6 +219,97 @@ service cloud.firestore {
       // Edição e exclusão: só o profissional dono do colaborador
       allow update, delete: if estaLogado()
         && resource.data.profissionalId == uidAtual();
+    }
+
+    // ✅ ASSINATURAS — Coleção para assinaturas VIP (backend Asaas)
+    match /assinaturas/{assinaturaId} {
+      // Leitura: usuário vê suas próprias assinaturas OU admin vê todas
+      allow read: if estaLogado() && (
+        resource.data.userId == uidAtual() || ehAdmin()
+      );
+      // Criação/Update: só backend (webhook) ou admin
+      allow create, update: if estaLogado() && (
+        request.resource.data.userId == uidAtual() || ehAdmin()
+      );
+      allow delete: if ehAdmin();
+    }
+
+    // ✅ WEBHOOK LOGS — Logs de comunicação com Asaas (debug/monitoramento)
+    match /webhookLogs/{logId} {
+      // Leitura: apenas admin pode ver logs de webhooks
+      allow read: if ehAdmin();
+      // Criação: backend pode criar logs
+      allow create: if estaLogado();
+      allow update, delete: if ehAdmin();
+    }
+
+    // ✅ ACTIVITY LOGS — Logs de atividades dos usuários (monitoramento em tempo real)
+    match /activityLogs/{logId} {
+      // Leitura: admin pode ler TUDO; usuário comum pode ler apenas SEUS logs
+      allow read: if ehAdmin() || (estaLogado() && resource.data.userId == uidAtual());
+      // Criação: qualquer usuário logado pode criar log (o app garante que é do próprio user)
+      allow create: if estaLogado();
+      // Update/Delete: apenas admin
+      allow update, delete: if ehAdmin();
+    }
+
+    // ✅ CAMPANHAS — Campanhas de marketing (apenas admin)
+    match /campanhas/{campanhaId} {
+      allow read: if ehAdmin();
+      allow create: if ehAdmin();
+      allow update: if ehAdmin();
+      allow delete: if ehAdmin();
+    }
+
+    // ✅ EQUIPE ADMIN — Gestão de equipe administrativa (apenas admin)
+    match /equipeAdmin/{membroId} {
+      allow read: if ehAdmin();
+      allow create: if ehAdmin();
+      allow update: if ehAdmin();
+      allow delete: if ehAdmin();
+    }
+
+    // ✅ ANUNCIOS — Sistema de anúncios patrocinados
+    match /anuncios/{anuncioId} {
+      // Admin gerencia tudo
+      allow read: if ehAdmin() || (
+        estaLogado() && 
+        resource.data.status == 'ativo' && 
+        resource.data.dataInicio <= request.time &&
+        resource.data.dataFim >= request.time
+      );
+      allow create: if ehAdmin();
+      allow update: if ehAdmin() || (
+        estaLogado() && 
+        resource.data.anuncianteId == uidAtual()
+      );
+      allow delete: if ehAdmin();
+    }
+
+    // ✅ ANUNCIANTES — Empresas anunciantes
+    match /anunciantes/{anuncianteId} {
+      allow read: if ehAdmin() || (
+        estaLogado() && anuncianteId == uidAtual()
+      );
+      allow create: if estaLogado(); // Qualquer um pode se cadastrar
+      allow update: if ehAdmin() || (
+        estaLogado() && anuncianteId == uidAtual()
+      );
+      allow delete: if ehAdmin();
+    }
+
+    // ✅ IMPRESSOES ANUNCIOS — Tracking (qualquer usuário logado pode registrar)
+    match /impressoesAnuncios/{impressaoId} {
+      allow read: if ehAdmin();
+      allow create: if estaLogado();
+      allow update, delete: if false;
+    }
+
+    // ✅ CLIQUES ANUNCIOS — Tracking (qualquer usuário logado pode registrar)
+    match /cliquesAnuncios/{cliqueId} {
+      allow read: if ehAdmin();
+      allow create: if estaLogado();
+      allow update, delete: if false;
     }
 
     match /{document=**} {

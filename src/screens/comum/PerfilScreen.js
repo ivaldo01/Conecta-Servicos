@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from "../../services/firebaseConfig";
-import { doc, getDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, Timestamp, onSnapshot } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
 import colors from "../../constants/colors";
 import {
@@ -162,6 +162,26 @@ export default function PerfilScreen({ navigation }) {
     };
 
     fetchPerfil();
+
+    // LISTENER TEMPO REAL: Sincroniza mudanças de plano (Web/Backend → Mobile)
+    const unsubPlano = onSnapshot(doc(db, "usuarios", auth.currentUser.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const dados = docSnap.data();
+        // Atualiza plano e selo em tempo real
+        const planoId = dados?.planoAtivo || 'pro_iniciante';
+        const temSeloPlano = temSeloVerificado(planoId);
+        setTemSelo(temSeloPlano);
+        // Atualiza perfil também para manter sincronizado
+        setPerfil(prev => ({ ...prev, ...dados }));
+      }
+    }, (error) => {
+      console.log('[PerfilScreen] Erro no listener (não crítico):', error.message);
+      // Não quebra nada - getDoc já carregou os dados
+    });
+
+    return () => {
+      unsubPlano(); // Cleanup ao sair da tela
+    };
   }, []);
 
   const fotoPerfilUrl = useMemo(() => {
@@ -806,6 +826,20 @@ export default function PerfilScreen({ navigation }) {
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuText}>Conecta Solutions VIP</Text>
             <Text style={styles.menuSubText}>Ver planos e assinatura</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color="#CCC" />
+        </TouchableOpacity>
+
+        {/* MINHAS ASSINATURAS - Histórico de pagamentos e planos */}
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('MinhasAssinaturas')}>
+          <View style={[styles.iconBox, { backgroundColor: '#F3E5F5' }]}>
+            <Ionicons name="receipt-outline" size={22} color="#8E24AA" />
+          </View>
+
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuText}>Minhas Assinaturas</Text>
+            <Text style={styles.menuSubText}>Histórico de pagamentos e planos</Text>
           </View>
 
           <Ionicons name="chevron-forward" size={20} color="#CCC" />
