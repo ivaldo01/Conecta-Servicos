@@ -3,12 +3,12 @@
 // Busca anúncios ativos do Firestore e registra métricas
 // ============================================================
 
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  addDoc, 
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
   serverTimestamp,
   limit,
   orderBy,
@@ -28,8 +28,12 @@ const CLIQUES_COLLECTION = 'cliquesAnuncios';
 // ============================================================
 export async function getAnunciosAtivos(tipo = 'banner_superior', contexto = {}) {
   try {
+    console.log('🔍 [anuncioService] Buscando anúncios tipo:', tipo);
+    console.log('🔍 [anuncioService] Contexto:', contexto);
+
     const agora = Timestamp.now();
-    
+    console.log('🔍 [anuncioService] Timestamp atual:', agora.toDate());
+
     // Query base: anúncios ativos do tipo especificado
     let q = query(
       collection(db, ANUNCIOS_COLLECTION),
@@ -40,53 +44,96 @@ export async function getAnunciosAtivos(tipo = 'banner_superior', contexto = {})
       orderBy('prioridade', 'desc'),
       limit(20)
     );
-    
-    const snapshot = await getDocs(q);
+
+    let snapshot;
+    try {
+      snapshot = await getDocs(q);
+      console.log('🔍 [anuncioService] Total encontrado no Firestore:', snapshot.size);
+
+      // Se não encontrou nada, tentar sem filtros de data
+      if (snapshot.size === 0) {
+        console.log('🔍 [anuncioService] 0 resultados com datas, tentando sem datas...');
+        const qSimples = query(
+          collection(db, ANUNCIOS_COLLECTION),
+          where('status', '==', 'ativo'),
+          where('tipo', '==', tipo),
+          limit(20)
+        );
+        snapshot = await getDocs(qSimples);
+        console.log('🔍 [anuncioService] Total sem filtros de data:', snapshot.size);
+      }
+    } catch (queryError) {
+      console.error('🔍 [anuncioService] ❌ Erro na query:', queryError.message);
+      console.error('🔍 [anuncioService] Código:', queryError.code);
+
+      // Fallback: query simples sem datas
+      console.log('🔍 [anuncioService] Tentando query simplificada (erro)...');
+      const qSimples = query(
+        collection(db, ANUNCIOS_COLLECTION),
+        where('status', '==', 'ativo'),
+        where('tipo', '==', tipo),
+        limit(20)
+      );
+      snapshot = await getDocs(qSimples);
+      console.log('🔍 [anuncioService] Total com query simples:', snapshot.size);
+    }
+
     let anuncios = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
+
+    console.log('🔍 [anuncioService] Anúncios antes da segmentação:', anuncios.length);
+    if (anuncios.length > 0) {
+      console.log('🔍 [anuncioService] Primeiro anúncio:', anuncios[0].titulo, '| Status:', anuncios[0].status, '| Tipo:', anuncios[0].tipo);
+    }
+    if (anuncios.length > 0) {
+      console.log('🔍 [anuncioService] Primeiro anúncio:', anuncios[0].titulo, '| Seg:', anuncios[0].segmentacao);
+    }
+
     // Filtrar por segmentação do usuário
     if (contexto && anuncios.length > 0) {
       anuncios = anuncios.filter(anuncio => {
         const seg = anuncio.segmentacao || {};
-        
+
         // Se for segmentação "todos", permite
         if (seg.todos) return true;
-        
+
         // Verificar perfil do usuário
         if (contexto.perfil && seg.perfis && seg.perfis.length > 0) {
           if (!seg.perfis.includes(contexto.perfil)) return false;
         }
-        
+
         // Verificar cidade
         if (contexto.cidade && seg.cidades && seg.cidades.length > 0) {
           if (!seg.cidades.includes(contexto.cidade)) return false;
         }
-        
+
         // Verificar categoria
         if (contexto.categoria && seg.categorias && seg.categorias.length > 0) {
           if (!seg.categorias.includes(contexto.categoria)) return false;
         }
-        
+
         // Verificar dispositivo
         if (contexto.device && seg.dispositivos && seg.dispositivos.length > 0) {
           if (!seg.dispositivos.includes(contexto.device)) return false;
         }
-        
+
         // Verificar plano
         if (contexto.plano && seg.planos && seg.planos.length > 0) {
           if (!seg.planos.includes(contexto.plano)) return false;
         }
-        
+
         return true;
       });
+      console.log('🔍 [anuncioService] Após segmentação:', anuncios.length);
     }
-    
+
     // Ordenar por relevância/prioridade aleatória
-    return anuncios.sort(() => Math.random() - 0.5);
-    
+    const resultado = anuncios.sort(() => Math.random() - 0.5);
+    console.log('🔍 [anuncioService] Retornando:', resultado.length, 'anúncios');
+    return resultado;
+
   } catch (error) {
     console.error('[AnuncioService] Erro ao buscar anúncios:', error);
     return [];
@@ -108,26 +155,13 @@ export async function registrarImpressao(anuncioId, anuncianteId, dados = {}) {
       timestamp: serverTimestamp(),
       createdAt: serverTimestamp()
     };
-    
-    // Registrar impressão
+
+    // Registrar impressão (apenas criar documento, sem atualizar métricas)
     await addDoc(collection(db, IMPRESSOES_COLLECTION), impressao);
-    
-    // Atualizar métricas do anúncio
-    await updateDoc(doc(db, ANUNCIOS_COLLECTION, anuncioId), {
-      'metricas.impressoes': increment(1),
-      updatedAt: serverTimestamp()
-    });
-    
-    // Atualizar métricas do anunciante
-    if (anuncianteId) {
-      await updateDoc(doc(db, 'anunciantes', anuncianteId), {
-        'metricas.impressoes': increment(1),
-        updatedAt: serverTimestamp()
-      });
-    }
-    
+    console.log('✅ Impressão registrada para anúncio:', anuncioId);
+
     return { success: true };
-    
+
   } catch (error) {
     console.error('[AnuncioService] Erro ao registrar impressão:', error);
     return { success: false, error: error.message };
@@ -150,26 +184,13 @@ export async function registrarClique(anuncioId, anuncianteId, dados = {}) {
       timestamp: serverTimestamp(),
       createdAt: serverTimestamp()
     };
-    
-    // Registrar clique
+
+    // Registrar clique (apenas criar documento, sem atualizar métricas)
     await addDoc(collection(db, CLIQUES_COLLECTION), clique);
-    
-    // Atualizar métricas do anúncio
-    await updateDoc(doc(db, ANUNCIOS_COLLECTION, anuncioId), {
-      'metricas.cliques': increment(1),
-      updatedAt: serverTimestamp()
-    });
-    
-    // Atualizar métricas do anunciante
-    if (anuncianteId) {
-      await updateDoc(doc(db, 'anunciantes', anuncianteId), {
-        'metricas.cliques': increment(1),
-        updatedAt: serverTimestamp()
-      });
-    }
-    
+    console.log('✅ Clique registrado para anúncio:', anuncioId);
+
     return { success: true };
-    
+
   } catch (error) {
     console.error('[AnuncioService] Erro ao registrar clique:', error);
     return { success: false, error: error.message };
@@ -181,15 +202,25 @@ export async function registrarClique(anuncioId, anuncianteId, dados = {}) {
 // ============================================================
 export async function getAnuncioRandom(tipo = 'banner_superior', contexto = {}) {
   try {
+    console.log('🎯 [getAnuncioRandom] Iniciando busca tipo:', tipo);
     const anuncios = await getAnunciosAtivos(tipo, contexto);
-    
-    if (anuncios.length === 0) return null;
-    
-    // Retorna um aleatório
-    return anuncios[Math.floor(Math.random() * anuncios.length)];
-    
+
+    if (anuncios.length === 0) {
+      console.log('🎯 [getAnuncioRandom] ❌ Nenhum anúncio disponível');
+      return null;
+    }
+
+    // Selecionar um aleatório
+    const anuncio = anuncios[Math.floor(Math.random() * anuncios.length)];
+    console.log('🎯 [getAnuncioRandom] ✅ Anúncio selecionado:', anuncio.titulo, '| ID:', anuncio.id);
+
+    return {
+      ...anuncio,
+      id: anuncio.id
+    };
+
   } catch (error) {
-    console.error('[AnuncioService] Erro ao buscar anúncio:', error);
+    console.error('🎯 [getAnuncioRandom] ❌ Erro:', error);
     return null;
   }
 }
@@ -199,7 +230,7 @@ export async function getAnuncioRandom(tipo = 'banner_superior', contexto = {}) 
 // ============================================================
 export function getContextoUsuario(usuario) {
   if (!usuario) return { device: 'mobile' };
-  
+
   return {
     perfil: usuario.tipo || usuario.perfil || 'cliente',
     cidade: usuario.cidade || usuario.endereco?.cidade || null,
@@ -215,11 +246,11 @@ export function getContextoUsuario(usuario) {
 // ============================================================
 export async function foiVistoHoje(anuncioId, userId) {
   if (!userId) return false;
-  
+
   try {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    
+
     const q = query(
       collection(db, IMPRESSOES_COLLECTION),
       where('anuncioId', '==', anuncioId),
@@ -227,10 +258,10 @@ export async function foiVistoHoje(anuncioId, userId) {
       where('timestamp', '>=', Timestamp.fromDate(hoje)),
       limit(1)
     );
-    
+
     const snap = await getDocs(q);
     return !snap.empty;
-    
+
   } catch (error) {
     console.error('[AnuncioService] Erro ao verificar visualização:', error);
     return false;

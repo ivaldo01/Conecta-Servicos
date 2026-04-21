@@ -15,10 +15,12 @@ import {
   Dimensions,
   Animated
 } from 'react-native';
-import { useAuth } from '../../hooks/useAuth';
-import { 
-  getAnuncioRandom, 
-  registrarImpressao, 
+import { auth, db } from '../../services/firebaseConfig';
+import { getDoc, doc } from 'firebase/firestore';
+import { temAnuncios } from '../../constants/plans';
+import {
+  getAnuncioRandom,
+  registrarImpressao,
   registrarClique,
   getContextoUsuario,
   foiVistoHoje
@@ -36,48 +38,88 @@ const SIZES = {
   story: { width: 120, height: 200 }
 };
 
-export default function BannerAd({ 
-  tipo = 'banner_superior', 
+export default function BannerAd({
+  tipo = 'banner_superior',
   style,
   onPress,
   allowRepeat = false, // Se false, não mostra o mesmo anúncio 2x no mesmo dia
   showBadge = true,
   fallback = null
 }) {
-  const { user } = useAuth();
+  const authUser = auth.currentUser;
+  const [userProfile, setUserProfile] = useState(null);
   const [anuncio, setAnuncio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [impressaoRegistrada, setImpressaoRegistrada] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Buscar anúncio ao montar
+  // Buscar perfil do usuário no Firestore
   useEffect(() => {
-    buscarAnuncio();
-  }, [tipo, user]);
+    const fetchUserProfile = async () => {
+      if (!authUser?.uid) {
+        console.log('🎨 [BannerAd] ❌ Usuário não autenticado');
+        return;
+      }
+
+      try {
+        console.log('🎨 [BannerAd] Buscando perfil no Firestore...');
+        const userDoc = await getDoc(doc(db, 'usuarios', authUser.uid));
+        console.log('🎨 [BannerAd] Documento existe?', userDoc.exists());
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          console.log('🎨 [BannerAd] Dados brutos do Firestore:', JSON.stringify(data, null, 2));
+          const profile = { uid: authUser.uid, ...data };
+          setUserProfile(profile);
+          console.log('🎨 [BannerAd] Perfil carregado - planoAtivo:', profile.planoAtivo);
+        } else {
+          console.log('🎨 [BannerAd] ❌ Perfil não encontrado no Firestore');
+        }
+      } catch (err) {
+        console.error('🎨 [BannerAd] Erro ao carregar perfil:', err);
+      }
+    };
+
+    fetchUserProfile();
+  }, [authUser?.uid]);
+
+  // Buscar anúncio ao montar (só se logado e não VIP)
+  useEffect(() => {
+    if (userProfile) {
+      console.log('🎨 [BannerAd] Componente montado - tipo:', tipo);
+      console.log('🎨 [BannerAd] Usuário:', userProfile.uid, '| Plano:', userProfile.planoAtivo);
+      buscarAnuncio();
+    }
+  }, [tipo, userProfile]);
 
   const buscarAnuncio = async () => {
     try {
+      console.log('🎨 [BannerAd] Iniciando busca de anúncio...');
       setLoading(true);
       setError(null);
-      
+
       // Contexto do usuário para segmentação
-      const contexto = getContextoUsuario(user);
-      
+      const contexto = getContextoUsuario(userProfile);
+      console.log('🎨 [BannerAd] Contexto:', contexto);
+
       // Buscar anúncio aleatório ativo
       let ad = await getAnuncioRandom(tipo, contexto);
-      
+      console.log('🎨 [BannerAd] Anúncio retornado:', ad ? ad.titulo : 'NULL');
+
       // Se não permitir repetição no mesmo dia, verificar
-      if (ad && !allowRepeat && user?.uid) {
-        const vistoHoje = await foiVistoHoje(ad.id, user.uid);
+      if (ad && !allowRepeat && userProfile?.uid) {
+        const vistoHoje = await foiVistoHoje(ad.id, userProfile.uid);
+        console.log('🎨 [BannerAd] Já visto hoje?', vistoHoje);
         if (vistoHoje) {
-          // Buscar outro
+          console.log('🎨 [BannerAd] Buscando outro anúncio (já visto hoje)...');
           ad = await getAnuncioRandom(tipo, contexto);
+          console.log('🎨 [BannerAd] Novo anúncio:', ad ? ad.titulo : 'NULL');
         }
       }
-      
+
       setAnuncio(ad);
-      
+      console.log('🎨 [BannerAd] Estado atualizado - anúncio:', ad ? 'OK' : 'NULL');
+
       // Animar entrada
       if (ad) {
         Animated.timing(fadeAnim, {
@@ -86,7 +128,7 @@ export default function BannerAd({
           useNativeDriver: true
         }).start();
       }
-      
+
     } catch (err) {
       console.error('[BannerAd] Erro:', err);
       setError(err.message);
@@ -97,37 +139,37 @@ export default function BannerAd({
 
   // Registrar impressão quando visível
   useEffect(() => {
-    if (anuncio && !impressaoRegistrada) {
+    if (anuncio && !impressaoRegistrada && userProfile?.uid) {
       registrarImpressao(anuncio.id, anuncio.anuncianteId, {
-        userId: user?.uid || null,
+        userId: userProfile.uid,
         device: 'mobile',
         pagina: 'home',
         custo: anuncio.modeloCobranca === 'cpm' ? (anuncio.valorCpm || 25) / 1000 : 0
       });
-      
+
       setImpressaoRegistrada(true);
     }
-  }, [anuncio, impressaoRegistrada, user]);
+  }, [anuncio, impressaoRegistrada, userProfile?.uid]);
 
   // Handler de clique
   const handlePress = useCallback(async () => {
-    if (!anuncio) return;
-    
+    if (!anuncio || !userProfile?.uid) return;
+
     try {
       // Registrar clique
       await registrarClique(anuncio.id, anuncio.anuncianteId, {
-        userId: user?.uid || null,
+        userId: userProfile.uid,
         device: 'mobile',
         pagina: 'home',
         custo: anuncio.modeloCobranca === 'cpc' ? (anuncio.valorCpc || 0.5) : 0,
         converteu: false
       });
-      
+
       // Callback opcional
       if (onPress) {
         onPress(anuncio);
       }
-      
+
       // Abrir link
       if (anuncio.ctaLink) {
         const supported = await Linking.canOpenURL(anuncio.ctaLink);
@@ -135,11 +177,25 @@ export default function BannerAd({
           await Linking.openURL(anuncio.ctaLink);
         }
       }
-      
+
     } catch (err) {
       console.error('[BannerAd] Erro ao registrar clique:', err);
     }
-  }, [anuncio, user, onPress]);
+  }, [anuncio, userProfile?.uid, onPress]);
+
+  // Verificar condições para mostrar anúncio
+  // Se planoAtivo for undefined/null, trata como pro_iniciante (gratuito)
+  const planoAtual = userProfile?.planoAtivo || 'pro_iniciante';
+  const deveMostrarAnuncios = temAnuncios(planoAtual);
+  const podeBuscar = authUser?.uid && userProfile && deveMostrarAnuncios;
+
+  console.log('🎨 [BannerAd] Verificação - Plano:', planoAtual, '| Deve mostrar:', deveMostrarAnuncios, '| Pode buscar:', podeBuscar);
+
+  // Se não pode buscar, retornar fallback ou null
+  if (!podeBuscar) {
+    console.log('🎨 [BannerAd] Não mostrando - VIP ou não logado');
+    return fallback || null;
+  }
 
   // Loading
   if (loading) {
@@ -159,22 +215,22 @@ export default function BannerAd({
   const imageUrl = anuncio.imagemMobileUrl || anuncio.imagemUrl;
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
-        styles.container, 
-        size, 
+        styles.container,
+        size,
         style,
         { opacity: fadeAnim }
       ]}
     >
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.9}
         style={styles.touchable}
       >
         {/* Imagem do anúncio */}
         {imageUrl ? (
-          <Image 
+          <Image
             source={{ uri: imageUrl }}
             style={[styles.image, size]}
             resizeMode="cover"
@@ -186,14 +242,14 @@ export default function BannerAd({
             </Text>
           </View>
         )}
-        
+
         {/* Badge "Ad" */}
         {showBadge && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>Ad</Text>
           </View>
         )}
-        
+
         {/* Título sobreposto (opcional) */}
         {tipo === 'card' && anuncio.titulo && (
           <View style={styles.overlay}>
@@ -213,11 +269,11 @@ export default function BannerAd({
 // Componente para Story Ads (estilo Instagram)
 export function StoryAd({ anuncios, onPress }) {
   const [atual, setAtual] = useState(0);
-  
+
   if (!anuncios || anuncios.length === 0) return null;
-  
+
   const anuncio = anuncios[atual];
-  
+
   return (
     <View style={styles.storyContainer}>
       <TouchableOpacity onPress={() => onPress?.(anuncio)}>
@@ -229,11 +285,11 @@ export function StoryAd({ anuncios, onPress }) {
           <Text style={styles.storyBadgeText}>Ad</Text>
         </View>
       </TouchableOpacity>
-      
+
       {/* Indicadores */}
       <View style={styles.indicators}>
         {anuncios.map((_, idx) => (
-          <View 
+          <View
             key={idx}
             style={[
               styles.indicator,
@@ -250,18 +306,18 @@ export function StoryAd({ anuncios, onPress }) {
 export function ModalAd({ visible, onClose, anuncio }) {
   const [countdown, setCountdown] = useState(5);
   const { user } = useAuth();
-  
+
   useEffect(() => {
     if (!visible || !anuncio) return;
-    
+
     // Registrar impressão
     registrarImpressao(anuncio.id, anuncio.anuncianteId, {
-      userId: user?.uid || null,
+      userId: userProfile?.uid || null,
       device: 'mobile',
       pagina: 'modal',
       custo: anuncio.modeloCobranca === 'cpm' ? (anuncio.valorCpm || 25) / 1000 : 0
     });
-    
+
     // Countdown para fechar
     const timer = setInterval(() => {
       setCountdown(prev => {
@@ -272,34 +328,34 @@ export function ModalAd({ visible, onClose, anuncio }) {
         return prev - 1;
       });
     }, 1000);
-    
+
     return () => clearInterval(timer);
-  }, [visible, anuncio, user]);
-  
+  }, [visible, anuncio, userProfile?.uid]);
+
   const handlePress = async () => {
-    if (!anuncio) return;
-    
+    if (!anuncio || !userProfile?.uid) return;
+
     await registrarClique(anuncio.id, anuncio.anuncianteId, {
-      userId: user?.uid || null,
+      userId: userProfile.uid,
       device: 'mobile',
       pagina: 'modal',
       custo: anuncio.modeloCobranca === 'cpc' ? (anuncio.valorCpc || 0.5) : 0,
       converteu: false
     });
-    
+
     if (anuncio.ctaLink) {
       Linking.openURL(anuncio.ctaLink);
     }
-    
+
     onClose?.();
   };
-  
+
   if (!visible || !anuncio) return null;
-  
+
   return (
     <View style={styles.modalOverlay}>
       <View style={styles.modalContent}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.closeButton, countdown > 0 && styles.closeButtonDisabled]}
           onPress={onClose}
           disabled={countdown > 0}
@@ -308,7 +364,7 @@ export function ModalAd({ visible, onClose, anuncio }) {
             {countdown > 0 ? `${countdown}s` : 'X'}
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity onPress={handlePress}>
           <Image
             source={{ uri: anuncio.imagemUrl }}
@@ -316,11 +372,11 @@ export function ModalAd({ visible, onClose, anuncio }) {
             resizeMode="contain"
           />
         </TouchableOpacity>
-        
+
         {anuncio.titulo && (
           <Text style={styles.modalTitle}>{anuncio.titulo}</Text>
         )}
-        
+
         {anuncio.ctaTexto && (
           <TouchableOpacity style={styles.modalCta} onPress={handlePress}>
             <Text style={styles.modalCtaText}>{anuncio.ctaTexto}</Text>
@@ -390,7 +446,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
   },
-  
+
   // Story styles
   storyContainer: {
     width: 120,
@@ -430,7 +486,7 @@ const styles = StyleSheet.create({
   indicatorActive: {
     backgroundColor: '#3B82F6',
   },
-  
+
   // Modal styles
   modalOverlay: {
     position: 'absolute',

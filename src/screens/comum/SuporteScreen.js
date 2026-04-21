@@ -44,7 +44,7 @@ export default function SuporteScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [modalAnexoVisivel, setModalAnexoVisivel] = useState(false);
-    
+
     const flatListRef = useRef();
     const soundRef = useRef();
     const userId = auth.currentUser?.uid;
@@ -171,9 +171,9 @@ export default function SuporteScreen({ navigation }) {
                 if (!docFile) return;
                 const isPdf = docFile.mimeType?.includes('pdf') || docFile.name.endsWith('.pdf');
                 processarUploadAnexo(
-                    docFile.uri, 
-                    docFile.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream'), 
-                    docFile.name, 
+                    docFile.uri,
+                    docFile.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream'),
+                    docFile.name,
                     isPdf ? 'documento' : 'imagem'
                 );
             }
@@ -218,6 +218,7 @@ export default function SuporteScreen({ navigation }) {
     const renderItem = ({ item }) => {
         const ehEu = item.senderId === userId;
         const ehAnexo = !!item.anexoUrl;
+        const ehCampanha = item.tipo === 'campanha';
 
         return (
             <View style={[styles.messageContainer, ehEu ? styles.myMessage : styles.supportMessage]}>
@@ -226,10 +227,41 @@ export default function SuporteScreen({ navigation }) {
                         <Ionicons name="headset" size={16} color="#FFF" />
                     </View>
                 )}
-                
-                <View style={[styles.messageBubble, ehEu ? styles.myBubble : styles.supportBubble]}>
-                    {ehAnexo ? (
-                        <TouchableOpacity 
+
+                <View style={[styles.messageBubble, ehEu ? styles.myBubble : styles.supportBubble, ehCampanha && styles.bubbleCampanha]}>
+                    {ehCampanha ? (
+                        <View style={styles.campanhaContainer}>
+                            <View style={styles.campanhaHeader}>
+                                <Ionicons name="megaphone" size={14} color="#8b5cf6" />
+                                <Text style={styles.campanhaLabel}>NOVA CAMPANHA</Text>
+                            </View>
+                            <Text style={styles.campanhaTitulo}>{item.titulo}</Text>
+                            <Text style={[styles.messageText, styles.campanhaMensagem]}>{item.mensagem}</Text>
+
+                            {item.imagemUrl && (
+                                <TouchableOpacity onPress={() => abrirAnexo(item.imagemUrl)} activeOpacity={0.8}>
+                                    <Image source={{ uri: item.imagemUrl }} style={styles.campanhaImagem} resizeMode="cover" />
+                                </TouchableOpacity>
+                            )}
+
+                            {item.videoUrl && (
+                                <Video
+                                    source={{ uri: item.videoUrl }}
+                                    style={styles.campanhaVideo}
+                                    useNativeControls
+                                    resizeMode="contain"
+                                />
+                            )}
+
+                            {item.cupom && (
+                                <View style={styles.campanhaCupom}>
+                                    <Ionicons name="ticket" size={16} color="#22c55e" />
+                                    <Text style={styles.campanhaCupomTexto}>{item.cupom}</Text>
+                                </View>
+                            )}
+                        </View>
+                    ) : ehAnexo ? (
+                        <TouchableOpacity
                             onPress={() => abrirAnexo(item.anexoUrl)}
                             activeOpacity={0.8}
                             style={styles.anexoWrapper}
@@ -253,7 +285,7 @@ export default function SuporteScreen({ navigation }) {
                             {item.texto}
                         </Text>
                     )}
-                    
+
                     <Text style={[styles.messageTime, ehEu ? styles.myMessageTime : styles.supportMessageTime]}>
                         {item.createdAt ? new Date(item.createdAt.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </Text>
@@ -308,7 +340,7 @@ export default function SuporteScreen({ navigation }) {
                 <TouchableOpacity style={styles.attachButton} onPress={() => setModalAnexoVisivel(true)}>
                     <Ionicons name="add-circle" size={28} color={colors.secondary} />
                 </TouchableOpacity>
-                
+
                 <TextInput
                     style={styles.input}
                     placeholder="Escreva sua mensagem..."
@@ -317,7 +349,7 @@ export default function SuporteScreen({ navigation }) {
                     onChangeText={setNovaMensagem}
                     multiline
                 />
-                
+
                 <TouchableOpacity
                     style={[styles.sendButton, (!novaMensagem.trim() && !uploading) ? styles.sendButtonDisabled : {}]}
                     onPress={enviarMensagem}
@@ -332,7 +364,7 @@ export default function SuporteScreen({ navigation }) {
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalAnexoVisivel(false)}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>O que deseja enviar?</Text>
-                        
+
                         <View style={styles.modalOptions}>
                             <TouchableOpacity style={styles.modalOptionBtn} onPress={anexarFoto}>
                                 <View style={[styles.modalIconBg, { backgroundColor: '#E1F5FE' }]}>
@@ -348,7 +380,7 @@ export default function SuporteScreen({ navigation }) {
                                 <Text style={styles.modalOptionText}>PDF / Doc</Text>
                             </TouchableOpacity>
                         </View>
-                        
+
                         <TouchableOpacity style={styles.modalCancel} onPress={() => setModalAnexoVisivel(false)}>
                             <Text style={styles.modalCancelText}>Cancelar</Text>
                         </TouchableOpacity>
@@ -595,12 +627,78 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     modalIconBg: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(139, 92, 246, 0.15)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8
+        marginBottom: 8,
+    },
+    bubbleCampanha: {
+        backgroundColor: 'transparent',
+        padding: 0,
+    },
+    campanhaContainer: {
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(139, 92, 246, 0.3)',
+        borderRadius: 16,
+        padding: 16,
+        width: '100%',
+    },
+    campanhaHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 6,
+    },
+    campanhaLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#8b5cf6',
+        letterSpacing: 0.5,
+    },
+    campanhaTitulo: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFF',
+        marginBottom: 6,
+    },
+    campanhaMensagem: {
+        color: '#E2E8F0',
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    campanhaImagem: {
+        width: '100%',
+        height: 180,
+        borderRadius: 12,
+        marginTop: 12,
+    },
+    campanhaVideo: {
+        width: '100%',
+        height: 180,
+        borderRadius: 12,
+        marginTop: 12,
+    },
+    campanhaCupom: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 12,
+        padding: 12,
+        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        borderColor: 'rgba(34, 197, 94, 0.5)',
+        borderRadius: 10,
+    },
+    campanhaCupomTexto: {
+        color: '#4ADE80',
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 1,
     },
     modalOptionText: {
         fontSize: 14,

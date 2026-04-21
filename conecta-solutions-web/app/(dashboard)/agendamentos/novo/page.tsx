@@ -108,10 +108,11 @@ function NovoAgendamentoContent() {
       const docRef = await addDoc(collection(db, 'agendamentos'), agendamentoData);
 
       // 2. ENVIAR NOTIFICAÇÃO (Seguindo rigorosamente o padrão do Mobile)
+      const nomeCliente = dadosUsuario.nome || dadosUsuario.email || 'Cliente';
       await addDoc(collection(db, 'usuarios', profId as string, 'notificacoes'), {
         titulo: 'Novo Agendamento! 📅',
-        mensagem: `${dadosUsuario.nome} solicitou ${servico?.nome} para ${dataString} às ${horaSel}.`,
-        texto: `${dadosUsuario.nome} solicitou ${servico?.nome} para ${dataString} às ${horaSel}.`, // redundância
+        mensagem: `${nomeCliente} solicitou ${servico?.nome} para ${dataString} às ${horaSel}.`,
+        texto: `${nomeCliente} solicitou ${servico?.nome} para ${dataString} às ${horaSel}.`, // redundância
         data: serverTimestamp(),
         createdAt: serverTimestamp(), // O Mobile às vezes usa createdAt
         lida: false,
@@ -120,7 +121,7 @@ function NovoAgendamentoContent() {
         tipoNotificacao: 'agendamento',
         agendamentoId: docRef.id,
         clienteId: dadosUsuario.uid,
-        clienteNome: dadosUsuario.nome
+        clienteNome: nomeCliente
       });
 
       // 3. Tentar atualizar contador (pode falhar se as regras de segurança forem restritas)

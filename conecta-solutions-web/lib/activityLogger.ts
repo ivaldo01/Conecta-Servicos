@@ -25,12 +25,40 @@ interface ActivityLogData {
 }
 
 /**
+ * Remove recursivamente todos os campos undefined de um objeto
+ */
+function removeUndefined(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined).filter(v => v !== undefined);
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        result[key] = removeUndefined(value);
+      }
+    }
+    return result;
+  }
+  
+  return obj;
+}
+
+/**
  * Registra uma atividade do usuário para monitoramento em tempo real
  */
 export const logActivity = async (data: ActivityLogData) => {
   try {
+    // Remove campos undefined recursivamente para evitar erro do Firestore
+    const cleanData = removeUndefined(data);
+    
     await addDoc(collection(db, 'activityLogs'), {
-      ...data,
+      ...cleanData,
       timestamp: serverTimestamp(),
       createdAt: new Date().toISOString()
     });
@@ -44,7 +72,7 @@ export const logActivity = async (data: ActivityLogData) => {
 // Helpers pré-definidos
 export const logAuth = (user: UserInfo | null, acao: string, detalhes?: Record<string, unknown>) =>
   logActivity({
-    userId: user?.uid,
+    userId: (user as any)?.codigoConecta || user?.uid,
     userNome: user?.nome || user?.displayName,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || user?.role || 'cliente',
@@ -56,7 +84,7 @@ export const logAuth = (user: UserInfo | null, acao: string, detalhes?: Record<s
 
 export const logNavegacao = (user: UserInfo | null, pagina: string, detalhes?: Record<string, unknown>) =>
   logActivity({
-    userId: user?.uid,
+    userId: (user as any)?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || 'cliente',
@@ -68,7 +96,7 @@ export const logNavegacao = (user: UserInfo | null, pagina: string, detalhes?: R
 
 export const logAgendamento = (user: UserInfo | null, acao: string, detalhes?: Record<string, unknown>) =>
   logActivity({
-    userId: user?.uid,
+    userId: (user as any)?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || 'cliente',
@@ -80,7 +108,7 @@ export const logAgendamento = (user: UserInfo | null, acao: string, detalhes?: R
 
 export const logPagamento = (user: UserInfo | null, acao: string, detalhes?: Record<string, unknown>) =>
   logActivity({
-    userId: user?.uid,
+    userId: (user as any)?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || 'cliente',
@@ -92,7 +120,7 @@ export const logPagamento = (user: UserInfo | null, acao: string, detalhes?: Rec
 
 export const logPerfil = (user: UserInfo | null, acao: string, detalhes?: Record<string, unknown>) =>
   logActivity({
-    userId: user?.uid,
+    userId: (user as any)?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || 'cliente',
@@ -104,7 +132,7 @@ export const logPerfil = (user: UserInfo | null, acao: string, detalhes?: Record
 
 export const logChat = (user: UserInfo | null, acao: string, detalhes?: Record<string, unknown>) =>
   logActivity({
-    userId: user?.uid,
+    userId: (user as any)?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || 'cliente',

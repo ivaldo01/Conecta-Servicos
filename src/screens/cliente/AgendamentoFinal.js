@@ -32,6 +32,7 @@ import {
     salvarNotificacaoProfissional,
 } from "../../utils/notificationUtils";
 import { travarHorario, liberarHorario } from '../../utils/agendaDisponibilidade';
+import { logAgendamento } from '../../services/activityLogger';
 import Sidebar from '../../components/Sidebar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -383,53 +384,92 @@ export default function AgendamentoFinal({ route, navigation }) {
                     "",
             };
 
-            const colabSnap = await getDocs(collection(db, "usuarios", clinicaId, "colaboradores"));
+            // Buscar colaboradores de AMBAS as fontes (subcoleção + coleção raiz)
             const listaColabs = [];
+            const colabsProcessados = new Set(); // Evitar duplicatas
 
-            for (const d of colabSnap.docs) {
-                const dados = d.data();
+            // 1. Buscar na subcoleção (mobile cria aqui)
+            try {
+                const colabSnap = await getDocs(collection(db, "usuarios", clinicaId, "colaboradores"));
+                for (const d of colabSnap.docs) {
+                    if (colabsProcessados.has(d.id)) continue;
+                    colabsProcessados.add(d.id);
 
-                const agendaRef = doc(
-                    db,
-                    "usuarios",
-                    clinicaId,
-                    "colaboradores",
-                    d.id,
-                    "configuracoes",
-                    "agenda"
-                );
-                const aSnap = await getDoc(agendaRef);
+                    const dados = d.data();
+                    const agendaRef = doc(db, "usuarios", clinicaId, "colaboradores", d.id, "configuracoes", "agenda");
+                    const aSnap = await getDoc(agendaRef);
 
-                listaColabs.push({
-                    id: d.id,
-                    ...dados,
-                    nome: dados.nome || dados.nomeCompleto || "Profissional",
-                    telefone: dados.telefone || "",
-                    whatsapp: dados.whatsapp || dados.telefone || "",
-                    agenda: aSnap.exists()
-                        ? {
-                            horarios: aSnap.data().horarios || [],
-                            dias: aSnap.data().dias || [],
-                            agendaAtiva: aSnap.data().agendaAtiva !== false,
-                            configAlmoco: aSnap.data().configAlmoco || {},
-                            atenderFeriados: aSnap.data().atenderFeriados || false,
-                            horaInicio: aSnap.data().horaInicio || "08:00",
-                            horaFim: aSnap.data().horaFim || "18:00",
-                        }
-                        : null,
-                    ehDono: false,
-                    fotoPerfil:
-                        dados?.fotoPerfil ||
-                        dados?.foto ||
-                        dados?.avatar ||
-                        "",
-                    bannerPerfil:
-                        dados?.bannerPerfil ||
-                        dados?.banner ||
-                        "",
-                });
+                    listaColabs.push({
+                        id: d.id,
+                        ...dados,
+                        nome: dados.nome || dados.nomeCompleto || "Profissional",
+                        telefone: dados.telefone || "",
+                        whatsapp: dados.whatsapp || dados.telefone || "",
+                        agenda: aSnap.exists()
+                            ? {
+                                horarios: aSnap.data().horarios || [],
+                                dias: aSnap.data().dias || [],
+                                agendaAtiva: aSnap.data().agendaAtiva !== false,
+                                configAlmoco: aSnap.data().configAlmoco || {},
+                                atenderFeriados: aSnap.data().atenderFeriados || false,
+                                horaInicio: aSnap.data().horaInicio || "08:00",
+                                horaFim: aSnap.data().horaFim || "18:00",
+                            }
+                            : null,
+                        ehDono: false,
+                        fotoPerfil: dados?.fotoPerfil || dados?.foto || dados?.fotoUrl || dados?.avatar || "",
+                        bannerPerfil: dados?.bannerPerfil || dados?.banner || dados?.bannerUrl || "",
+                    });
+                }
+                console.log(`[Agendamento] Subcoleção: ${colabSnap.docs.length} colaboradores`);
+            } catch (e) {
+                console.log("[Agendamento] Erro ao buscar subcoleção:", e);
             }
 
+            // 2. Buscar na coleção raiz (web/desktop cria aqui)
+            try {
+                const webSnap = await getDocs(
+                    query(collection(db, "colaboradores"), where("profissionalId", "==", clinicaId))
+                );
+                for (const d of webSnap.docs) {
+                    const dados = d.data();
+                    const colabId = dados.uid || d.id; // Web usa uid, não doc.id
+
+                    if (colabsProcessados.has(colabId)) continue;
+                    colabsProcessados.add(colabId);
+
+                    // Buscar agenda na subcoleção (onde web também salva)
+                    const agendaRef = doc(db, "usuarios", clinicaId, "colaboradores", colabId, "configuracoes", "agenda");
+                    const aSnap = await getDoc(agendaRef);
+
+                    listaColabs.push({
+                        id: colabId,
+                        ...dados,
+                        nome: dados.nome || dados.nomeCompleto || "Profissional",
+                        telefone: dados.telefone || "",
+                        whatsapp: dados.whatsapp || dados.telefone || "",
+                        agenda: aSnap.exists()
+                            ? {
+                                horarios: aSnap.data().horarios || [],
+                                dias: aSnap.data().dias || [],
+                                agendaAtiva: aSnap.data().agendaAtiva !== false,
+                                configAlmoco: aSnap.data().configAlmoco || {},
+                                atenderFeriados: aSnap.data().atenderFeriados || false,
+                                horaInicio: aSnap.data().horaInicio || "08:00",
+                                horaFim: aSnap.data().horaFim || "18:00",
+                            }
+                            : null,
+                        ehDono: false,
+                        fotoPerfil: dados?.fotoPerfil || dados?.foto || dados?.fotoUrl || dados?.avatar || "",
+                        bannerPerfil: dados?.bannerPerfil || dados?.banner || dados?.bannerUrl || "",
+                    });
+                }
+                console.log(`[Agendamento] Coleção web: ${webSnap.docs.length} colaboradores`);
+            } catch (e) {
+                console.log("[Agendamento] Erro ao buscar coleção web:", e);
+            }
+
+            console.log(`[Agendamento] Total: ${listaColabs.length} colaboradores`);
             setEquipe([donoComoProfissional, ...listaColabs]);
         } catch (e) {
             console.log("Erro ao carregar dados iniciais:", e);
@@ -487,10 +527,10 @@ export default function AgendamentoFinal({ route, navigation }) {
 
     const estaForaDoExpediente = (agenda, horario, diaIdx, data) => {
         if (!agenda || !horario) return false;
-        
+
         const config = agenda?.configAlmoco?.[diaIdx];
         const feriado = ehFeriado(data);
-        
+
         // Se for feriado e o profissional NÃO atende em feriados, está fora do expediente
         if (feriado && !agenda.atenderFeriados) return true;
 
@@ -534,10 +574,10 @@ export default function AgendamentoFinal({ route, navigation }) {
         );
 
         const jaAgendado = agendamentosExistentes.some(
-            a => a.horario === horario && 
-                 a.colaboradorId === colab.id && 
-                 a.status !== 'cancelado' && 
-                 a.status !== 'concluido'
+            a => a.horario === horario &&
+                a.colaboradorId === colab.id &&
+                a.status !== 'cancelado' &&
+                a.status !== 'concluido'
         );
 
         const noAlmoco = estaNoHorarioDeAlmoco(agenda, horario, diaSemanaSelecionado);
@@ -557,10 +597,10 @@ export default function AgendamentoFinal({ route, navigation }) {
 
             const temHorarioLivre = (agenda?.horarios || []).some(h => {
                 const jaAgendado = agendamentosExistentes.some(
-                    a => a.horario === h && 
-                         a.colaboradorId === colab.id && 
-                         a.status !== 'cancelado' && 
-                         a.status !== 'concluido'
+                    a => a.horario === h &&
+                        a.colaboradorId === colab.id &&
+                        a.status !== 'cancelado' &&
+                        a.status !== 'concluido'
                 );
                 return !jaAgendado;
             });
@@ -957,6 +997,24 @@ export default function AgendamentoFinal({ route, navigation }) {
                     horarioSelecionadoAtual: horarioSelecionado,
                 });
             }
+
+            // Log da atividade
+            logAgendamento(
+                { uid: auth.currentUser.uid, nome: nomeCliente, tipo: 'cliente' },
+                'Novo agendamento criado',
+                {
+                    agendamentoId: novoAgendamentoRef.id,
+                    profissionalId: colaboradorEscolhido.id,
+                    profissionalNome: colaboradorEscolhido.nome || 'Profissional',
+                    clinicaId,
+                    data: dataExibicao,
+                    horario: horarioSelecionado,
+                    servicos: servicos.map(s => s.nome),
+                    valorTotal: valorTotalAgendamento,
+                    formaPagamento,
+                    status: 'pendente'
+                }
+            );
 
             Alert.alert(
                 "Sucesso!",

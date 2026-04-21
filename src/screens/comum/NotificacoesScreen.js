@@ -60,6 +60,8 @@ function getIcon(tipo) {
             return 'card-outline';
         case 'cobranca':
             return 'receipt-outline';
+        case 'campanha':
+            return 'megaphone-outline';
         default:
             return 'notifications-outline';
     }
@@ -79,6 +81,8 @@ function getIconBackground(tipo) {
             return '#F3EDFF';
         case 'cobranca':
             return '#FFF0EA';
+        case 'campanha':
+            return '#F3EDFF';
         default:
             return `${colors.primary}15`;
     }

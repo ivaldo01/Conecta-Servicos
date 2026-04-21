@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Bell } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import NotificacoesDropdown from '@/components/NotificacoesDropdown';
 import '@/styles/topbar.css';
 
 // ============================================================
@@ -31,10 +31,7 @@ export default function Topbar({ title, subtitle, action }: TopbarProps) {
       <div className="topbar-actions">
         {action && <div className="topbar-page-action">{action}</div>}
 
-        <button className="topbar-icon-btn" aria-label="Notificações">
-          <Bell size={18} />
-          <span className="topbar-notification-dot" />
-        </button>
+        <NotificacoesDropdown />
 
         <div className="topbar-user">
           <span className="topbar-greeting">

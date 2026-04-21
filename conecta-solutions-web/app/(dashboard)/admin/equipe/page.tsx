@@ -63,8 +63,13 @@ export default function EquipeAdminPage() {
         setMembros(data);
       },
       (error) => {
-        console.error('[Equipe] Erro ao carregar membros:', error);
-        alert('Erro de permissão ao carregar equipe. Verifique se você é admin.');
+        console.error('[Equipe Admin] Erro ao carregar:', error.message, error.code);
+        if (error.code === 'permission-denied') {
+          console.error('[Equipe Admin] Permissão negada - usuário não é admin');
+          toast.error('Você não tem permissão para acessar esta página');
+        } else {
+          toast.error('Erro ao carregar equipe');
+        }
       }
     );
     return () => unsubscribe();
@@ -72,13 +77,18 @@ export default function EquipeAdminPage() {
 
   const adicionarMembro = async (e: React.FormEvent) => {
     e.preventDefault();
-    await addDoc(collection(db, 'equipeAdmin'), {
-      ...novoMembro,
-      status: 'ativo',
-      dataEntrada: serverTimestamp()
-    });
-    setShowModal(false);
-    setNovoMembro({ nome: '', email: '', telefone: '', cargo: 'suporte', permissoes: ['suporte'] });
+    try {
+      await addDoc(collection(db, 'equipeAdmin'), {
+        ...novoMembro,
+        status: 'ativo',
+        dataEntrada: serverTimestamp()
+      });
+      setShowModal(false);
+      setNovoMembro({ nome: '', email: '', telefone: '', cargo: 'suporte', permissoes: ['suporte'] });
+    } catch (err: any) {
+      console.error('[Equipe Admin] Erro ao adicionar membro:', err.message, err.code);
+      toast.error('Erro ao adicionar membro');
+    }
   };
 
   const alterarStatus = async (id: string, status: string) => {

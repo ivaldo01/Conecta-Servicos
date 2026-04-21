@@ -26,9 +26,9 @@ import {
 import { Alert } from 'react-native';
 import AdBanner from '../../components/AdBanner';
 import NativeAdCard from '../../components/NativeAdCard';
+import BannerAd from '../../components/ads/BannerAd';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { auth, db } from '../../services/firebaseConfig';
-import { onSnapshot } from 'firebase/firestore';
 import colors from '../../constants/colors';
 import { temAnuncios, getMaxFuncionarios } from '../../constants/plans';
 import { getHojeStr as getHojeFiltroStr, isAtendendoAgora } from '../../utils/agendamentoUtils';
@@ -703,6 +703,12 @@ export default function HomeProfissional({ navigation }) {
                 </View>
 
                 <AdBanner enabled={temAnuncios(usuario?.planoAtivo)} />
+
+                {/* Anúncios Patrocinados */}
+                <BannerAd
+                    tipo="banner_superior"
+                    style={{ marginHorizontal: 0 }}
+                />
 
                 {/* ── CARD FINANCEIRO ── */}
                 <View style={styles.financeCard}>

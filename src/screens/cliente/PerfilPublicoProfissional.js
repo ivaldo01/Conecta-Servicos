@@ -13,12 +13,12 @@ import {
     Platform,
     Animated as RNAnimated,
 } from 'react-native';
-import Animated, { 
-    useAnimatedStyle, 
-    useSharedValue, 
-    withRepeat, 
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
     withTiming,
-    interpolate 
+    interpolate
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -282,6 +282,7 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                     ...item.data(),
                 }));
                 setServicos(listaServicos);
+                console.log('📱 [PerfilPublicoProfissional] Serviços carregados:', listaServicos.map(s => ({ nome: s.nome, fotoUrl: s.fotoUrl })));
             } catch (errorServicos) {
                 console.log('Erro ao carregar serviços do profissional:', errorServicos);
                 setServicos([]);
@@ -601,11 +602,11 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                         {loadingFavorito ? (
                             <ActivityIndicator size="small" color={favorito ? '#E63946' : colors.primary} />
                         ) : (
-                                <Ionicons
-                                    name={favorito ? 'heart' : 'heart-outline'}
-                                    size={22}
-                                    color={favorito ? '#E63946' : colors.primary}
-                                />
+                            <Ionicons
+                                name={favorito ? 'heart' : 'heart-outline'}
+                                size={22}
+                                color={favorito ? '#E63946' : colors.primary}
+                            />
                         )}
                     </TouchableOpacity>
                 )}
@@ -742,6 +743,13 @@ export default function PerfilPublicoProfissional({ route, navigation }) {
                                             activeOpacity={0.9}
                                             onPress={() => toggleServico(servico)}
                                         >
+                                            {servico?.fotoUrl ? (
+                                                <Image source={{ uri: servico.fotoUrl }} style={styles.serviceImage} resizeMode="cover" />
+                                            ) : (
+                                                <View style={styles.serviceImagePlaceholder}>
+                                                    <Ionicons name="cut-outline" size={24} color="#94A3B8" />
+                                                </View>
+                                            )}
                                             <View style={styles.serviceLeft}>
                                                 <View style={styles.serviceTextBox}>
                                                     <Text style={styles.serviceName}>
@@ -1406,5 +1414,20 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         backgroundColor: '#22C55E',
         zIndex: 1,
+    },
+    serviceImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 12,
+        marginRight: 12,
+    },
+    serviceImagePlaceholder: {
+        width: 60,
+        height: 60,
+        borderRadius: 12,
+        marginRight: 12,
+        backgroundColor: '#E2E8F0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

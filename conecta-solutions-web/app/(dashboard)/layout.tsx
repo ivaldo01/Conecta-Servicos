@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import Sidebar from '@/components/layout/Sidebar';
+import { ConfigProvider } from '@/lib/useConfig';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Lock, Check, X, ShieldAlert } from 'lucide-react';
@@ -36,17 +37,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!user) return null;
 
   return (
-    <div className="dashboard-root">
-      <Sidebar />
-      <div className="dashboard-content">
-        {children}
-      </div>
+    <ConfigProvider>
+      <div className="dashboard-root">
+        <Sidebar />
+        <div className="dashboard-content">
+          {children}
+        </div>
 
-      {/* MODAL DE TROCA DE SENHA OBRIGATÓRIA (Apenas para Colaboradores no 1º acesso) */}
-      {dadosUsuario?.perfil === 'colaborador' && (dadosUsuario as any).precisaTrocarSenha && (
-        <ModalTrocaSenha uid={dadosUsuario.uid} />
-      )}
-    </div>
+        {/* MODAL DE TROCA DE SENHA OBRIGATÓRIA (Apenas para Colaboradores no 1º acesso) */}
+        {dadosUsuario?.perfil === 'colaborador' && (dadosUsuario as any).precisaTrocarSenha && (
+          <ModalTrocaSenha uid={dadosUsuario.uid} />
+        )}
+      </div>
+    </ConfigProvider>
   );
 }
 

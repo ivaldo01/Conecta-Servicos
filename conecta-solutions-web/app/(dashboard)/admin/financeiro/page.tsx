@@ -9,6 +9,7 @@ import {
   where,
   doc,
   getDoc,
+  limit,
   Timestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -91,16 +92,80 @@ interface WebhookLog {
   receivedAt: any;
 }
 
+// Função para exportar dados para CSV
+function exportToCSV(data: any[], filename: string, headers: string[]) {
+  const csvRows = [headers.join(';')];
+  
+  for (const row of data) {
+    const values = headers.map(header => {
+      const value = row[header] || '';
+      return `"${String(value).replace(/"/g, '""')}"`;
+    });
+    csvRows.push(values.join(';'));
+  }
+  
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export default function FinanceiroAdminPage() {
   // Dados do Backend
   const [assinaturas, setAssinaturas] = useState<Assinatura[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [saques, setSaques] = useState<Saque[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookLog[]>([]);
+
+  // Função para exportar relatório financeiro
+  const exportarRelatorio = () => {
+    const data = new Date().toISOString().split('T')[0];
+    const assinaturasData = assinaturas.map(a => ({
+      'Tipo': 'Assinatura',
+      'Usuario': a.userNome || a.userId,
+      'Plano': a.planoNome || a.planoId,
+      'Status': a.status,
+      'Valor': a.valor,
+      'BillingType': a.billingType,
+      'CriadoEm': a.createdAt?.toDate?.() || a.createdAt
+    }));
+    
+    const pagamentosData = pagamentos.map(p => ({
+      'Tipo': 'Pagamento',
+      'Usuario': p.userNome || p.userId,
+      'Descricao': p.descricao,
+      'Status': p.status,
+      'Valor': p.valor,
+      'CriadoEm': p.createdAt?.toDate?.() || p.createdAt,
+      'PagoEm': p.pagoEm?.toDate?.() || p.pagoEm
+    }));
+    
+    const todosDados = [...assinaturasData, ...pagamentosData];
+    
+    if (todosDados.length === 0) {
+      alert('Não há dados para exportar.');
+      return;
+    }
+    
+    exportToCSV(
+      todosDados,
+      `relatorio-financeiro-${data}.csv`,
+      ['Tipo', 'Usuario', 'Plano', 'Descricao', 'Status', 'Valor', 'BillingType', 'CriadoEm', 'PagoEm']
+    );
+    
+    alert(`Relatório exportado! ${todosDados.length} registros baixados.`);
+  };
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'assinaturas' | 'pagamentos' | 'saques' | 'webhooks'>('assinaturas');
+  const [activeTab, setActiveTab] = useState<'assinaturas' | 'pagamentos' | 'saques' | 'webhooks' | 'agendamentos'>('agendamentos');
+  const [agendamentosPagos, setAgendamentosPagos] = useState([]);
   const [busca, setBusca] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
 
@@ -208,6 +273,73 @@ export default function FinanceiroAdminPage() {
           console.error('[Financeiro] Erro ao carregar webhooks:', error);
         });
 
+        // Agendamentos Pagos (cobranças dos agendamentos) - query simplificada sem orderBy
+        const qAgendamentos = query(
+          collection(db, 'agendamentos'), 
+          where('status', 'in', ['confirmado', 'concluido']),
+          where('pagamentoConfirmado', '==', true)
+        );
+        const unsubAgendamentos = onSnapshot(qAgendamentos, async (snapshot) => {
+          console.log(`[Financeiro] Agendamentos pagos carregados: ${snapshot.docs.length}`);
+          let data = await Promise.all(snapshot.docs.map(async (docSnap) => {
+            const ag = docSnap.data();
+            try {
+              // Buscar nome do cliente
+              let clienteNome = ag.clienteNome || 'Cliente';
+              if (ag.clienteId) {
+                const cliDoc = await getDoc(doc(db, 'usuarios', ag.clienteId));
+                if (cliDoc.exists()) {
+                  clienteNome = cliDoc.data().nome || clienteNome;
+                }
+              }
+              
+              // Buscar nome do profissional
+              let profissionalNome = ag.profissionalNome || ag.colaboradorNome || 'Profissional';
+              
+              return {
+                id: docSnap.id,
+                ...ag,
+                clienteNome,
+                profissionalNome,
+                tipo: 'agendamento',
+                descricao: `Agendamento: ${ag.servico || ag.servicos?.map(s => s.nome).join(', ') || 'Serviço'}`,
+                valor: ag.valorTotal || 0,
+                status: ag.pagamentoConfirmado ? 'PAGO' : 'PENDENTE',
+                createdAt: ag.dataCriacao,
+                pagoEm: ag.dataPagamento,
+                dataFiltro: ag.dataFiltro // Para ordenação
+              };
+            } catch (e) {
+              return {
+                id: docSnap.id,
+                ...ag,
+                clienteNome: ag.clienteNome || 'Cliente',
+                profissionalNome: ag.profissionalNome || 'Profissional',
+                tipo: 'agendamento',
+                descricao: `Agendamento: ${ag.servico || 'Serviço'}`,
+                valor: ag.valorTotal || 0,
+                status: ag.pagamentoConfirmado ? 'PAGO' : 'PENDENTE',
+                createdAt: ag.dataCriacao,
+                pagoEm: ag.dataPagamento,
+                dataFiltro: ag.dataFiltro
+              };
+            }
+          }));
+          
+          // Ordenar no cliente por data (desc)
+          data = data.sort((a, b) => {
+            if (!a.dataFiltro) return 1;
+            if (!b.dataFiltro) return -1;
+            return b.dataFiltro.localeCompare(a.dataFiltro);
+          }).slice(0, 100); // Limitar a 100
+          
+          setAgendamentosPagos(data);
+          setLoading(false);
+        }, (error) => {
+          console.error('[Financeiro] Erro ao carregar agendamentos:', error);
+          setLoading(false);
+        });
+
         setLoading(false);
 
         return () => {
@@ -215,6 +347,7 @@ export default function FinanceiroAdminPage() {
           unsubPagamentos();
           unsubSaques();
           unsubWebhooks();
+          unsubAgendamentos();
         };
       } catch (err) {
         console.error('[Financeiro] Erro geral:', err);
@@ -237,7 +370,9 @@ export default function FinanceiroAdminPage() {
     webhooks24h: webhooks.filter(w => {
       const h24 = Date.now() - 24 * 60 * 60 * 1000;
       return w.receivedAt?.toMillis?.() > h24;
-    }).length
+    }).length,
+    agendamentosPagos: agendamentosPagos.length,
+    receitaAgendamentos: agendamentosPagos.reduce((acc, ag) => acc + (ag.valor || 0), 0)
   };
 
   // Helpers
@@ -309,7 +444,7 @@ export default function FinanceiroAdminPage() {
           <h1 className="admin-title">Monitoramento Backend</h1>
           <p className="admin-subtitle">Visualização das comunicações com Asaas Gateway</p>
         </div>
-        <button className="btn-primary" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+        <button className="btn-primary" onClick={exportarRelatorio}>
           <Download size={18} />
           Exportar Relatório
         </button>
@@ -366,6 +501,31 @@ export default function FinanceiroAdminPage() {
             <span className="kpi-value">{stats.webhooks24h}</span>
           </div>
         </div>
+
+        <div className="kpi-card success">
+          <div className="kpi-icon">
+            <CreditCard size={24} />
+          </div>
+          <div className="kpi-info">
+            <span className="kpi-label">Agendamentos Pagos</span>
+            <span className="kpi-value">{stats.agendamentosPagos}</span>
+          </div>
+        </div>
+
+        <div className="kpi-card warning">
+          <div className="kpi-icon">
+            <DollarSign size={24} />
+          </div>
+          <div className="kpi-info">
+            <span className="kpi-label">Receita Agendamentos</span>
+            <span className="kpi-value">
+              {stats.receitaAgendamentos.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -376,6 +536,13 @@ export default function FinanceiroAdminPage() {
         >
           <Crown size={16} />
           Assinaturas ({assinaturas.length})
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'agendamentos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('agendamentos')}
+        >
+          <Calendar size={16} />
+          Agendamentos ({agendamentosPagos.length})
         </button>
         <button 
           className={`tab-btn ${activeTab === 'pagamentos' ? 'active' : ''}`}
@@ -467,6 +634,44 @@ export default function FinanceiroAdminPage() {
                       <td>{a.billingType}</td>
                       <td>{formatDate(a.createdAt)}</td>
                       <td><code className="code-small">{a.asaasSubscriptionId?.slice(0, 15)}...</code></td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Tabela Agendamentos Pagos */}
+      {activeTab === 'agendamentos' && (
+        <div className="data-table-container">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Profissional</th>
+                <th>Serviço</th>
+                <th>Valor</th>
+                <th>Status Pagamento</th>
+                <th>Data Agendamento</th>
+                <th>Pago em</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agendamentosPagos.length === 0 ? (
+                <tr><td colSpan={7} className="empty-cell"><div className="empty-state"><Calendar size={48} /><p>Nenhum agendamento pago encontrado</p></div></td></tr>
+              ) : (
+                agendamentosPagos
+                  .filter(ag => ag.clienteNome?.toLowerCase().includes(busca.toLowerCase()) || ag.profissionalNome?.toLowerCase().includes(busca.toLowerCase()))
+                  .map(ag => (
+                    <tr key={ag.id}>
+                      <td>{ag.clienteNome}</td>
+                      <td>{ag.profissionalNome}</td>
+                      <td>{ag.descricao}</td>
+                      <td>R$ {(ag.valor || 0).toFixed(2)}</td>
+                      <td><span className={`status-badge ${ag.status === 'PAGO' ? 'RECEIVED' : 'PENDING'}`}>{ag.status}</span></td>
+                      <td>{ag.data} {ag.horario}</td>
+                      <td>{ag.pagoEm ? new Date(ag.pagoEm?.toDate?.() || ag.pagoEm).toLocaleDateString('pt-BR') : '-'}</td>
                     </tr>
                   ))
               )}

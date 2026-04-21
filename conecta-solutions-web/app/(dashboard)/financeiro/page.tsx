@@ -5,8 +5,8 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, DollarSign, ArrowDownCircle, ArrowUpCircle, Calendar, Wallet } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { TrendingUp, DollarSign, ArrowDownCircle, ArrowUpCircle, Calendar, Wallet, Download, Filter, Search, TrendingDown } from 'lucide-react';
 import '@/styles/financeiro.css';
 
 // ============================================================
@@ -16,8 +16,8 @@ interface Transacao {
   id: string;
   tipo?: 'entrada' | 'saida';
   descricao?: string;
-  valor?: any;
-  data?: any;
+  valor?: number | string | null;
+  data?: unknown;
   status?: string;
   clienteNome?: string;
   servico?: string;
@@ -37,6 +37,20 @@ export default function FinanceiroPage() {
   const [saldo, setSaldo]               = useState<number>(0);
   const [loading, setLoading]           = useState(true);
   const [periodoFiltro, setPeriodoFiltro] = useState<'7' | '30' | '90'>('30');
+  const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'entrada' | 'saida'>('todos');
+  const [busca, setBusca] = useState('');
+
+  // Taxa de serviço baseada no plano VIP do profissional
+  const getTaxaPorPlano = (plano: string | undefined): number => {
+    switch (plano?.toUpperCase()) {
+      case 'OURO': return 5;
+      case 'PRATA': return 8;
+      case 'BRONZE':
+      case 'INICIANTE':
+      default: return 10;
+    }
+  };
+  const taxaServico = getTaxaPorPlano(dadosUsuario?.planoAtivo);
 
   const carregarDados = useCallback(async () => {
     if (!dadosUsuario?.uid) return;
@@ -70,27 +84,44 @@ export default function FinanceiroPage() {
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
   // Converte data do Firestore com segurança
-  const toDate = (v: any): Date | null => {
+  const toDate = (v: unknown): Date | null => {
     if (!v) return null;
-    if (v.toDate && typeof v.toDate === 'function') return v.toDate();
-    const d = new Date(v);
+    if (typeof v === 'object' && v !== null && 'toDate' in v && typeof (v as { toDate: () => unknown }).toDate === 'function') {
+      return (v as { toDate: () => Date }).toDate();
+    }
+    const d = new Date(String(v));
     return isNaN(d.getTime()) ? null : d;
   };
 
   // Formata valor monetário com segurança
-  const fmtBRL = (v: any) => {
+  const fmtBRL = (v: string | number | undefined | null) => {
     const n = Number(v) || 0;
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  // Filtra transações pelo período
+  // Filtra transações pelo período e tipo
   const diasFiltro = parseInt(periodoFiltro);
   const dataCorte = new Date();
   dataCorte.setDate(dataCorte.getDate() - diasFiltro);
 
+  // Período anterior para comparação
+  const dataCorteAnterior = new Date(dataCorte);
+  dataCorteAnterior.setDate(dataCorteAnterior.getDate() - diasFiltro);
+
   const transacoesFiltradas = transacoes.filter(t => {
     const d = toDate(t.data);
-    return d && d >= dataCorte;
+    const matchPeriodo = d && d >= dataCorte;
+    const matchTipo = tipoFiltro === 'todos' || t.tipo === tipoFiltro;
+    const matchBusca = !busca || 
+      t.descricao?.toLowerCase().includes(busca.toLowerCase()) ||
+      t.clienteNome?.toLowerCase().includes(busca.toLowerCase());
+    return matchPeriodo && matchTipo && matchBusca;
+  });
+
+  // Transações do período anterior (para comparação)
+  const transacoesPeriodoAnterior = transacoes.filter(t => {
+    const d = toDate(t.data);
+    return d && d >= dataCorteAnterior && d < dataCorte && t.tipo === 'entrada';
   });
 
   // KPIs
@@ -98,11 +129,19 @@ export default function FinanceiroPage() {
     .filter(t => t.tipo === 'entrada')
     .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
 
+  const receitaPeriodoAnterior = transacoesPeriodoAnterior
+    .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
+
   const saidaPeriodo = transacoesFiltradas
     .filter(t => t.tipo === 'saida')
     .reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
 
-  // Gráfico
+  // Cálculo de variação percentual
+  const variacaoPercentual = receitaPeriodoAnterior > 0
+    ? ((receitaPeriodo - receitaPeriodoAnterior) / receitaPeriodoAnterior) * 100
+    : 0;
+
+  // Gráfico de área (Performance)
   const dadosGrafico: DadoGrafico[] = (() => {
     const mapa: Record<string, number> = {};
     transacoesFiltradas.filter(t => t.tipo === 'entrada').forEach(t => {
@@ -115,11 +154,42 @@ export default function FinanceiroPage() {
     return Object.entries(mapa).map(([dia, receita]) => ({ dia, receita }));
   })();
 
+  // Gráfico de pizza (Distribuição por serviço)
+  const dadosPieChart = (() => {
+    const mapa: Record<string, number> = {};
+    transacoesFiltradas.filter(t => t.tipo === 'entrada').forEach(t => {
+      const servico = t.servico || 'Outros';
+      mapa[servico] = (mapa[servico] || 0) + (Number(t.valor) || 0);
+    });
+    const cores = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+    return Object.entries(mapa)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([nome, valor], i) => ({ nome, valor, cor: cores[i % cores.length] }));
+  })();
+
   return (
     <div className="financeiro-page-premium">
       <Topbar title="Gestão Financeira" subtitle="Controle analítico de receitas e fluxo de capital" />
 
       <div className="financeiro-container-premium">
+
+        {/* ===== TAXA DE SERVIÇO DO PLANO VIP ===== */}
+        <div style={{ 
+          background: '#FEF3C7', 
+          borderLeft: '4px solid #F59E0B', 
+          padding: '12px 16px', 
+          borderRadius: '8px', 
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span style={{ fontSize: '18px' }}>⚠️</span>
+          <span style={{ fontSize: '13px', color: '#92400E' }}>
+            Plano <strong>{dadosUsuario?.planoAtivo || 'Bronze'}</strong>: Taxa de <strong>{taxaServico}%</strong> sobre cada pagamento
+          </span>
+        </div>
         
         {/* ===== CARDS DE ALTO IMPACTO (KPIs) ===== */}
         <section className="fin-analytics-grid">
@@ -161,7 +231,69 @@ export default function FinanceiroPage() {
             </div>
             <div className="kpi-accent-bg roxo" />
           </div>
+
+          {/* Card de Comparativo Mensal */}
+          <div className="comparison-card-premium">
+            <div className="comparison-header">Comparativo Período Anterior</div>
+            <div className="comparison-value">
+              {variacaoPercentual > 0 ? '+' : ''}{variacaoPercentual.toFixed(1)}%
+            </div>
+            <div className={`comparison-badge ${variacaoPercentual >= 0 ? 'positive' : 'negative'}`}>
+              {variacaoPercentual >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {variacaoPercentual >= 0 ? 'Crescimento' : 'Queda'} vs período anterior
+            </div>
+          </div>
+
+          {/* Card de Taxa do Plano */}
+          <div className="tax-info-card">
+            <div className="tax-info-header">Taxa de Serviço do Plano</div>
+            <div className="tax-info-value">{taxaServico}%</div>
+            <div className="tax-info-desc">descontado de cada pagamento recebido</div>
+            <span className="tax-info-plano">Plano {dadosUsuario?.planoAtivo || 'Bronze'}</span>
+          </div>
         </section>
+
+        {/* FILTROS AVANÇADOS */}
+        <div className="filters-toolbar-premium">
+          <div className="filter-item">
+            <Filter size={14} />
+            <select 
+              className="filter-select-premium"
+              value={tipoFiltro}
+              onChange={(e) => setTipoFiltro(e.target.value as 'todos' | 'entrada' | 'saida')}
+            >
+              <option value="todos">Todos os tipos</option>
+              <option value="entrada">Entradas</option>
+              <option value="saida">Saídas</option>
+            </select>
+          </div>
+          <div className="filter-item">
+            <Search size={14} />
+            <input
+              type="text"
+              className="filter-search-premium"
+              placeholder="Buscar por cliente ou descrição..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
+          <button 
+            className="btn-export-premium"
+            onClick={() => {
+              const csvContent = transacoesFiltradas.map(t => 
+                `${t.data},${t.tipo},${t.descricao},${t.valor}`
+              ).join('\n');
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `extrato_${periodoFiltro}dias.csv`;
+              a.click();
+            }}
+          >
+            <Download size={14} /> Exportar CSV
+          </button>
+        </div>
 
         <div className="fin-business-dashboard">
           
@@ -200,11 +332,68 @@ export default function FinanceiroPage() {
                     <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} tickFormatter={v => `R$${v}`} />
                     <Tooltip 
                       contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-                      formatter={(v: any) => [fmtBRL(v), 'Receita']}
+                      formatter={(v: number | undefined) => [fmtBRL(v || 0), 'Receita']}
                     />
                     <Area type="monotone" dataKey="receita" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorIncome)" />
                   </AreaChart>
                 </ResponsiveContainer>
+              )}
+            </div>
+          </section>
+
+          {/* PAINEL DE DISTRIBUIÇÃO POR SERVIÇO (PIE CHART) */}
+          <section className="fin-chart-enterprise-panel">
+            <div className="panel-header-premium">
+              <div className="header-text">
+                <h3 className="panel-title-premium">Distribuição por Serviço</h3>
+                <p className="panel-hint-premium">Receita por tipo de serviço prestado</p>
+              </div>
+            </div>
+
+            <div className="pie-chart-container">
+              {loading ? (
+                <div className="loading-chart-skeleton" style={{ width: 180, height: 180 }} />
+              ) : dadosPieChart.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '40px 0' }}>
+                  Sem dados para exibir
+                </div>
+              ) : (
+                <>
+                  <div className="pie-chart-wrapper">
+                    <ResponsiveContainer width={180} height={180}>
+                      <PieChart>
+                        <Pie
+                          data={dadosPieChart}
+                          cx={90}
+                          cy={90}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={2}
+                          dataKey="valor"
+                        >
+                          {dadosPieChart.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.cor} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pie-chart-center">
+                      <div className="pie-chart-center-value">{dadosPieChart.length}</div>
+                      <div className="pie-chart-center-label">Serviços</div>
+                    </div>
+                  </div>
+                  <div className="pie-legend">
+                    {dadosPieChart.map((item, i) => (
+                      <div key={i} className="pie-legend-item">
+                        <div className="pie-legend-dot" style={{ background: item.cor }}></div>
+                        <div className="pie-legend-info">
+                          <div className="pie-legend-label">{item.nome}</div>
+                          <div className="pie-legend-value">{fmtBRL(item.valor)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </section>

@@ -675,17 +675,6 @@ export default function PerfilScreen({ navigation }) {
                 </Text>
               </View>
 
-              <Ionicons name="chevron-forward" size={20} color="#CCC" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => navigation.navigate("Financeiro")}
-            >
-              <View style={[styles.iconBox, { backgroundColor: '#E8F5E9' }]}>
-                <Ionicons name="wallet-outline" size={22} color="#2E7D32" />
-              </View>
-
               <View style={styles.menuTextWrap}>
                 <Text style={styles.menuText}>Financeiro</Text>
                 <Text style={styles.menuSubText}>

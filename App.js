@@ -48,6 +48,8 @@ import PerfilScreen from './src/screens/comum/PerfilScreen';
 
 import EditarPerfil from './src/screens/comum/EditarPerfil';
 
+import { ConfigProvider } from './src/hooks/useConfig';
+
 import LoadingScreen from './src/screens/comum/LoadingScreen';
 
 import NotificacoesScreen from './src/screens/comum/NotificacoesScreen';
@@ -1157,15 +1159,17 @@ function AppNavigator() {
 
 }
 
-
-
 export default function App() {
 
   return (
 
     <SafeAreaProvider>
 
-      <AppNavigator />
+      <ConfigProvider>
+
+        <AppNavigator />
+
+      </ConfigProvider>
 
     </SafeAreaProvider>
 

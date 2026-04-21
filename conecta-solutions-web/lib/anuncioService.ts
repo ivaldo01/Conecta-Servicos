@@ -1,11 +1,7 @@
 import { db } from './firebase';
 import {
   collection,
-  doc,
   addDoc,
-  updateDoc,
-  deleteDoc,
-  getDoc,
   getDocs,
   query,
   orderBy,
@@ -14,8 +10,7 @@ import {
   serverTimestamp,
   onSnapshot,
   limit,
-  QueryConstraint,
-  increment
+  QueryConstraint
 } from 'firebase/firestore';
 
 // ============================================================
@@ -340,8 +335,32 @@ export async function getAnunciosAtivos(tipo: TipoAnuncio, userContext?: {
     limit(10)
   ];
   
-  const q = query(anunciosRef, ...constraints);
-  const snap = await getDocs(q);
+  let snap;
+  try {
+    const q = query(anunciosRef, ...constraints);
+    snap = await getDocs(q);
+    console.log('🌐 [Web] Anúncios com datas:', snap.size);
+  } catch (error: any) {
+    console.error('🌐 [Web] Erro ao buscar anúncios:', error.message, error.code);
+    if (error.code === 'permission-denied') {
+      console.error('🌐 [Web] Permissão negada na coleção anuncios');
+    }
+    console.log('🌐 [Web] Erro com datas, tentando sem datas...');
+    // Fallback sem datas
+    const qSimples = query(
+      anunciosRef,
+      where('status', '==', 'ativo'),
+      where('tipo', '==', tipo),
+      limit(10)
+    );
+    try {
+      snap = await getDocs(qSimples);
+      console.log('🌐 [Web] Anúncios sem datas:', snap.size);
+    } catch (error2: any) {
+      console.error('🌐 [Web] Erro fallback:', error2.message, error2.code);
+      snap = { docs: [] } as any;
+    }
+  }
   
   let anuncios = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Anuncio);
   
@@ -387,52 +406,14 @@ export async function registrarImpressao(
   anuncianteId: string,
   data: Omit<ImpressaoAnuncio, 'id' | 'anuncioId' | 'anuncianteId' | 'timestamp'>
 ): Promise<void> {
-  // Registrar impressão
+  // Registrar impressão (apenas criar documento)
   await addDoc(impressoesRef, {
     anuncioId,
     anuncianteId,
     ...data,
     timestamp: serverTimestamp()
   });
-  
-  // Atualizar métricas do anúncio
-  const anuncioRef = doc(db, 'anuncios', anuncioId);
-  const anuncioSnap = await getDoc(anuncioRef);
-  
-  if (anuncioSnap.exists()) {
-    const anuncio = anuncioSnap.data() as Anuncio;
-    const metricas = anuncio.metricas;
-    const modelo = anuncio.modeloCobranca;
-    const valorCobranca = anuncio.valorCobranca;
-    
-    // Calcular custo
-    let custoImpressao = 0;
-    if (modelo === 'cpm') {
-      custoImpressao = valorCobranca / 1000; // CPM = custo por 1000 impressões
-    }
-    
-    const novoOrcamentoGasto = (anuncio.orcamentoGasto || 0) + custoImpressao;
-    const novasImpressoes = metricas.impressoes + 1;
-    const novoCpmMedio = novoOrcamentoGasto / (novasImpressoes / 1000);
-    
-    await updateDoc(anuncioRef, {
-      'metricas.impressoes': novasImpressoes,
-      'metricas.cpmMedio': novoCpmMedio,
-      'metricas.gastoTotal': novoOrcamentoGasto,
-      orcamentoGasto: novoOrcamentoGasto,
-      // Se atingiu orçamento, pausar
-      status: anuncio.orcamentoTotal && novoOrcamentoGasto >= anuncio.orcamentoTotal ? 'pausado' : anuncio.status,
-      updatedAt: serverTimestamp()
-    });
-    
-    // Atualizar saldo do anunciante
-    const anuncianteRef = doc(db, 'anunciantes', anuncianteId);
-    await updateDoc(anuncianteRef, {
-      saldoCreditos: increment(-custoImpressao),
-      totalGasto: increment(custoImpressao),
-      updatedAt: serverTimestamp()
-    });
-  }
+  console.log('🌐 [Web] Impressão registrada para:', anuncioId);
 }
 
 export async function registrarClique(
@@ -441,55 +422,20 @@ export async function registrarClique(
   impressaoId: string | undefined,
   data: Omit<CliqueAnuncio, 'id' | 'anuncioId' | 'anuncianteId' | 'impressaoId' | 'timestamp'>
 ): Promise<void> {
-  // Registrar clique
-  await addDoc(cliquesRef, {
+  // Registrar clique (apenas criar documento)
+  const cliqueData: any = {
     anuncioId,
     anuncianteId,
-    impressaoId,
     ...data,
     timestamp: serverTimestamp()
-  });
+  };
   
-  // Atualizar métricas do anúncio
-  const anuncioRef = doc(db, 'anuncios', anuncioId);
-  const anuncioSnap = await getDoc(anuncioRef);
-  
-  if (anuncioSnap.exists()) {
-    const anuncio = anuncioSnap.data() as Anuncio;
-    const metricas = anuncio.metricas;
-    const modelo = anuncio.modeloCobranca;
-    const valorCobranca = anuncio.valorCobranca;
-    
-    // Calcular custo
-    let custoClique = 0;
-    if (modelo === 'cpc') {
-      custoClique = valorCobranca;
-    }
-    
-    const novoOrcamentoGasto = (anuncio.orcamentoGasto || 0) + custoClique;
-    const novosCliques = metricas.cliques + 1;
-    const novoCtr = (novosCliques / metricas.impressoes) * 100;
-    const novoCpcMedio = novoOrcamentoGasto / novosCliques;
-    
-    await updateDoc(anuncioRef, {
-      'metricas.cliques': novosCliques,
-      'metricas.ctr': novoCtr,
-      'metricas.cpcMedio': novoCpcMedio,
-      'metricas.gastoTotal': novoOrcamentoGasto,
-      orcamentoGasto: novoOrcamentoGasto,
-      status: anuncio.orcamentoTotal && novoOrcamentoGasto >= anuncio.orcamentoTotal ? 'pausado' : anuncio.status,
-      updatedAt: serverTimestamp()
-    });
-    
-    // Atualizar saldo do anunciante
-    if (custoClique > 0) {
-      const anuncianteRef = doc(db, 'anunciantes', anuncianteId);
-      await updateDoc(anuncianteRef, {
-        saldoCreditos: increment(-custoClique),
-        totalGasto: increment(custoClique),
-        updatedAt: serverTimestamp()
-      });
-    }
+  // Só incluir impressaoId se estiver definido (Firestore não aceita undefined)
+  if (impressaoId !== undefined && impressaoId !== null) {
+    cliqueData.impressaoId = impressaoId;
   }
+  
+  await addDoc(cliquesRef, cliqueData);
+  console.log('🌐 [Web] Clique registrado para:', anuncioId);
 }
 

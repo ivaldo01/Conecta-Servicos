@@ -4,8 +4,8 @@
 
 .dashboard-page {
   min-height: 100vh;
-  background-color: #0B0F1A; /* Deep Navy - Dark Premium */
-  color: #FFFFFF;
+  background-color: #0b0f1a; /* Deep Navy - Dark Premium */
+  color: #ffffff;
 }
 
 .dashboard-body {
@@ -24,8 +24,16 @@
   gap: 24px;
 }
 
-@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px)  { .kpi-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1200px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .kpi-card {
   background: #151925;
@@ -35,28 +43,32 @@
   flex-direction: column;
   gap: 20px;
   border: 1px solid rgba(59, 130, 246, 0.2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.2);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
   text-decoration: none;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .kpi-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 20px 25px -5px rgba(59, 130, 246, 0.15),
+    0 10px 10px -5px rgba(0, 0, 0, 0.3);
   border-color: rgba(59, 130, 246, 0.5);
 }
 
 .kpi-card::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 3px;
-  background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -80,10 +92,38 @@
 }
 
 /* Glassmorphism Styles for Icons */
-.kpi-card--blue .kpi-card-icon   { background: rgba(208, 235, 255, 0.6); color: #1971C2; }
-.kpi-card--green .kpi-card-icon  { background: rgba(211, 249, 216, 0.6); color: #2F9E44; }
-.kpi-card--purple .kpi-card-icon { background: rgba(243, 217, 250, 0.6); color: #9C36B5; }
-.kpi-card--orange .kpi-card-icon { background: rgba(255, 232, 204, 0.6); color: #E8590C; }
+.kpi-card--blue .kpi-card-icon {
+  background: rgba(208, 235, 255, 0.6);
+  color: #1971c2;
+}
+.kpi-card--green .kpi-card-icon {
+  background: rgba(211, 249, 216, 0.6);
+  color: #2f9e44;
+}
+.kpi-card--purple .kpi-card-icon {
+  background: rgba(243, 217, 250, 0.6);
+  color: #9c36b5;
+}
+.kpi-card--orange .kpi-card-icon {
+  background: rgba(255, 232, 204, 0.6);
+  color: #e8590c;
+}
+.kpi-card--gold .kpi-card-icon {
+  background: rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+}
+.kpi-card--yellow .kpi-card-icon {
+  background: rgba(254, 243, 199, 0.6);
+  color: #d97706;
+}
+.kpi-card--info .kpi-card-icon {
+  background: rgba(207, 250, 254, 0.6);
+  color: #0891b2;
+}
+.kpi-card--pink .kpi-card-icon {
+  background: rgba(252, 231, 243, 0.6);
+  color: #db2777;
+}
 
 .kpi-card-info {
   display: flex;
@@ -92,7 +132,7 @@
 
 .kpi-card-label {
   font-size: 13px;
-  color: #64748B; /* Slate 500 */
+  color: #94a3b8; /* Slate 400 - mais claro */
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -102,15 +142,22 @@
 .kpi-card-value {
   font-size: 28px;
   font-weight: 800;
-  color: #1E293B; /* Slate 800 */
+  color: #f1f5f9; /* Slate 100 - branco */
+  line-height: 1;
+}
+
+.kpi-card-subtext {
+  font-size: 12px;
+  color: #cbd5e1; /* Slate 300 - mais claro */
+  font-weight: 500;
   line-height: 1;
 }
 
 .kpi-card-trend {
   font-size: 11px;
   font-weight: 700;
-  color: #10B981;
-  background: #ECFDF5;
+  color: #10b981;
+  background: #ecfdf5;
   padding: 2px 8px;
   border-radius: 50px;
   margin-top: 8px;
@@ -121,10 +168,10 @@
    SEÇÃO DE AGENDAMENTOS — LISTA EXECUTIVA
    ============================================================ */
 .dashboard-section {
-  background: #ffffff;
+  background: #151925;
   border-radius: 24px;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
 
@@ -138,9 +185,7 @@
 .dashboard-section-title {
   font-size: 18px;
   font-weight: 800;
-  background: linear-gradient(135deg, #1E293B 0%, #475569 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #ffffff;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -165,8 +210,8 @@
 }
 
 .appointment-card:hover {
-  background: #F8FAFC;
-  border-color: #E2E8F0;
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
   transform: translateX(4px);
 }
 
@@ -174,7 +219,7 @@
   width: 48px;
   height: 48px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #1971C2 0%, #1864AB 100%);
+  background: linear-gradient(135deg, #1971c2 0%, #1864ab 100%);
   color: #fff;
   font-weight: 700;
   display: flex;
@@ -190,13 +235,13 @@
 .appointment-name {
   font-size: 15px;
   font-weight: 700;
-  color: #1E293B;
+  color: #f1f5f9;
   margin-bottom: 2px;
 }
 
 .appointment-service {
   font-size: 12px;
-  color: #64748B;
+  color: #94a3b8;
   font-weight: 500;
 }
 
@@ -215,14 +260,23 @@
   border-radius: 8px;
 }
 
-.status--confirmado { background: #DCFCE7; color: #166534; }
-.status--pendente    { background: #FEF3C7; color: #92400E; }
-.status--concluido   { background: #DBEAFE; color: #1E40AF; }
+.status--confirmado {
+  background: #dcfce7;
+  color: #166534;
+}
+.status--pendente {
+  background: #fef3c7;
+  color: #92400e;
+}
+.status--concluido {
+  background: #dbeafe;
+  color: #1e40af;
+}
 
 .appointment-value {
   font-size: 14px;
   font-weight: 800;
-  color: #1E293B;
+  color: #1e293b;
   min-width: 80px;
   text-align: right;
 }
@@ -230,14 +284,24 @@
 .appointments-empty {
   padding: 80px 0;
   text-align: center;
-  color: #94A3B8;
+  color: #64748b;
   font-weight: 500;
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.dashboard-section { animation: slideIn 0.5s ease both; }
-.kpi-card { animation: slideIn 0.4s ease both; }
+.dashboard-section {
+  animation: slideIn 0.5s ease both;
+}
+.kpi-card {
+  animation: slideIn 0.4s ease both;
+}

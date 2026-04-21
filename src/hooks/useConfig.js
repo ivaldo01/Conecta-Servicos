@@ -1,0 +1,113 @@
+import { useState, useEffect, useContext, createContext } from 'react';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { db } from '../services/firebaseConfig';
+
+// Valores padrão
+const defaultConfig = {
+  geral: {
+    nomePlataforma: 'Conecta Solutions',
+    emailSuporte: 'suporte@conectasolutions.com',
+    telefoneSuporte: '',
+    timezone: 'America/Sao_Paulo',
+    idiomaPadrao: 'pt-BR',
+  },
+  notificacoes: {
+    emailAtivado: true,
+    pushAtivado: true,
+    smsAtivado: false,
+    notificarNovoCadastro: true,
+    notificarNovoAgendamento: true,
+    notificarPagamento: true,
+  },
+  pagamentos: {
+    gatewayPadrao: 'stripe',
+    moedaPadrao: 'BRL',
+    taxaServico: 10,
+    pagamentoAntecipado: false,
+  },
+  seguranca: {
+    autenticacaoDupla: false,
+    timeoutSessao: 60,
+    tentativasLogin: 5,
+  },
+};
+
+// Criar contexto
+const ConfigContext = createContext({
+  config: defaultConfig,
+  loading: true,
+  error: null,
+});
+
+// Provider
+export function ConfigProvider({ children }) {
+  const [config, setConfig] = useState(defaultConfig);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    console.log('[Mobile ConfigProvider] Iniciando listener...');
+    
+    const unsubscribe = onSnapshot(
+      doc(db, 'configuracoes', 'sistema'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          console.log('[Mobile] Configurações carregadas:', data);
+          
+          // Merge com valores padrão
+          setConfig({
+            geral: { ...defaultConfig.geral, ...data.geral },
+            notificacoes: { ...defaultConfig.notificacoes, ...data.notificacoes },
+            pagamentos: { ...defaultConfig.pagamentos, ...data.pagamentos },
+            seguranca: { ...defaultConfig.seguranca, ...data.seguranca },
+          });
+        } else {
+          console.log('[Mobile] Configurações não existem, usando padrão');
+          setConfig(defaultConfig);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error('[Mobile] Erro ao carregar configurações:', err);
+        setError('Erro ao carregar configurações');
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <ConfigContext.Provider value={{ config, loading, error }}>
+      {children}
+    </ConfigContext.Provider>
+  );
+}
+
+// Hook
+export function useConfig() {
+  return useContext(ConfigContext);
+}
+
+// Função auxiliar fora de componentes
+export async function getConfigServerSide() {
+  try {
+    const docRef = doc(db, 'configuracoes', 'sistema');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        geral: { ...defaultConfig.geral, ...data.geral },
+        notificacoes: { ...defaultConfig.notificacoes, ...data.notificacoes },
+        pagamentos: { ...defaultConfig.pagamentos, ...data.pagamentos },
+        seguranca: { ...defaultConfig.seguranca, ...data.seguranca },
+      };
+    }
+    return defaultConfig;
+  } catch (error) {
+    console.error('[Mobile] Erro getConfigServerSide:', error);
+    return defaultConfig;
+  }
+}

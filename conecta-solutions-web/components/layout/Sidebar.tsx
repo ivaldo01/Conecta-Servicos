@@ -4,6 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useConfig } from '@/lib/useConfig';
+import '@/styles/sidebar.css';
+
 import {
   Activity, Calendar, Settings, Users, Wallet,
   Star, User, MessageCircle, Search, FileText,
@@ -11,7 +14,6 @@ import {
   Shield, Bell, Radio, Stethoscope,
   Megaphone, Building2, Mail
 } from 'lucide-react';
-import '@/styles/sidebar.css';
 
 // ============================================================
 // INTERFACE — Definição de um item de menu
@@ -74,7 +76,10 @@ const navCliente: NavItem[] = [
 // ============================================================
 export default function Sidebar() {
   const { dadosUsuario, ehProfissional, ehAdmin, logout } = useAuth();
+  const { config, loading } = useConfig();
   const pathname = usePathname();
+  
+  const nomePlataforma = loading ? 'Carregando...' : config.geral.nomePlataforma;
 
   // Seleciona os itens de navegação conforme o perfil
   let navItems = navCliente;
@@ -94,7 +99,10 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* ===== LOGO ===== */}
       <div className="sidebar-logo">
-        <img src="/logo-cs.png" alt="Conecta Solutions" className="sidebar-logo-img" />
+        <img src="/logo-cs.png" alt={nomePlataforma} className="sidebar-logo-img" />
+        <p style={{ color: '#fff', fontSize: '14px', fontWeight: 600, marginTop: 8, textAlign: 'center' }}>
+          {nomePlataforma}
+        </p>
       </div>
 
       {/* ===== PERFIL DO USUÁRIO ===== */}

@@ -10,7 +10,8 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { auth, db } from "../../services/firebaseConfig";
+import { db, auth } from "../../services/firebaseConfig";
+import { logAgendamento } from "../../services/activityLogger";
 import {
     doc,
     getDoc,
@@ -368,6 +369,28 @@ export default function DetalhesAgendamentoPro({ route, navigation }) {
             }
 
             await enviarNotificacaoCompletaParaCliente(novoStatus);
+
+            // Log da atividade
+            const acaoTexto = {
+                'confirmado': 'Agendamento confirmado',
+                'recusado': 'Agendamento recusado',
+                'cancelado': 'Agendamento cancelado',
+                'concluido': 'Agendamento concluído'
+            }[novoStatus] || 'Status atualizado';
+
+            logAgendamento(
+                { uid: auth.currentUser?.uid, nome: agendamentoAtual.profissionalNome || 'Profissional', tipo: 'profissional' },
+                acaoTexto,
+                {
+                    agendamentoId: agendamentoAtual.id,
+                    clienteId: agendamentoAtual.clienteId,
+                    clienteNome: agendamentoAtual.clienteNome,
+                    profissionalId: agendamentoAtual.profissionalId,
+                    status: novoStatus,
+                    data: agendamentoAtual.data,
+                    horario: agendamentoAtual.horario
+                }
+            );
 
             Alert.alert("Sucesso", "Status atualizado com sucesso.");
         } catch (error) {

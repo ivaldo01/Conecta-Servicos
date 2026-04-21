@@ -26,17 +26,261 @@
   background: var(--bg-page);
 }
 
+/* ============================================================
+   HEADER COM ESTATÍSTICAS (Estilo Suporte Master)
+   ============================================================ */
+.suporte-header-stats {
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.suporte-header-stats .stats-row {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.stat-card.primary {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.stat-card.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.stat-card.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.stat-card.info {
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.stat-card.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ============================================================
+   STATUS BADGE (Estilo Suporte Master)
+   ============================================================ */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge.aberto {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.status-badge.aberto::before {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.status-badge.em_atendimento {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.status-badge.em_atendimento::before {
+  background: #3b82f6;
+  box-shadow: 0 0 8px #3b82f6;
+}
+
+.status-badge.resolvido {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+}
+
+.status-badge.resolvido::before {
+  background: #6b7280;
+}
+
+.status-badge.urgente {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.status-badge.urgente::before {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================================
+   HEADER COM ESTATÍSTICAS (Estilo Suporte Master)
+   ============================================================ */
+.suporte-header-stats {
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.suporte-header-stats .stats-row {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.stat-card.primary {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.stat-card.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.stat-card.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.stat-card.info {
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.stat-card.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ============================================================
+   STATUS BADGE (Estilo Suporte Master)
+   ============================================================ */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge.aberto {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.status-badge.aberto::before {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.status-badge.em_atendimento {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.status-badge.em_atendimento::before {
+  background: #3b82f6;
+  box-shadow: 0 0 8px #3b82f6;
+}
+
+.status-badge.resolvido {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+}
+
+.status-badge.resolvido::before {
+  background: #6b7280;
+}
+
+.status-badge.urgente {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.status-badge.urgente::before {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 .suporte-body {
   padding: var(--space-xl);
-  display: grid;
-  grid-template-columns: 300px 1fr;  /* lista lateral | chat */
-  gap: var(--space-xl);
+  display: flex;
   flex: 1;
-  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 @media (max-width: 768px) {
-  .suporte-body { grid-template-columns: 1fr; }
+  .suporte-body { padding: var(--space-md); }
 }
 
 
@@ -158,7 +402,7 @@
 
 
 /* ============================================================
-   7. CABEÇALHO DO CHAT
+   7. CABEÇALHO DO CHAT (Estilo Suporte Master)
    ============================================================ */
 .suporte-chat-header {
   display: flex;
@@ -169,10 +413,33 @@
   background: var(--bg-muted);
 }
 
-.suporte-chat-header h3 {
-  font-size: 14px;
+.suporte-chat-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.suporte-chat-header-info h3 {
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
+  margin: 0;
+}
+
+.suporte-chat-header-info p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.suporte-chat-header-info .color-primary {
+  color: var(--color-primary);
+}
+
+.suporte-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 
@@ -390,3 +657,342 @@
   background: var(--bg-card);
 }
 .hidden { display: none; }
+
+/* ============================================================
+   13. AVATARES E ESTRUTURA MELHORADA DAS MENSAGENS
+   ============================================================ */
+.suporte-msg {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 85%;
+  animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.suporte-msg-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.suporte-msg-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-suporte {
+  background: var(--color-primary);
+  color: white;
+}
+
+.suporte-msg-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.suporte-msg-header {
+  margin-bottom: 4px;
+}
+
+.msg-nome {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.suporte-msg-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.suporte-msg-status {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.suporte-msg-status .lida {
+  color: var(--color-primary);
+}
+
+/* ============================================================
+   14. SEPARADOR DE DATAS
+   ============================================================ */
+.suporte-data-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.suporte-data-separator::before,
+.suporte-data-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+  max-width: 100px;
+}
+
+/* ============================================================
+   15. INDICADOR "DIGITANDO..."
+   ============================================================ */
+.digitando-indicator {
+  opacity: 0.7;
+}
+
+.digitando-bubble {
+  padding: 12px 20px !important;
+  min-width: 60px;
+}
+
+.digitando-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+.digitando-dots span {
+  width: 8px;
+  height: 8px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.digitando-dots span:nth-child(1) { animation-delay: -0.32s; }
+.digitando-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* ============================================================
+   16. PREVIEW DE IMAGEM ANTES DE ENVIAR
+   ============================================================ */
+.suporte-preview-container {
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-muted);
+}
+
+.preview-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--border-color);
+}
+
+.preview-wrapper img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.btn-remover-preview {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-remover-preview:hover {
+  background: rgba(0,0,0,0.8);
+  transform: scale(1.1);
+}
+
+/* ============================================================
+   17. LOADING SPINNER E ESTADOS
+   ============================================================ */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.suporte-msg-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: auto;
+}
+
+/* ============================================================
+   18. ESTADO VAZIO MELHORADO
+   ============================================================ */
+.suporte-chat-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-muted);
+}
+
+.vazio-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--bg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+}
+
+.vazio-dica {
+  font-size: 12px;
+  background: var(--bg-muted);
+  padding: 8px 16px;
+  border-radius: 20px;
+  margin-top: 8px;
+}
+
+/* ============================================================
+   19. CONTADOR DE CARACTERES
+   ============================================================ */
+.char-counter-input {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   21. CAMPANHA E ANEXOS MELHORADOS
+   ============================================================ */
+.msg-texto {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.suporte-msg-campanha {
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--bg-card) 100%);
+  border: 1px solid var(--color-primary);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 4px;
+}
+
+.campanha-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.campanha-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 0.5px;
+}
+
+.campanha-titulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.campanha-mensagem {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+.campanha-imagem {
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  max-width: 300px;
+}
+
+.campanha-imagem img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.campanha-video {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.campanha-cupom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--color-primary);
+}
+
+.campanha-cupom code {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary);
+  font-family: monospace;
+}
+
+/* Upload spinner */
+.upload-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}

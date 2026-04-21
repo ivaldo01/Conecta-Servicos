@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { getAnunciosAtivos, registrarImpressao, registrarClique, Anuncio, TipoAnuncio } from '@/lib/anuncioService';
+import { useAuth } from '@/lib/auth';
 
 interface BannerAdProps {
   tipo: TipoAnuncio;
@@ -11,6 +12,7 @@ interface BannerAdProps {
 }
 
 export default function BannerAd({ tipo, className = '', fallback = null }: BannerAdProps) {
+  const { user } = useAuth();
   const [anuncio, setAnuncio] = useState<Anuncio | null>(null);
   const [loading, setLoading] = useState(true);
   const [impressaoRegistrada, setImpressaoRegistrada] = useState(false);
@@ -20,17 +22,16 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
   useEffect(() => {
     const buscarAnuncio = async () => {
       try {
-        // Aqui você pode passar o contexto do usuário logado
-        const anuncios = await getAnunciosAtivos(tipo, {
-          // perfil: 'cliente', // ou 'profissional'
-          // cidade: 'São Paulo',
-          // device: 'web',
-        });
+        console.log('[BannerAd] Buscando anúncios tipo:', tipo);
+        const anuncios = await getAnunciosAtivos(tipo, {});
+        console.log('[BannerAd] Anúncios encontrados:', anuncios.length);
         
-        // Selecionar um aleatório (rotação de anúncios)
         if (anuncios.length > 0) {
           const randomIndex = Math.floor(Math.random() * anuncios.length);
+          console.log('[BannerAd] Selecionado:', anuncios[randomIndex].titulo);
           setAnuncio(anuncios[randomIndex]);
+        } else {
+          console.log('[BannerAd] Nenhum anúncio encontrado');
         }
       } catch (err) {
         console.error('[BannerAd] Erro ao buscar anúncio:', err);
@@ -55,12 +56,12 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
               anuncio.id!,
               anuncio.anuncianteId,
               {
-                userId: undefined, // Pegar do auth context
-                userTipo: undefined,
+                userId: user?.uid || null,
+                userTipo: user?.tipo || null,
                 device: 'web',
                 pagina: window.location.pathname,
-                localizacao: undefined,
-                custo: 0 // Calculado no service
+                localizacao: null,
+                custo: 0
               }
             ).catch((err) => {
               console.error('[BannerAd] Erro ao registrar impressão:', err);
@@ -87,9 +88,9 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
       await registrarClique(
         anuncio.id!,
         anuncio.anuncianteId,
-        undefined, // impressaoId - idealmente guardar o ID da impressão
+        undefined,
         {
-          userId: undefined,
+          userId: user?.uid || null,
           device: 'web',
           pagina: window.location.pathname,
           custo: 0,
@@ -117,7 +118,25 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
   }
 
   if (!anuncio) {
-    return <>{fallback}</>;
+    return (
+      <div 
+        className="banner-ad-empty"
+        style={{
+          width: '100%',
+          maxWidth: 728,
+          height: 90,
+          background: '#f0f0f0',
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#999',
+          fontSize: 12
+        }}
+      >
+        Espaço para anúncio
+      </div>
+    );
   }
 
   // Estilos por tipo
@@ -197,17 +216,58 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
           textDecoration: 'none'
         }}
       >
-        {/* Imagem */}
+        {/* Imagem ou Fallback */}
         {tipo !== 'push' ? (
-          <img
-            src={anuncio.imagemUrl}
-            alt={anuncio.tituloAnuncio}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
-            }}
-          />
+          <div style={{
+            width: '100%',
+            height: '100%',
+            background: anuncio.corPrimaria || '#3B82F6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#FFF',
+            padding: 16,
+            position: 'relative'
+          }}>
+            {anuncio.imagemUrl && (
+              <img
+                src={anuncio.imagemUrl}
+                alt=""
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  zIndex: 1
+                }}
+                onError={(e) => {
+                  console.log('[BannerAd] Imagem inválida, usando fallback');
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            )}
+            <div style={{ position: 'relative', zIndex: 2, textAlign: 'center' }}>
+              <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 4 }}>
+                {anuncio.tituloAnuncio || anuncio.titulo || 'Anúncio'}
+              </div>
+              {(anuncio.textoAnuncio || anuncio.descricao) && (
+                <div style={{ fontSize: 14, opacity: 0.9 }}>{anuncio.textoAnuncio || anuncio.descricao}</div>
+              )}
+              <div style={{ 
+                marginTop: 12, 
+                padding: '8px 20px', 
+                background: anuncio.corSecundaria || '#1E40AF',
+                borderRadius: 4,
+                fontSize: 14,
+                fontWeight: 500,
+                display: 'inline-block'
+              }}>
+                {anuncio.ctaTexto || 'Clique aqui'}
+              </div>
+            </div>
+          </div>
         ) : (
           // Layout para Push Notification
           <div

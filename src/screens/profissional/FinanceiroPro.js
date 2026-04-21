@@ -29,6 +29,7 @@ import colors from '../../constants/colors';
 import { db } from '../../services/firebaseConfig';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsuario } from '../../hooks/useUsuario';
+import { useConfig } from '../../hooks/useConfig';
 import { solicitarSaqueProfissional } from '../../services/paymentService';
 import { PLANS, getTaxaSaque, getTaxaServico } from '../../constants/plans';
 
@@ -176,6 +177,19 @@ function EmptyState({ icon, title, subtitle }) {
 export default function FinanceiroPro({ navigation }) {
   const { usuario: authUser, loadingAuth } = useAuth();
   const { dadosUsuario, loadingUsuario } = useUsuario(authUser?.uid);
+  const { config, loading: loadingConfig } = useConfig();
+
+  // Taxa de serviço baseada no plano VIP do profissional
+  const getTaxaPorPlano = (plano) => {
+    switch (plano?.toUpperCase()) {
+      case 'OURO': return 5;
+      case 'PRATA': return 8;
+      case 'BRONZE':
+      case 'INICIANTE':
+      default: return 10;
+    }
+  };
+  const taxaServico = getTaxaPorPlano(dadosUsuario?.planoAtivo);
 
   const usuario = useMemo(
     () => ({
@@ -1198,6 +1212,16 @@ export default function FinanceiroPro({ navigation }) {
             </View>
           </View>
         )}
+
+        {/* Taxa de Serviço - Plano VIP */}
+        <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 12, marginBottom: 12, borderLeftWidth: 4, borderLeftColor: '#F59E0B' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="information-circle-outline" size={20} color="#D97706" />
+            <Text style={{ fontSize: 13, color: '#92400E', marginLeft: 8, flex: 1 }}>
+              Plano <Text style={{ fontWeight: '700' }}>{dadosUsuario?.planoAtivo || 'Bronze'}</Text>: Taxa de <Text style={{ fontWeight: '700' }}>{taxaServico}%</Text> sobre cada pagamento
+            </Text>
+          </View>
+        </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
           <View style={{ flex: 1, backgroundColor: '#FFF', padding: 16, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6 }}>

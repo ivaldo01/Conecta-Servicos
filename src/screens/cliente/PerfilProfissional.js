@@ -119,6 +119,7 @@ export default function PerfilProfissional({ route, navigation }) {
         id: d.id,
         ...d.data(),
       }));
+      console.log('📱 [PerfilProfissional] Serviços carregados:', listaServicos.map(s => ({ nome: s.nome, fotoUrl: s.fotoUrl })));
       setServicos(listaServicos);
 
       const avaliacoesQuery = query(
@@ -466,10 +467,14 @@ export default function PerfilProfissional({ route, navigation }) {
                   <Text style={styles.sectionCount}>{servicos.length}</Text>
                 </View>
 
+                {/* DEBUG: Mostrar dados dos serviços */}
+                {console.log('Serviços no mobile:', servicos)}
+
                 {servicos.length === 0 ? (
                   <Text style={styles.emptyText}>Nenhum serviço cadastrado.</Text>
                 ) : (
                   servicos.map((servico) => {
+                    console.log('DEBUG - Serviço:', servico.nome, '| fotoUrl:', servico.fotoUrl, '| Tem foto?', !!servico.fotoUrl);
                     const selecionado = servicosSelecionados.some((s) => s.id === servico.id);
 
                     return (
@@ -479,6 +484,19 @@ export default function PerfilProfissional({ route, navigation }) {
                         onPress={() => toggleServico(servico)}
                         activeOpacity={0.9}
                       >
+                        {/* Foto do Serviço */}
+                        {servico.fotoUrl ? (
+                          <Image
+                            source={{ uri: servico.fotoUrl }}
+                            style={styles.serviceCardImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={styles.serviceCardImagePlaceholder}>
+                            <Ionicons name="cut-outline" size={28} color="#94A3B8" />
+                          </View>
+                        )}
+
                         <View style={styles.serviceInfo}>
                           <Text style={styles.serviceName}>{servico.nome}</Text>
                           {!!servico.descricao && (
@@ -931,6 +949,22 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '800',
     marginTop: 10,
+  },
+  serviceCardImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+  },
+  serviceCardImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 16,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    justifyContent: 'center',
   },
   avaliacaoCard: {
     backgroundColor: '#FFF',

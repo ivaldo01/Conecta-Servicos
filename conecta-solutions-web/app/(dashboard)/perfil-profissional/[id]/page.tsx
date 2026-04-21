@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, collection, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Topbar from '@/components/layout/Topbar';
-import { MapPin, Star, Clock, DollarSign, ChevronRight, User, MessageSquare, Calendar } from 'lucide-react';
+import { MapPin, Star, Clock, DollarSign, ChevronRight, User, MessageSquare, Calendar, Scissors } from 'lucide-react';
 import '@/styles/perfil-profissional.css';
 
 // ============================================================
@@ -40,6 +40,8 @@ interface Servico {
   preco: number;
   duracao: number;
   descricao?: string;
+  fotoUrl?: string;
+  categoria?: string;
 }
 
 // ============================================================
@@ -181,6 +183,18 @@ export default function PerfilProfissionalPage() {
             ) : (
               servicos.map(s => (
                 <div key={s.id} className="prof-servico-card">
+                  {/* Foto do Serviço */}
+                  <div className="prof-servico-foto-wrap">
+                    {s.fotoUrl ? (
+                      <img src={s.fotoUrl} alt={s.nome} className="prof-servico-foto" />
+                    ) : (
+                      <div className="prof-servico-foto-placeholder">
+                        <Scissors size={24} />
+                      </div>
+                    )}
+                    {s.categoria && <span className="prof-servico-categoria">{s.categoria}</span>}
+                  </div>
+                  
                   <div className="prof-servico-info">
                     <h3 className="prof-servico-nome">{s.nome}</h3>
                     {s.descricao && <p className="prof-servico-desc">{s.descricao}</p>}

@@ -1,14 +1,29 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  User
-} from 'firebase/auth';
-import { doc, getDoc, onSnapshot, query, collection, where, getDocs } from 'firebase/firestore';
-import { auth, db } from './firebase';
+  User,
+} from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  collection,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { logAuth, logNavegacao } from "./activityLogger";
+import { auth, db } from "./firebase";
 
 // =============================================
 // TIPOS
@@ -17,9 +32,16 @@ interface DadosUsuario {
   uid: string;
   nome?: string;
   email?: string;
-  perfil?: 'profissional' | 'cliente' | 'colaborador' | 'empresa' | 'admin' | 'suporte';
+  perfil?:
+    | "profissional"
+    | "cliente"
+    | "colaborador"
+    | "empresa"
+    | "admin"
+    | "suporte";
   planoAtivo?: string;
   fotoPerfil?: string;
+  fotoUrl?: string;
   profissionalId?: string; // ID do patrão (para colaboradores)
   [key: string]: unknown;
 }
@@ -55,42 +77,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         // --- FLUXO GESTOR / CLIENTE (OFICIAL) ---
         setUser(firebaseUser);
-        
-        unsubscribeProfile = onSnapshot(doc(db, 'usuarios', firebaseUser.uid), (snap) => {
-          if (snap.exists()) {
-            setDadosUsuario({ uid: firebaseUser.uid, ...snap.data() } as DadosUsuario);
-          } else {
-            console.warn('[Auth] Perfil não encontrado no Firestore.');
-          }
-          setLoading(false);
-        }, (err) => {
-          console.error('[Auth] Erro Profile Gestor:', err.message);
-          if (err.code === 'permission-denied') {
-            signOut(auth);
-          }
-          setLoading(false);
-        });
 
-      } else {
-        // --- FLUXO COLABORADOR (MANUAL) ---
-        const colabId = sessionStorage.getItem('colab_uid');
-        if (colabId) {
-          unsubscribeProfile = onSnapshot(doc(db, 'colaboradores', colabId), (snap) => {
+        unsubscribeProfile = onSnapshot(
+          doc(db, "usuarios", firebaseUser.uid),
+          (snap) => {
             if (snap.exists()) {
-              const data = snap.data();
-              setUser({ uid: colabId, email: data.email, displayName: data.nome } as any);
-              setDadosUsuario({ uid: colabId, perfil: 'colaborador', ...data } as any);
+              setDadosUsuario({
+                uid: firebaseUser.uid,
+                ...snap.data(),
+              } as DadosUsuario);
             } else {
-              sessionStorage.removeItem('colab_uid');
-              setUser(null);
-              setDadosUsuario(null);
+              console.warn("[Auth] Perfil não encontrado no Firestore.");
             }
             setLoading(false);
-          }, (err) => {
-            console.error('[Auth] Erro Profile Colab:', err.message);
-            sessionStorage.removeItem('colab_uid');
+          },
+          (err) => {
+            console.error("[Auth] Erro Profile Gestor:", err.message);
+            if (err.code === "permission-denied") {
+              signOut(auth);
+            }
             setLoading(false);
-          });
+          },
+        );
+      } else {
+        // --- FLUXO COLABORADOR (MANUAL) ---
+        const colabId = sessionStorage.getItem("colab_uid");
+        if (colabId) {
+          unsubscribeProfile = onSnapshot(
+            doc(db, "colaboradores", colabId),
+            (snap) => {
+              if (snap.exists()) {
+                const data = snap.data();
+                setUser({
+                  uid: colabId,
+                  email: data.email,
+                  displayName: data.nome,
+                } as any);
+                setDadosUsuario({
+                  uid: colabId,
+                  perfil: "colaborador",
+                  ...data,
+                } as any);
+              } else {
+                sessionStorage.removeItem("colab_uid");
+                setUser(null);
+                setDadosUsuario(null);
+              }
+              setLoading(false);
+            },
+            (err) => {
+              console.error("[Auth] Erro Profile Colab:", err.message);
+              sessionStorage.removeItem("colab_uid");
+              setLoading(false);
+            },
+          );
         } else {
           setUser(null);
           setDadosUsuario(null);
@@ -108,24 +148,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // LOGIN HÍBRIDO
   const login = async (email: string, password: string) => {
     const emailLimpo = email.trim().toLowerCase();
-    
+
     try {
-      console.log('[Auth] Tentando login oficial...');
+      console.log("[Auth] Tentando login oficial...");
       // 1. Tenta Auth Oficial
-      await signInWithEmailAndPassword(auth, emailLimpo, password);
-      sessionStorage.removeItem('colab_uid');
+      const userCred = await signInWithEmailAndPassword(
+        auth,
+        emailLimpo,
+        password,
+      );
+      sessionStorage.removeItem("colab_uid");
+
+      // Log da atividade
+      logAuth(userCred.user, "Login realizado", { metodo: "email_senha" });
     } catch (err: any) {
-      console.log('[Auth] Usuário não encontrado no Auth. Tentando canal de colaborador...');
-      
+      console.log(
+        "[Auth] Usuário não encontrado no Auth. Tentando canal de colaborador...",
+      );
+
       try {
         // --- PONTE DE SEGURANÇA ---
-        const { signInAnonymously } = await import('firebase/auth');
+        const { signInAnonymously } = await import("firebase/auth");
         if (!auth.currentUser) {
           try {
             await signInAnonymously(auth);
           } catch (anonErr: any) {
-            if (anonErr.code === 'auth/admin-restricted-operation') {
-              console.warn('[Auth] Login Anônimo desativado no Firebase. Tentando busca direta...');
+            if (anonErr.code === "auth/admin-restricted-operation") {
+              console.warn(
+                "[Auth] Login Anônimo desativado no Firebase. Tentando busca direta...",
+              );
             } else {
               throw anonErr;
             }
@@ -133,43 +184,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // 2. BUSCA NO FIRESTORE (Agora com permissão de 'autenticado')
-        const colabsRef = collection(db, 'colaboradores');
-        const q = query(colabsRef, where('email', '==', emailLimpo));
+        const colabsRef = collection(db, "colaboradores");
+        const q = query(colabsRef, where("email", "==", emailLimpo));
         const snap = await getDocs(q);
-        
+
         if (!snap.empty) {
           const colabDoc = snap.docs[0];
           const colabDados = colabDoc.data();
-          
-          console.log('[Auth] Colaborador localizado. Validando credenciais...');
+
+          console.log(
+            "[Auth] Colaborador localizado. Validando credenciais...",
+          );
 
           if (String(colabDados.senhaTemporaria) === String(password)) {
             const uid = colabDoc.id;
-            
+
             // Define os dados IMEDIATAMENTE
             const mockUser = {
               uid,
               email: colabDados.email,
               displayName: colabDados.nome,
             } as any;
-            
+
             setUser(mockUser);
-            setDadosUsuario({ uid, perfil: 'colaborador', ...colabDados } as any);
-            sessionStorage.setItem('colab_uid', uid);
-            
-            console.log('[Auth] Login de colaborador realizado com sucesso!');
+            setDadosUsuario({
+              uid,
+              perfil: "colaborador",
+              ...colabDados,
+            } as any);
+            sessionStorage.setItem("colab_uid", uid);
+
+            console.log("[Auth] Login de colaborador realizado com sucesso!");
+
+            // Log da atividade
+            logAuth(mockUser, "Login realizado", { metodo: "colaborador" });
             return;
           } else {
             // Se a senha estiver errada, saímos do anônimo para não travar
             await signOut(auth);
-            throw new Error('Senha incorreta para este colaborador.');
+            throw new Error("Senha incorreta para este colaborador.");
           }
         } else {
           // Se não achou na busca, sai do anônimo
           await signOut(auth);
         }
       } catch (firestoreErr: any) {
-        console.error('[Auth] Erro na busca de colaboradores:', firestoreErr.message);
+        console.error(
+          "[Auth] Erro na busca de colaboradores:",
+          firestoreErr.message,
+        );
         await signOut(auth);
       }
 
@@ -179,17 +242,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Log antes de deslogar
+    if (user) {
+      logAuth(user, 'Logout realizado', {});
+    }
     sessionStorage.removeItem('colab_uid');
     setDadosUsuario(null);
     setUser(null);
     await signOut(auth);
   };
 
-  const ehProfissional = dadosUsuario?.perfil === 'profissional' || dadosUsuario?.tipo === 'profissional';
-  const ehAdmin = dadosUsuario?.perfil === 'admin' || dadosUsuario?.isAdmin === true;
+  const ehProfissional =
+    dadosUsuario?.perfil === "profissional" ||
+    dadosUsuario?.tipo === "profissional";
+  // Efeito para logar navegação quando perfil muda
+  useEffect(() => {
+    if (dadosUsuario && !loading) {
+      logNavegacao(
+        {
+          uid: dadosUsuario.uid,
+          nome: dadosUsuario.nome,
+          tipo: dadosUsuario.perfil,
+          codigoConecta: dadosUsuario.codigoConecta,
+        },
+        "Dashboard",
+        { 
+          perfil: dadosUsuario.perfil, 
+          ...(dadosUsuario.planoAtivo && { plano: dadosUsuario.planoAtivo })
+        },
+      );
+    }
+  }, [dadosUsuario, loading]);
+
+  const ehAdmin =
+    dadosUsuario?.perfil === "admin" || dadosUsuario?.isAdmin === true;
 
   return (
-    <AuthContext.Provider value={{ user, dadosUsuario, loading, ehProfissional, ehAdmin, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        dadosUsuario,
+        loading,
+        ehProfissional,
+        ehAdmin,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -197,6 +296,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth deve ser usado dentro de <AuthProvider>');
+  if (!ctx) throw new Error("useAuth deve ser usado dentro de <AuthProvider>");
   return ctx;
 }

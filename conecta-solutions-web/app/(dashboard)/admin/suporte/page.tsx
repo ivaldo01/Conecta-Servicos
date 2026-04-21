@@ -64,6 +64,8 @@ export default function SuporteMasterPage() {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const mensagensEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Carregar todos os chats de suporte
   useEffect(() => {
@@ -116,6 +118,86 @@ export default function SuporteMasterPage() {
   useEffect(() => {
     mensagensEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensagens]);
+
+  // Função para upload de imagem no Cloudinary (mesmas credenciais do mobile)
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    // Credenciais do mobile (uploadService.js)
+    const cloudName = 'dctnkaktn';
+    const uploadPreset = 'Conecta-Solutions';
+    
+    console.log('[Cloudinary] Cloud Name:', cloudName);
+    console.log('[Cloudinary] Upload Preset:', uploadPreset);
+    console.log('[Cloudinary] Enviando arquivo:', file.name, 'Size:', file.size);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Cloudinary] Status:', response.status);
+      console.error('[Cloudinary] Response:', errorText);
+      throw new Error(`Erro ${response.status}: ${errorText || response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('[Cloudinary] Upload sucesso:', data.secure_url);
+    return data.secure_url;
+  };
+
+  // Upload de arquivo para Cloudinary
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !chatSelecionado || !dadosUsuario?.uid) return;
+
+    // Verificar tamanho (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Arquivo muito grande. Máximo 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      
+      // Enviar mensagem com anexo
+      const mensagensRef = collection(db, 'suporte', chatSelecionado.id, 'mensagens');
+      await addDoc(mensagensRef, {
+        texto: '',
+        anexoUrl: url,
+        anexoNome: file.name,
+        tipo: file.type.startsWith('image/') ? 'imagem' : 'arquivo',
+        senderId: dadosUsuario.uid,
+        senderNome: dadosUsuario?.nome || 'Admin',
+        senderType: 'admin',
+        createdAt: serverTimestamp()
+      });
+
+      // Atualizar última mensagem do chat
+      await updateDoc(doc(db, 'suporte', chatSelecionado.id), {
+        ultimaMensagem: `📎 Arquivo: ${file.name}`,
+        ultimaMensagemAdmin: true,
+        ultimaMensagemData: serverTimestamp()
+      });
+
+    } catch (err: any) {
+      console.error('[Upload Error]', err);
+      console.error('[Upload Error Message]', err?.message);
+      console.error('[Upload Error Response]', err?.response);
+      alert(`Falha ao enviar arquivo: ${err?.message || 'Erro desconhecido'}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const enviarMensagem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,18 +414,21 @@ export default function SuporteMasterPage() {
                     className={`message ${msg.senderType === 'admin' ? 'sent' : 'received'}`}
                   >
                     <div className="message-bubble">
-                      {msg.anexo && (
+                      {msg.anexoUrl && (
                         <div className="message-attachment">
-                          {msg.anexo.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                            <>
-                              <ImageIcon size={16} />
-                              <span>Imagem anexada</span>
-                            </>
+                          {msg.anexoUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                            <a href={msg.anexoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+                              <img 
+                                src={msg.anexoUrl} 
+                                alt="Imagem anexada" 
+                                style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', cursor: 'pointer' }} 
+                              />
+                            </a>
                           ) : (
-                            <>
+                            <a href={msg.anexoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', textDecoration: 'none' }}>
                               <FileText size={16} />
-                              <span>Arquivo anexado</span>
-                            </>
+                              <span>{msg.anexoNome || 'Arquivo anexado'}</span>
+                            </a>
                           )}
                         </div>
                       )}
@@ -360,7 +445,21 @@ export default function SuporteMasterPage() {
 
             {/* Input de Mensagem */}
             <form className="message-input-bar" onSubmit={enviarMensagem}>
-              <button type="button" className="btn-anexo" title="Anexar arquivo">
+              {/* Input file escondido para upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*,.pdf,.doc,.docx"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
+              
+              <button 
+                type="button" 
+                className="btn-anexo" 
+                onClick={() => fileInputRef.current?.click()}
+                title="Anexar arquivo"
+              >
                 <Paperclip size={20} />
               </button>
               <input

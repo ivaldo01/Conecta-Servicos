@@ -1,6 +1,31 @@
 import { db } from './firebaseConfig';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { Platform } from 'react-native';
+
+/**
+ * Remove recursivamente todos os campos undefined de um objeto
+ */
+function removeUndefined(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined).filter(v => v !== undefined);
+  }
+
+  if (typeof obj === 'object') {
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        result[key] = removeUndefined(value);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+}
 
 /**
  * Registra uma atividade do usuário para monitoramento em tempo real
@@ -21,25 +46,27 @@ export const logActivity = async ({
   tipoUsuario,
   acao,
   categoria,
-  detalhes = {},
+  detalhes,
   plataforma = 'mobile'
 }) => {
   try {
-    const activityData = {
+    const data = removeUndefined({
       userId,
-      userNome: userNome || 'Usuário',
-      userEmail: userEmail || '',
-      tipoUsuario: tipoUsuario || 'cliente',
+      userNome,
+      userEmail,
+      tipoUsuario,
       acao,
       categoria,
-      plataforma,
       detalhes,
-      timestamp: Timestamp.now(),
+      plataforma
+    });
+
+    await addDoc(collection(db, 'activityLogs'), {
+      ...data,
+      timestamp: serverTimestamp(),
       deviceInfo: Platform.OS === 'ios' ? 'iOS' : 'Android',
       createdAt: new Date().toISOString()
-    };
-
-    await addDoc(collection(db, 'activityLogs'), activityData);
+    });
     console.log(`[ActivityLogger] Log registrado: ${acao}`);
   } catch (error) {
     console.error('[ActivityLogger] Erro ao registrar:', error);
@@ -48,9 +75,9 @@ export const logActivity = async ({
 };
 
 // Helpers pré-definidos para facilitar uso
-export const logAuth = (user, acao, detalhes = {}) => 
+export const logAuth = (user, acao, detalhes = {}) =>
   logActivity({
-    userId: user?.uid,
+    userId: user?.codigoConecta || user?.uid,
     userNome: user?.nome || user?.displayName,
     userEmail: user?.email,
     tipoUsuario: user?.tipo || user?.role,
@@ -62,7 +89,7 @@ export const logAuth = (user, acao, detalhes = {}) =>
 
 export const logNavegacao = (user, pagina, detalhes = {}) =>
   logActivity({
-    userId: user?.uid,
+    userId: user?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo,
@@ -74,7 +101,7 @@ export const logNavegacao = (user, pagina, detalhes = {}) =>
 
 export const logAgendamento = (user, acao, detalhes = {}) =>
   logActivity({
-    userId: user?.uid,
+    userId: user?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo,
@@ -86,7 +113,7 @@ export const logAgendamento = (user, acao, detalhes = {}) =>
 
 export const logPagamento = (user, acao, detalhes = {}) =>
   logActivity({
-    userId: user?.uid,
+    userId: user?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo,
@@ -98,7 +125,7 @@ export const logPagamento = (user, acao, detalhes = {}) =>
 
 export const logPerfil = (user, acao, detalhes = {}) =>
   logActivity({
-    userId: user?.uid,
+    userId: user?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo,
@@ -110,7 +137,7 @@ export const logPerfil = (user, acao, detalhes = {}) =>
 
 export const logChat = (user, acao, detalhes = {}) =>
   logActivity({
-    userId: user?.uid,
+    userId: user?.codigoConecta || user?.uid,
     userNome: user?.nome,
     userEmail: user?.email,
     tipoUsuario: user?.tipo,

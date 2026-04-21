@@ -58,8 +58,18 @@ service cloud.firestore {
       }
 
       match /configuracoes/{configId} {
-        allow read: if ehDono(userId) || (estaLogado() && configId == "agenda");
-        allow write: if ehDono(userId);
+        allow read: if ehDono(userId) || (estaLogado() && configId == "agenda") || ehAdmin();
+        allow write: if ehDono(userId) || ehAdmin();
+      }
+
+      match /campanhas/{campanhaId} {
+        allow read: if estaLogado();
+        allow write: if ehAdmin();
+      }
+
+      match /campanhasEmail/{campanhaId} {
+        allow read: if estaLogado();
+        allow write: if ehAdmin();
       }
 
       match /colaboradores/{colabId} {
@@ -67,8 +77,9 @@ service cloud.firestore {
         allow write: if ehDono(userId);
 
         match /configuracoes/{configId} {
-          allow read: if ehDono(userId) || (estaLogado() && configId == "agenda");
-          allow write: if ehDono(userId);
+          // Leitura: gestor (dono), próprio colaborador, ou admin
+          allow read: if ehDono(userId) || uidAtual() == colabId || (estaLogado() && configId == "agenda") || ehAdmin();
+          allow write: if ehDono(userId) || uidAtual() == colabId || ehAdmin();
         }
       }
 
@@ -176,15 +187,34 @@ service cloud.firestore {
 
     // SUPORTE — Regras para tickets e mensagens
     match /suporte/{ticketId} {
-      // O usuário pode ler/escrever se o ticketId for o UID dele (estilo antigo)
-      // OU se o campo usuarioId for igual ao UID dele (estilo novo)
-      allow read: if estaLogado() && (ticketId == uidAtual() || resource.data.usuarioId == uidAtual() || ehAdmin());
-      allow create: if estaLogado() && (ticketId == uidAtual() || request.resource.data.usuarioId == uidAtual());
-      allow update: if estaLogado() && (ticketId == uidAtual() || resource.data.usuarioId == uidAtual() || ehAdmin());
+      // Se ticketId for o UID do usuário, permite tudo (estilo antigo/simples)
+      // Se não, verifica o campo usuarioId no documento (estilo novo)
+      allow read: if estaLogado() && (
+        ticketId == uidAtual() || 
+        ehAdmin() ||
+        (resource.data.usuarioId == uidAtual())
+      );
+      allow create: if estaLogado() && (
+        ticketId == uidAtual() || 
+        request.resource.data.usuarioId == uidAtual()
+      );
+      allow update: if estaLogado() && (
+        ticketId == uidAtual() || 
+        ehAdmin() ||
+        resource.data.usuarioId == uidAtual()
+      );
       allow delete: if ehAdmin();
 
       match /mensagens/{msgId} {
-        allow read, write: if estaLogado() && (ticketId == uidAtual() || get(/databases/$(database)/documents/suporte/$(ticketId)).data.usuarioId == uidAtual() || ehAdmin());
+        // Permite ler/escrever se ticketId é o UID do usuário (estilo antigo)
+        // Ou se o campo usuarioId no documento pai pertence ao usuário
+        // Se documento não existe, permite se ticketId == uid (usuário criando próprio ticket)
+        allow read, write: if estaLogado() && (
+          ticketId == uidAtual() || 
+          ehAdmin() ||
+          (!exists(/databases/$(database)/documents/suporte/$(ticketId)) && ticketId == uidAtual()) ||
+          get(/databases/$(database)/documents/suporte/$(ticketId)).data.usuarioId == uidAtual()
+        );
       }
     }
 
@@ -253,17 +283,11 @@ service cloud.firestore {
       allow update, delete: if ehAdmin();
     }
 
-    // ✅ CAMPANHAS — Campanhas de marketing (apenas admin)
-    match /campanhas/{campanhaId} {
-      allow read: if ehAdmin();
-      allow create: if ehAdmin();
-      allow update: if ehAdmin();
-      allow delete: if ehAdmin();
-    }
-
-    // ✅ EQUIPE ADMIN — Gestão de equipe administrativa (apenas admin)
+    // ✅ EQUIPE ADMIN — Gestão de equipe administrativa
     match /equipeAdmin/{membroId} {
-      allow read: if ehAdmin();
+      // Todos autenticados podem LER (para relatórios, etc)
+      // Apenas admin pode CRIAR/EDITAR/DELETAR
+      allow read: if estaLogado();
       allow create: if ehAdmin();
       allow update: if ehAdmin();
       allow delete: if ehAdmin();
@@ -273,17 +297,34 @@ service cloud.firestore {
     match /anuncios/{anuncioId} {
       // Admin gerencia tudo
       allow read: if ehAdmin() || (
-        estaLogado() && 
-        resource.data.status == 'ativo' && 
-        resource.data.dataInicio <= request.time &&
-        resource.data.dataFim >= request.time
+        estaLogado() && resource.data.status == 'ativo'
       );
+    }
+    
+    // ✅ CAMPANHAS — Campanhas de marketing
+    match /campanhas/{campanhaId} {
+      allow read: if estaLogado();
+      allow write: if ehAdmin();
+    }
+    
+    // ✅ CAMPANHAS EMAIL — Campanhas de email marketing
+    match /campanhasEmail/{campanhaId} {
+      allow read: if estaLogado();
+      allow write: if ehAdmin();
       allow create: if ehAdmin();
       allow update: if ehAdmin() || (
         estaLogado() && 
         resource.data.anuncianteId == uidAtual()
       );
       allow delete: if ehAdmin();
+    }
+
+    // ✅ CONFIGURACOES — Configurações do sistema
+    // Todos usuários logados podem LER (nome da plataforma, taxas, etc)
+    // Apenas admin pode ESCREVER
+    match /configuracoes/{configId} {
+      allow read: if estaLogado();
+      allow write: if estaLogado() && ehAdmin();
     }
 
     // ✅ ANUNCIANTES — Empresas anunciantes
@@ -300,14 +341,14 @@ service cloud.firestore {
 
     // ✅ IMPRESSOES ANUNCIOS — Tracking (qualquer usuário logado pode registrar)
     match /impressoesAnuncios/{impressaoId} {
-      allow read: if ehAdmin();
+      allow read: if estaLogado();
       allow create: if estaLogado();
       allow update, delete: if false;
     }
 
     // ✅ CLIQUES ANUNCIOS — Tracking (qualquer usuário logado pode registrar)
     match /cliquesAnuncios/{cliqueId} {
-      allow read: if ehAdmin();
+      allow read: if estaLogado();
       allow create: if estaLogado();
       allow update, delete: if false;
     }

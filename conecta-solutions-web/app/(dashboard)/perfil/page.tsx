@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { doc, getDoc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import React, { useEffect, useState, useCallback } from 'react';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
 import { 
   User, Mail, MapPin, Shield, Camera, 
-  Save, Briefcase, Lock, MessageCircle, Copy, Hash
+  Save, Briefcase, Lock, MessageCircle, Copy, Hash,
+  Loader2, CheckCircle2, AlertCircle, Eye, EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '@/styles/perfil.css';
+import { validarPerfilForm, formatarTelefone, removerMascaraTelefone, ValidationErrors } from '@/lib/validation';
 
 // Configuração Cloudinary (Sincronizada com Mobile)
 const CLOUDINARY_CLOUD_NAME = 'dctnkaktn';
@@ -21,6 +23,103 @@ function gerarPlatformUID(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const rand = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   return `CS-${rand(4)}-${rand(6)}`;
+}
+
+// Componente de input validado
+function ValidatedInput({ 
+  label, 
+  value, 
+  onChange, 
+  error, 
+  required = false, 
+  disabled = false,
+  type = 'text',
+  maxLength,
+  placeholder,
+  helpText
+}: { 
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+  type?: string;
+  maxLength?: number;
+  placeholder?: string;
+  helpText?: string;
+}) {
+  const [touched, setTouched] = useState(false);
+
+  return (
+    <div className={`input-box ${error && touched ? 'input-box--error' : ''}`}>
+      <label>
+        {label}
+        {required && <span className="required-indicator">*</span>}
+      </label>
+      <input 
+        type={type} 
+        value={value} 
+        disabled={disabled}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        onBlur={() => setTouched(true)}
+        className={error && touched ? 'input-error' : ''}
+      />
+      {error && touched && (
+        <span className="input-error-message">
+          <AlertCircle size={14} /> {error}
+        </span>
+      )}
+      {helpText && !error && <span className="input-help-text">{helpText}</span>}
+    </div>
+  );
+}
+
+// Componente de textarea validado
+function ValidatedTextarea({ 
+  label, 
+  value, 
+  onChange, 
+  error, 
+  required = false,
+  maxLength = 500,
+  rows = 4
+}: { 
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  required?: boolean;
+  maxLength?: number;
+  rows?: number;
+}) {
+  const [touched, setTouched] = useState(false);
+  const charCount = value?.length || 0;
+
+  return (
+    <div className={`input-box full ${error && touched ? 'input-box--error' : ''}`}>
+      <label>
+        {label}
+        {required && <span className="required-indicator">*</span>}
+        <span className="char-counter">{charCount}/{maxLength}</span>
+      </label>
+      <textarea 
+        rows={rows} 
+        value={value} 
+        maxLength={maxLength}
+        onChange={e => onChange(e.target.value)}
+        onBlur={() => setTouched(true)}
+        className={error && touched ? 'input-error' : ''}
+      />
+      {error && touched && (
+        <span className="input-error-message">
+          <AlertCircle size={14} /> {error}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function PerfilPage() {
@@ -43,6 +142,31 @@ export default function PerfilPage() {
     fotoUrl: '',
     fotoBanner: ''
   });
+
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+  // Validação em tempo real
+  const validateField = useCallback((field: string, value: string) => {
+    const fieldErrors = validarPerfilForm({
+      nome: field === 'nome' ? value : formData.nome,
+      whatsapp: field === 'whatsapp' ? value : formData.whatsapp,
+      email: field === 'email' ? value : formData.email,
+    });
+    
+    setErrors(prev => ({
+      ...prev,
+      [field]: fieldErrors[field] || ''
+    }));
+  }, [formData]);
+
+  // Handler para campos com formatação
+  const handleWhatsAppChange = (value: string) => {
+    const formatted = formatarTelefone(value);
+    setFormData({ ...formData, whatsapp: formatted });
+    validateField('whatsapp', formatted);
+    setTouchedFields(prev => new Set(prev).add('whatsapp'));
+  };
 
   useEffect(() => {
     async function loadPerfil() {
@@ -134,13 +258,45 @@ export default function PerfilPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.uid) return;
+    
+    // Marca todos os campos como touched
+    setTouchedFields(new Set(['nome', 'whatsapp', 'email']));
+    
+    // Valida todos os campos
+    const validationErrors = validarPerfilForm({
+      nome: formData.nome,
+      whatsapp: formData.whatsapp,
+      email: formData.email,
+    });
+    
+    setErrors(validationErrors);
+    
+    // Se houver erros, não salva
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error('Corrija os erros antes de salvar');
+      return;
+    }
+    
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'usuarios', user.uid), { ...formData, atualizadoEm: serverTimestamp() });
-      toast.success('Perfil atualizado com sucesso!');
+      // Remove máscara do telefone antes de salvar
+      const dataToSave = {
+        ...formData,
+        whatsapp: removerMascaraTelefone(formData.whatsapp),
+        telefone: removerMascaraTelefone(formData.telefone || formData.whatsapp),
+        atualizadoEm: serverTimestamp()
+      };
+      
+      await updateDoc(doc(db, 'usuarios', user.uid), dataToSave);
+      toast.success('Perfil atualizado com sucesso!', {
+        icon: <CheckCircle2 className="text-green-500" />,
+        duration: 3000,
+      });
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao salvar.');
+      toast.error('Erro ao salvar perfil. Tente novamente.', {
+        icon: <AlertCircle className="text-red-500" />,
+      });
     } finally {
       setSaving(false);
     }
@@ -210,41 +366,85 @@ export default function PerfilPage() {
             {activeTab === 'dados' ? (
               <form onSubmit={handleSave} className="enterprise-form">
                 <div className="form-grid">
-                  <div className="input-box full">
-                    <label>Nome Completo / Razão Social</label>
-                    <input type="text" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} />
-                  </div>
-                  <div className="input-box">
-                    <label>E-mail (Login)</label>
-                    <input type="email" value={formData.email} disabled />
-                  </div>
-                  <div className="input-box">
-                    <label>WhatsApp Profissional</label>
-                    <input type="text" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} />
-                  </div>
-                  <div className="input-box">
-                    <label>Cidade</label>
-                    <input type="text" value={formData.cidade} onChange={e => setFormData({...formData, cidade: e.target.value})} />
-                  </div>
-                  <div className="input-box">
-                    <label>Estado (UF)</label>
-                    <input type="text" maxLength={2} value={formData.estado} onChange={e => setFormData({...formData, estado: e.target.value})} />
-                  </div>
+                  <ValidatedInput
+                    label="Nome Completo / Razão Social"
+                    value={formData.nome}
+                    onChange={(value) => {
+                      setFormData({...formData, nome: value});
+                      validateField('nome', value);
+                    }}
+                    error={errors.nome}
+                    required
+                    maxLength={100}
+                    placeholder="Digite seu nome completo"
+                  />
+                  
+                  <ValidatedInput
+                    label="E-mail (Login)"
+                    value={formData.email}
+                    onChange={() => {}}
+                    disabled
+                    helpText="O email não pode ser alterado"
+                  />
+                  
+                  <ValidatedInput
+                    label="WhatsApp Profissional"
+                    value={formData.whatsapp}
+                    onChange={handleWhatsAppChange}
+                    error={errors.whatsapp}
+                    required
+                    maxLength={16}
+                    placeholder="(00) 00000-0000"
+                    helpText="Será usado para notificações e contato"
+                  />
+                  
+                  <ValidatedInput
+                    label="Cidade"
+                    value={formData.cidade}
+                    onChange={(value) => setFormData({...formData, cidade: value})}
+                    maxLength={50}
+                    placeholder="Sua cidade"
+                  />
+                  
+                  <ValidatedInput
+                    label="Estado (UF)"
+                    value={formData.estado}
+                    onChange={(value) => setFormData({...formData, estado: value.toUpperCase()})}
+                    maxLength={2}
+                    placeholder="UF"
+                  />
+                  
                   {ehProfissional && (
                     <>
-                      <div className="input-box full">
-                        <label>Especialidade Principal</label>
-                        <input type="text" value={formData.especialidade} onChange={e => setFormData({...formData, especialidade: e.target.value})} />
-                      </div>
-                      <div className="input-box full">
-                        <label>Biografia Profissional</label>
-                        <textarea rows={4} value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} />
-                      </div>
+                      <ValidatedInput
+                        label="Especialidade Principal"
+                        value={formData.especialidade}
+                        onChange={(value) => setFormData({...formData, especialidade: value})}
+                        maxLength={50}
+                        placeholder="Ex: Barbeiro, Manicure, Cabeleireira"
+                      />
+                      
+                      <ValidatedTextarea
+                        label="Biografia Profissional"
+                        value={formData.bio}
+                        onChange={(value) => setFormData({...formData, bio: value})}
+                        maxLength={500}
+                        rows={4}
+                      />
                     </>
                   )}
                 </div>
-                <button type="submit" className="btn-enterprise-save" disabled={saving}>
-                  {saving ? 'Processando...' : <><Save size={18} /> Atualizar Perfil Corporate</>}
+                
+                <button 
+                  type="submit" 
+                  className="btn-enterprise-save" 
+                  disabled={saving || Object.keys(errors).some(k => errors[k])}
+                >
+                  {saving ? (
+                    <><Loader2 size={18} className="animate-spin" /> Salvando...</>
+                  ) : (
+                    <><Save size={18} /> Atualizar Perfil Corporate</>
+                  )}
                 </button>
               </form>
             ) : (

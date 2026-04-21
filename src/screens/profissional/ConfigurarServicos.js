@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
+    Image,
     StyleSheet,
     TextInput,
     FlatList,
@@ -152,6 +153,19 @@ export default function ConfigurarServicos() {
 
     const renderItem = ({ item }) => (
         <View style={styles.card}>
+            {/* Foto do Serviço */}
+            {item.fotoUrl ? (
+                <Image
+                    source={{ uri: item.fotoUrl }}
+                    style={styles.cardImage}
+                    resizeMode="cover"
+                />
+            ) : (
+                <View style={styles.cardImagePlaceholder}>
+                    <Ionicons name="cut-outline" size={28} color="#94A3B8" />
+                </View>
+            )}
+
             <View style={styles.cardContent}>
                 <View style={styles.iconCircle}>
                     <Ionicons name="cut-outline" size={20} color={colors.primary} />
@@ -182,94 +196,101 @@ export default function ConfigurarServicos() {
             style={styles.container}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
         >
-                    <View style={styles.header}>
-                        <Text style={styles.title}>{ehColaborador ? 'Serviços liberados' : 'Configurar Serviços'}</Text>
-                        <Text style={styles.subtitle}>
-                            {ehColaborador
-                                ? 'Consulte os serviços definidos pela conta principal para a sua subconta'
-                                : 'Gerencie seu catálogo de serviços e preços'}
+            <View style={styles.header}>
+                <Text style={styles.title}>{ehColaborador ? 'Serviços liberados' : 'Configurar Serviços'}</Text>
+                <Text style={styles.subtitle}>
+                    {ehColaborador
+                        ? 'Consulte os serviços definidos pela conta principal para a sua subconta'
+                        : 'Gerencie seu catálogo de serviços e preços'}
+                </Text>
+            </View>
+
+            {ehColaborador ? (
+                <View style={styles.noticeCard}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.noticeTitle}>Edição bloqueada para colaborador</Text>
+                        <Text style={styles.noticeText}>
+                            Serviços e preços são controlados pela conta principal. Aqui você pode apenas consultar o que foi liberado para o seu atendimento.
+                        </Text>
+                    </View>
+                </View>
+            ) : (
+                <View style={styles.form}>
+                    <Text style={styles.label}>Novo Serviço</Text>
+
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Nome (ex: Corte Masculino)"
+                        placeholderTextColor="#999"
+                        value={nomeServico}
+                        onChangeText={setNomeServico}
+                        returnKeyType="next"
+                        onSubmitEditing={() => precoRef.current?.focus()}
+                    />
+
+                    <TextInput
+                        ref={precoRef}
+                        style={styles.input}
+                        placeholder="Preço (ex: 45.00)"
+                        placeholderTextColor="#999"
+                        value={preco}
+                        onChangeText={(val) => {
+                            // Máscara simples: permite apenas números e um ponto
+                            const formatted = val.replace(/[^0-9.]/g, '');
+                            setPreco(formatted);
+                        }}
+                        keyboardType="decimal-pad"
+                        returnKeyType="done"
+                        onSubmitEditing={handleAddServico}
+                    />
+
+                    {/* Info sobre foto */}
+                    <View style={styles.fotoInfoBox}>
+                        <Ionicons name="image-outline" size={20} color={colors.primary} />
+                        <Text style={styles.fotoInfoText}>
+                            Para adicionar foto, use a versão Web/Desktop
                         </Text>
                     </View>
 
-                    {ehColaborador ? (
-                        <View style={styles.noticeCard}>
-                            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.noticeTitle}>Edição bloqueada para colaborador</Text>
-                                <Text style={styles.noticeText}>
-                                    Serviços e preços são controlados pela conta principal. Aqui você pode apenas consultar o que foi liberado para o seu atendimento.
-                                </Text>
-                            </View>
-                        </View>
-                    ) : (
-                        <View style={styles.form}>
-                            <Text style={styles.label}>Novo Serviço</Text>
+                    <CustomButton
+                        title="Adicionar Serviço"
+                        onPress={handleAddServico}
+                        loading={salvando}
+                    />
+                </View>
+            )}
 
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Nome (ex: Corte Masculino)"
-                                placeholderTextColor="#999"
-                                value={nomeServico}
-                                onChangeText={setNomeServico}
-                                returnKeyType="next"
-                                onSubmitEditing={() => precoRef.current?.focus()}
-                            />
+            <View style={styles.listSection}>
+                <Text style={styles.listTitle}>
+                    {ehColaborador ? `Serviços disponíveis para você (${servicos.length})` : `Seus Serviços (${servicos.length})`}
+                </Text>
 
-                            <TextInput
-                                ref={precoRef}
-                                style={styles.input}
-                                placeholder="Preço (ex: 45.00)"
-                                placeholderTextColor="#999"
-                                value={preco}
-                                onChangeText={(val) => {
-                                    // Máscara simples: permite apenas números e um ponto
-                                    const formatted = val.replace(/[^0-9.]/g, '');
-                                    setPreco(formatted);
-                                }}
-                                keyboardType="decimal-pad"
-                                returnKeyType="done"
-                                onSubmitEditing={handleAddServico}
-                            />
-
-                            <CustomButton
-                                title={salvando ? "Salvando..." : "Adicionar ao Catálogo"}
-                                onPress={handleAddServico}
-                                color={colors.primary}
-                                disabled={salvando}
-                            />
-                        </View>
-                    )}
-
-                    <View style={styles.listSection}>
-                        <Text style={styles.listTitle}>
-                            {ehColaborador ? `Serviços disponíveis para você (${servicos.length})` : `Seus Serviços (${servicos.length})`}
-                        </Text>
-
-                        {loading ? (
-                            <ActivityIndicator
-                                size="large"
-                                color={colors.primary}
-                                style={styles.loader}
-                            />
-                        ) : (
-                            <FlatList
-                                data={servicos}
-                                keyExtractor={(item) => item.id}
-                                renderItem={renderItem}
-                                showsVerticalScrollIndicator={false}
-                                contentContainerStyle={styles.listContent}
-                                ListEmptyComponent={
-                                    <Text style={styles.empty}>
-                                        {ehColaborador
-                                            ? 'Nenhum serviço foi liberado pela conta principal ainda.'
-                                            : 'Nenhum serviço disponível.'}
-                                    </Text>
-                                }
-                                keyboardShouldPersistTaps="handled"
-                                keyboardDismissMode="on-drag"
-                            />
-                        )}
-                    </View>
+                {loading ? (
+                    <ActivityIndicator
+                        size="large"
+                        color={colors.primary}
+                        style={styles.loader}
+                    />
+                ) : (
+                    <FlatList
+                        data={servicos}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderItem}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.listContent}
+                        ListEmptyComponent={
+                            <Text style={styles.empty}>
+                                {ehColaborador
+                                    ? 'Nenhum serviço foi liberado pela conta principal ainda.'
+                                    : 'Nenhum serviço disponível.'}
+                            </Text>
+                        }
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
+                    />
+                )}
+            </View>
         </KeyboardAvoidingView>
     );
 }
@@ -344,6 +365,22 @@ const styles = StyleSheet.create({
         lineHeight: 18,
     },
 
+    fotoInfoBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary + '15',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 15,
+        gap: 8,
+    },
+
+    fotoInfoText: {
+        fontSize: 13,
+        color: colors.primary,
+        fontWeight: '600',
+    },
+
     label: {
         fontSize: 13,
         fontWeight: '800',
@@ -394,12 +431,31 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 3 },
         borderWidth: 1,
         borderColor: '#E8EDF5',
+        overflow: 'hidden',
+    },
+
+    cardImage: {
+        width: '100%',
+        height: 140,
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+
+    cardImagePlaceholder: {
+        width: '100%',
+        height: 140,
+        borderRadius: 12,
+        backgroundColor: '#E2E8F0',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
 
     cardContent: {
         flexDirection: 'row',
         alignItems: 'center',
     },
+
 
     iconCircle: {
         width: 40,

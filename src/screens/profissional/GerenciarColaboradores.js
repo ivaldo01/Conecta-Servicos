@@ -15,12 +15,13 @@ import {
     Modal,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
-import { collection, getDocs, doc, deleteDoc, writeBatch, serverTimestamp, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, writeBatch, serverTimestamp, getDoc, query, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { app } from "../../services/firebaseConfig";
 import { initializeApp, getApps } from "firebase/app";
 import { MultiSelect } from 'react-native-element-dropdown';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'react-native';
 import colors from "../../constants/colors";
 import { getMaxFuncionarios, podeCadastrarFuncionario, getPlanoProfissional } from "../../constants/plans";
 import { gerarConectaIdUnico } from "../../utils/idUtils";
@@ -79,8 +80,46 @@ export default function GerenciarColaboradores({ navigation }) {
             }));
             setServicosDisponiveis(listaServicos);
 
+            // Carregar colaboradores da subcoleção (mobile cria aqui)
+            console.log('[Equipe Mobile] Carregando subcoleção para user:', user.uid);
             const snapEquipe = await getDocs(collection(db, "usuarios", user.uid, "colaboradores"));
-            setEquipe(snapEquipe.docs.map(d => ({ id: d.id, ...d.data() })));
+            const equipeLocal = snapEquipe.docs.map(d => ({
+                id: d.id,
+                fotoUrl: d.data().fotoUrl,
+                bannerUrl: d.data().bannerUrl,
+                ...d.data()
+            }));
+            console.log('[Equipe Mobile] Subcoleção:', equipeLocal.length, 'colaboradores');
+
+            // Também buscar da coleção 'colaboradores' (web cria aqui)
+            console.log('[Equipe Mobile] Buscando coleção colaboradores com profissionalId:', user.uid);
+            try {
+                const snapWeb = await getDocs(
+                    query(collection(db, "colaboradores"), where("profissionalId", "==", user.uid))
+                );
+                const equipeWeb = snapWeb.docs.map(d => ({
+                    id: d.id,
+                    fotoUrl: d.data().fotoUrl,
+                    bannerUrl: d.data().bannerUrl,
+                    ...d.data()
+                }));
+                console.log('[Equipe Mobile] Coleção web:', equipeWeb.length, 'colaboradores');
+                equipeWeb.forEach(c => console.log('[Equipe Mobile] Web colab:', c.nome, c.conectaId));
+
+                // Merge: prioriza dados da subcoleção, complementa com web
+                const merged = [...equipeLocal];
+                equipeWeb.forEach(webColab => {
+                    const exists = merged.find(c => c.id === webColab.id || c.conectaId === webColab.conectaId);
+                    if (!exists) {
+                        merged.push(webColab);
+                    }
+                });
+                console.log('[Equipe Mobile] Total merged:', merged.length);
+                setEquipe(merged);
+            } catch (e) {
+                console.error('[Equipe Mobile] Erro ao buscar coleção web:', e);
+                setEquipe(equipeLocal);
+            }
         } catch (e) {
             console.error(e);
             Alert.alert("Erro", "Falha ao carregar dados da equipe.");
@@ -213,7 +252,7 @@ export default function GerenciarColaboradores({ navigation }) {
             );
 
             const novoColabId = userCredential.user.uid;
-            
+
             // Gerar CID Único
             const cid = await gerarConectaIdUnico();
 
@@ -335,7 +374,7 @@ export default function GerenciarColaboradores({ navigation }) {
                     showsVerticalScrollIndicator={false}
                 >
                     <Text style={styles.headerTitle}>Minha Equipe</Text>
-                    
+
                     {getLimiteFuncionarios() === 0 ? (
                         <View style={styles.premiumLockCard}>
                             <View style={styles.lockIconCircle}>
@@ -345,7 +384,7 @@ export default function GerenciarColaboradores({ navigation }) {
                             <Text style={styles.lockSubtitle}>
                                 O gerenciamento de equipe e subcontas está disponível apenas nos planos Conecta Solutions VIP (Profissional, Empresa e Franquia).
                             </Text>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.upgradeBtn}
                                 onPress={() => navigation.navigate("PremiumScreen")}
                             >
@@ -357,185 +396,211 @@ export default function GerenciarColaboradores({ navigation }) {
                         <>
                             {/* Card mostrando limite de funcionários do plano */}
                             {!carregandoPlano && planoUsuario && (
-                        <View style={{
-                            backgroundColor: getInfoLimite().atingiuLimite ? '#FFEBEE' : '#E3F2FD',
-                            padding: 12,
-                            borderRadius: 8,
-                            marginBottom: 12,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                        }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Ionicons
-                                    name={getInfoLimite().atingiuLimite ? "warning" : "information-circle"}
-                                    size={20}
-                                    color={getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2'}
-                                />
-                                <Text style={{
-                                    marginLeft: 8,
-                                    fontSize: 14,
-                                    color: getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2',
-                                    fontWeight: '600',
+                                <View style={{
+                                    backgroundColor: getInfoLimite().atingiuLimite ? '#FFEBEE' : '#E3F2FD',
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    marginBottom: 12,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
                                 }}>
-                                    {getInfoLimite().texto}
-                                </Text>
-                            </View>
-                            <Text style={{
-                                fontSize: 12,
-                                color: getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2',
-                            }}>
-                                {planoUsuario.name}
-                            </Text>
-                        </View>
-                    )}
-
-                    <View style={styles.helperCard}>
-                        <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
-                        <Text style={styles.helperText}>
-                            Cada colaborador funciona como uma subconta: você define os serviços liberados e a agenda de atendimento de cada um.
-                        </Text>
-                    </View>
-
-                    <View style={styles.formCard}>
-                        <Text style={styles.formSubtitle}>Cadastrar Novo Colaborador</Text>
-
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nome Completo do Profissional"
-                            placeholderTextColor="#999"
-                            value={nome}
-                            onChangeText={setNome}
-                            returnKeyType="next"
-                            onSubmitEditing={() => emailRef.current?.focus()}
-                        />
-
-                        <TextInput
-                            ref={emailRef}
-                            style={styles.input}
-                            placeholder="E-mail (login do colaborador)"
-                            placeholderTextColor="#999"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            returnKeyType="next"
-                            onSubmitEditing={() => senhaRef.current?.focus()}
-                        />
-
-                        <TextInput
-                            ref={senhaRef}
-                            style={styles.input}
-                            placeholder="Senha de acesso (mín. 6 dígitos)"
-                            placeholderTextColor="#999"
-                            value={senha}
-                            onChangeText={setSenha}
-                            secureTextEntry
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            returnKeyType="done"
-                            onSubmitEditing={salvarColaborador}
-                        />
-
-                        <Text style={styles.label}>Liberar estes serviços para a subconta:</Text>
-                        <MultiSelect
-                            style={styles.dropdown}
-                            placeholder="Selecione os serviços..."
-                            placeholderStyle={styles.dropdownPlaceholder}
-                            data={servicosDisponiveis}
-                            labelField="label"
-                            valueField="value"
-                            value={servicosSelecionados}
-                            onChange={item => setServicosSelecionados(item)}
-                            selectedStyle={styles.selectedChip}
-                        />
-
-                        <TouchableOpacity
-                            style={[styles.mainButton, salvando && styles.mainButtonDisabled]}
-                            onPress={salvarColaborador}
-                            disabled={salvando}
-                            activeOpacity={0.88}
-                        >
-                            {salvando ? (
-                                <ActivityIndicator color="#FFF" />
-                            ) : (
-                                <Text style={styles.buttonText}>CADASTRAR E GERAR LOGIN</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
-                    <Text style={styles.sectionTitle}>Colaboradores cadastrados</Text>
-
-                    {equipe.length === 0 ? (
-                        <Text style={styles.emptyText}>Nenhum profissional cadastrado.</Text>
-                    ) : (
-                        equipe.map((item) => (
-                            <View key={item.id} style={styles.colabCard}>
-                                <View style={styles.colabInfo}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Text style={styles.colabName}>{item.nome}</Text>
-                                        {planoUsuario?.verifiedBadge && (
-                                            <View style={{
-                                                marginLeft: 8,
-                                                backgroundColor: '#FFD700',
-                                                borderRadius: 10,
-                                                padding: 2,
-                                            }}>
-                                                <Ionicons name="checkmark-circle" size={14} color="#FFF" />
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text style={styles.colabEmail}>{item.email}</Text>
-                                    {item.conectaId && (
-                                        <View style={styles.cidBadge}>
-                                            <Ionicons name="id-card-outline" size={12} color="#FFF" />
-                                            <Text style={styles.cidBadgeText}>{item.conectaId}</Text>
-                                        </View>
-                                    )}
-                                    <View style={styles.badge}>
-
-                                        <Text style={styles.badgeText}>
-                                            {item.servicosHabilitados?.length || 0} serviço(s) liberado(s)
+                                        <Ionicons
+                                            name={getInfoLimite().atingiuLimite ? "warning" : "information-circle"}
+                                            size={20}
+                                            color={getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2'}
+                                        />
+                                        <Text style={{
+                                            marginLeft: 8,
+                                            fontSize: 14,
+                                            color: getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2',
+                                            fontWeight: '600',
+                                        }}>
+                                            {getInfoLimite().texto}
                                         </Text>
                                     </View>
-                                    <Text style={styles.serviceSummaryText}>{getResumoServicos(item.servicosHabilitados)}</Text>
+                                    <Text style={{
+                                        fontSize: 12,
+                                        color: getInfoLimite().atingiuLimite ? '#D32F2F' : '#1976D2',
+                                    }}>
+                                        {planoUsuario.name}
+                                    </Text>
                                 </View>
+                            )}
 
-                                <View style={styles.actionsColumn}>
-                                    <TouchableOpacity
-                                        style={styles.serviceButton}
-                                        onPress={() => abrirEditorServicos(item)}
-                                    >
-                                        <Ionicons name="cut-outline" size={18} color="#7C3AED" />
-                                        <Text style={styles.serviceButtonText}>Serviços</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.agendaButton}
-                                        onPress={() => {
-                                            Keyboard.dismiss();
-                                            navigation.navigate("ConfigurarAgenda", {
-                                                colaboradorId: item.id,
-                                                colaboradorNome: item.nome
-                                            });
-                                        }}
-                                    >
-                                        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-                                        <Text style={styles.agendaButtonText}>Agenda</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.deleteButton}
-                                        onPress={() => excluirColaborador(item.id, item.nome)}
-                                    >
-                                        <Ionicons name="trash-outline" size={18} color="#F44336" />
-                                    </TouchableOpacity>
-                                </View>
+                            <View style={styles.helperCard}>
+                                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                                <Text style={styles.helperText}>
+                                    Cada colaborador funciona como uma subconta: você define os serviços liberados e a agenda de atendimento de cada um.
+                                </Text>
                             </View>
-                        ))
-                    )}
-                    </>
+
+                            <View style={styles.formCard}>
+                                <Text style={styles.formSubtitle}>Cadastrar Novo Colaborador</Text>
+
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Nome Completo do Profissional"
+                                    placeholderTextColor="#999"
+                                    value={nome}
+                                    onChangeText={setNome}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => emailRef.current?.focus()}
+                                />
+
+                                <TextInput
+                                    ref={emailRef}
+                                    style={styles.input}
+                                    placeholder="E-mail (login do colaborador)"
+                                    placeholderTextColor="#999"
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => senhaRef.current?.focus()}
+                                />
+
+                                <TextInput
+                                    ref={senhaRef}
+                                    style={styles.input}
+                                    placeholder="Senha de acesso (mín. 6 dígitos)"
+                                    placeholderTextColor="#999"
+                                    value={senha}
+                                    onChangeText={setSenha}
+                                    secureTextEntry
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    returnKeyType="done"
+                                    onSubmitEditing={salvarColaborador}
+                                />
+
+                                <Text style={styles.label}>Liberar estes serviços para a subconta:</Text>
+                                <MultiSelect
+                                    style={styles.dropdown}
+                                    placeholder="Selecione os serviços..."
+                                    placeholderStyle={styles.dropdownPlaceholder}
+                                    data={servicosDisponiveis}
+                                    labelField="label"
+                                    valueField="value"
+                                    value={servicosSelecionados}
+                                    onChange={item => setServicosSelecionados(item)}
+                                    selectedStyle={styles.selectedChip}
+                                />
+
+                                <TouchableOpacity
+                                    style={[styles.mainButton, salvando && styles.mainButtonDisabled]}
+                                    onPress={salvarColaborador}
+                                    disabled={salvando}
+                                    activeOpacity={0.88}
+                                >
+                                    {salvando ? (
+                                        <ActivityIndicator color="#FFF" />
+                                    ) : (
+                                        <Text style={styles.buttonText}>CADASTRAR E GERAR LOGIN</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.sectionTitle}>Colaboradores cadastrados</Text>
+
+                            {equipe.length === 0 ? (
+                                <Text style={styles.emptyText}>Nenhum profissional cadastrado.</Text>
+                            ) : (
+                                equipe.map((item) => {
+                                    // Fallback para diferentes nomes de campo
+                                    const fotoUrl = item.fotoUrl || item.fotoPerfil || item.foto || null;
+                                    const bannerUrl = item.bannerUrl || item.bannerPerfil || item.banner || null;
+
+                                    return (
+                                        <View key={item.id} style={styles.colabCard}>
+                                            {/* Banner */}
+                                            {bannerUrl ? (
+                                                <Image source={{ uri: bannerUrl }} style={styles.colabBanner} />
+                                            ) : (
+                                                <View style={[styles.colabBanner, styles.colabBannerPlaceholder]} />
+                                            )}
+
+                                            {/* Foto Overlay */}
+                                            <View style={styles.colabPhotoContainer}>
+                                                {fotoUrl ? (
+                                                    <Image source={{ uri: fotoUrl }} style={styles.colabPhoto} />
+                                                ) : (
+                                                    <View style={[styles.colabPhoto, styles.colabPhotoPlaceholder]}>
+                                                        <Ionicons name="person" size={30} color="#999" />
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {/* Conteúdo */}
+                                            <View style={styles.colabContentRow}>
+                                                <View style={styles.colabInfo}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <Text style={styles.colabName}>{item.nome}</Text>
+                                                        {planoUsuario?.verifiedBadge && (
+                                                            <View style={{
+                                                                marginLeft: 8,
+                                                                backgroundColor: '#FFD700',
+                                                                borderRadius: 10,
+                                                                padding: 2,
+                                                            }}>
+                                                                <Ionicons name="checkmark-circle" size={14} color="#FFF" />
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    <Text style={styles.colabEmail}>{item.email}</Text>
+                                                    {item.conectaId && (
+                                                        <View style={styles.cidBadge}>
+                                                            <Ionicons name="id-card-outline" size={12} color="#FFF" />
+                                                            <Text style={styles.cidBadgeText}>{item.conectaId}</Text>
+                                                        </View>
+                                                    )}
+                                                    <View style={styles.badge}>
+                                                        <Text style={styles.badgeText}>
+                                                            {item.servicosHabilitados?.length || 0} serviço(s) liberado(s)
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={styles.serviceSummaryText}>{getResumoServicos(item.servicosHabilitados)}</Text>
+                                                </View>
+
+                                                <View style={styles.actionsColumn}>
+                                                    <TouchableOpacity
+                                                        style={styles.serviceButton}
+                                                        onPress={() => abrirEditorServicos(item)}
+                                                    >
+                                                        <Ionicons name="cut-outline" size={18} color="#7C3AED" />
+                                                        <Text style={styles.serviceButtonText}>Serviços</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        style={styles.agendaButton}
+                                                        onPress={() => {
+                                                            Keyboard.dismiss();
+                                                            navigation.navigate("ConfigurarAgenda", {
+                                                                colaboradorId: item.id,
+                                                                colaboradorNome: item.nome
+                                                            });
+                                                        }}
+                                                    >
+                                                        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                                                        <Text style={styles.agendaButtonText}>Agenda</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        style={styles.deleteButton}
+                                                        onPress={() => excluirColaborador(item.id, item.nome)}
+                                                    >
+                                                        <Ionicons name="trash-outline" size={18} color="#F44336" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    )
+                                })
+                            )}
+                        </>
                     )}
                 </ScrollView>
             </TouchableWithoutFeedback>
@@ -589,7 +654,7 @@ export default function GerenciarColaboradores({ navigation }) {
                     </View>
                 </View>
             </Modal>
-        </KeyboardAvoidingView>
+        </KeyboardAvoidingView >
     );
 }
 
@@ -719,11 +784,48 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFF',
         marginHorizontal: 20,
         marginBottom: 12,
-        padding: 15,
         borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
         elevation: 2,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+
+    colabBanner: {
+        width: '100%',
+        height: 80,
+        resizeMode: 'cover',
+    },
+
+    colabBannerPlaceholder: {
+        backgroundColor: '#E3F2FD',
+    },
+
+    colabPhotoContainer: {
+        position: 'absolute',
+        left: 15,
+        top: 40,
+        zIndex: 10,
+    },
+
+    colabPhoto: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        borderWidth: 3,
+        borderColor: '#FFF',
+        backgroundColor: '#F5F5F5',
+    },
+
+    colabPhotoPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#E0E0E0',
+    },
+
+    colabContentRow: {
+        flexDirection: 'row',
+        padding: 15,
+        paddingTop: 45, // Espaço para a foto sobrepor
         gap: 12,
     },
 

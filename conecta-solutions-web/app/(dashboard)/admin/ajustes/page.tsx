@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import {
   Settings,
   Save,
@@ -62,14 +62,20 @@ export default function AjustesPage() {
   }, []);
 
   const carregarConfiguracoes = async () => {
-    const docRef = doc(db, 'configuracoes', 'sistema');
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      setConfig(docSnap.data() as Configuracoes);
-    } else {
-      // Configurações padrão
-      setConfig({
+    try {
+      console.log('[Ajustes] Carregando configuracoes/sistema...');
+      console.log('[Ajustes] Usuário atual:', auth.currentUser?.uid);
+      
+      const docRef = doc(db, 'configuracoes', 'sistema');
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        console.log('[Ajustes] Configurações carregadas com sucesso');
+        setConfig(docSnap.data() as Configuracoes);
+      } else {
+        console.log('[Ajustes] Documento não existe, usando padrão');
+        // Configurações padrão
+        setConfig({
         geral: {
           nomePlataforma: 'Conecta Solutions',
           emailSuporte: 'suporte@conectasolutions.com.br',
@@ -99,8 +105,17 @@ export default function AjustesPage() {
         }
       });
     }
-    setLoading(false);
-  };
+  } catch (err: any) {
+    console.error('[Ajustes] Erro ao carregar configurações:', err.message, err.code);
+    if (err.code === 'permission-denied') {
+      console.error('[Ajustes] Permissão negada - verifique se o usuário é admin');
+      setMensagem({ tipo: 'erro', texto: 'Permissão negada para acessar configurações' });
+    } else {
+      setMensagem({ tipo: 'erro', texto: 'Erro ao carregar configurações' });
+    }
+  }
+  setLoading(false);
+};
 
   const salvarConfiguracoes = async () => {
     if (!config) return;

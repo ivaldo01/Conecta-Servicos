@@ -228,13 +228,13 @@ export default function SignUpCliente({ navigation, route }) {
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let currentCount = 1;
-        
+
         if (counterDoc.exists()) {
           currentCount = (counterDoc.data().usuarios || 0) + 1;
         }
 
         const codigoConecta = `CS-BR-${String(currentCount).padStart(6, '0')}`;
-        
+
         transaction.set(counterRef, { usuarios: currentCount }, { merge: true });
         transaction.set(userRef, {
           uid: userCert.user.uid,
@@ -443,7 +443,11 @@ export default function SignUpCliente({ navigation, route }) {
               value={senha}
               onChangeText={setSenha}
               returnKeyType="next"
-              onSubmitEditing={() => confirmarSenhaRef.current?.focus()}
+              onSubmitEditing={() => {
+                if (confirmarSenhaRef && confirmarSenhaRef.current) {
+                  confirmarSenhaRef.current.focus();
+                }
+              }}
             />
             <TouchableOpacity
               style={styles.eyeButton}
@@ -473,7 +477,11 @@ export default function SignUpCliente({ navigation, route }) {
               value={confirmarSenha}
               onChangeText={setConfirmarSenha}
               returnKeyType="done"
-              onSubmitEditing={handleCadastro}
+              onSubmitEditing={() => {
+                if (typeof handleCadastro === 'function') {
+                  handleCadastro();
+                }
+              }}
             />
             <TouchableOpacity
               style={styles.eyeButton}
