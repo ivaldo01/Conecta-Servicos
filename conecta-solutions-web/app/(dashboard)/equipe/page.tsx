@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
+import { getAuth, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import Topbar from '@/components/layout/Topbar';
 import {
   Users, Plus, X, Edit2, Trash2,
@@ -51,6 +52,22 @@ interface Colaborador {
   fonte?: 'web' | 'mobile';
 }
 
+interface HorarioDia {
+  ativo: boolean;
+  inicio: string;
+  fim: string;
+}
+
+interface EscalaHorarios {
+  segunda: HorarioDia;
+  terca: HorarioDia;
+  quarta: HorarioDia;
+  quinta: HorarioDia;
+  sexta: HorarioDia;
+  sabado: HorarioDia;
+  domingo: HorarioDia;
+}
+
 interface FormColaborador {
   nome: string;
   email: string;
@@ -59,10 +76,23 @@ interface FormColaborador {
   servicos: string[];
   nivelAcesso: NivelAcesso;
   senhaTemporaria: string;
+  escala: EscalaHorarios;
 }
 
+const HORARIO_PADRAO: HorarioDia = { ativo: true, inicio: '08:00', fim: '18:00' };
+const HORARIO_INATIVO: HorarioDia = { ativo: false, inicio: '08:00', fim: '18:00' };
+
 const FORM_VAZIO: FormColaborador = {
-  nome: '', email: '', telefone: '', cargo: '', servicos: [], nivelAcesso: 'operacao', senhaTemporaria: ''
+  nome: '', email: '', telefone: '', cargo: '', servicos: [], nivelAcesso: 'operacao', senhaTemporaria: '',
+  escala: {
+    segunda: { ...HORARIO_PADRAO },
+    terca: { ...HORARIO_PADRAO },
+    quarta: { ...HORARIO_PADRAO },
+    quinta: { ...HORARIO_PADRAO },
+    sexta: { ...HORARIO_PADRAO },
+    sabado: { ativo: true, inicio: '08:00', fim: '12:00' },
+    domingo: { ...HORARIO_INATIVO }
+  }
 };
 
 // ============================================================
@@ -205,10 +235,32 @@ export default function EquipePage() {
         console.warn('[Equipe] Subcoleção colaboradores não encontrada');
       }
       
+      // Deduplicar colaboradores (mesmo ID pode vir de web e mobile)
+      const colabsMap = new Map<string, Colaborador>();
+      allColabsRaw.forEach(c => {
+        // Usa conectaId como chave principal se disponível, senão usa id
+        const key = c.conectaId || c.id;
+        if (!colabsMap.has(key)) {
+          colabsMap.set(key, c);
+        } else {
+          // Merge: mantém dados da versão mobile se tiver mais campos
+          const existing = colabsMap.get(key)!;
+          colabsMap.set(key, {
+            ...existing,
+            ...c,
+            // Prioriza campos não-vazios
+            fotoUrl: c.fotoUrl || existing.fotoUrl,
+            bannerUrl: c.bannerUrl || existing.bannerUrl,
+            servicos: c.servicos?.length ? c.servicos : existing.servicos,
+          });
+        }
+      });
+      const colabsUnicos = Array.from(colabsMap.values());
+      
       // Normalizar colaboradores (merge servicos e servicosHabilitados)
-      const colabsNormalizados = allColabsRaw.map(c => {
+      const colabsNormalizados = colabsUnicos.map(c => {
         // Converter servicosHabilitados (IDs mobile) para nomes se possível
-        let servicosNomes = c.servicos || [];
+        const servicosNomes = c.servicos || [];
         if (c.servicosHabilitados && c.servicosHabilitados.length > 0) {
           // Vamos mapear IDs para nomes depois de carregar serviços
         }
@@ -219,7 +271,7 @@ export default function EquipePage() {
         };
       });
       
-      console.log(`[Equipe] Total colaboradores combinados: ${colabsNormalizados.length}`);
+      console.log(`[Equipe] Total colaboradores combinados: ${colabsNormalizados.length} (de ${allColabsRaw.length} brutos)`);
       setColaboradores(colabsNormalizados);
 
       // 3. Carrega Serviços do Gestor
@@ -260,7 +312,8 @@ export default function EquipePage() {
         cargo: colaborador.cargo || '',
         servicos: colaborador.servicos || [],
         nivelAcesso: colaborador.nivelAcesso || 'operacao',
-        senhaTemporaria: ''
+        senhaTemporaria: '',
+        escala: colaborador.escala || FORM_VAZIO.escala
       });
       setEditando(colaborador);
       setFotoPreview(colaborador.fotoUrl || '');
@@ -350,9 +403,9 @@ export default function EquipePage() {
           } else {
             throw new Error(data.error?.message || 'Upload failed');
           }
-        } catch (fotoErr: any) {
+        } catch (fotoErr: unknown) {
           console.error('[Equipe] Erro no upload da foto:', fotoErr);
-          toast.error('Erro ao salvar foto: ' + fotoErr.message);
+          toast.error('Erro ao salvar foto: ' + (fotoErr instanceof Error ? fotoErr.message : 'Tente novamente'));
         }
       }
 
@@ -377,9 +430,9 @@ export default function EquipePage() {
           } else {
             throw new Error(data.error?.message || 'Upload failed');
           }
-        } catch (bannerErr: any) {
+        } catch (bannerErr: unknown) {
           console.error('[Equipe] Erro no upload do banner:', bannerErr);
-          toast.error('Erro ao salvar banner: ' + bannerErr.message);
+          toast.error('Erro ao salvar banner: ' + (bannerErr instanceof Error ? bannerErr.message : 'Tente novamente'));
         }
       }
 
@@ -390,10 +443,13 @@ export default function EquipePage() {
         cargo:          form.cargo.trim(),
         servicos:       form.servicos,
         nivelAcesso:    form.nivelAcesso,
+        escala:         form.escala,
         fotoUrl,
         bannerUrl,
         profissionalId: dadosUsuario.uid,
         senhaTemporaria: form.senhaTemporaria.trim() || '123456',
+        tipo:           'profissional',
+        perfil:         'colaborador',
       };
 
       console.log('[Equipe] Dados a serem salvos:', { ...dados, fotoUrl, bannerUrl });
@@ -403,35 +459,98 @@ export default function EquipePage() {
         await updateDoc(doc(db, 'colaboradores', editando.id), dados);
         toast.success('Colaborador atualizado!');
       } else {
-        // NOVO: Cria em múltiplos lugares igual o mobile faz
-        const uidGenerado = gerarUID();
+        // NOVO: Cria em múltiplos lugares usando CID como ID do documento
         const cid = await gerarConectaIdUnico();
-        const colaboradorId = uidGenerado; // ID do colaborador (mesmo UID do doc)
+        const colaboradorId = cid; // ID único da plataforma (CID)
+        
+        // CRIAR CONTA NO FIREBASE AUTH usando app secundário (igual ao mobile)
+        // Isso evita deslogar o gestor principal
+        const senhaTemporaria = form.senhaTemporaria.trim() || '123456';
+        
+        try {
+          // Criar app Firebase secundário (igual ao mobile)
+          const { initializeApp, getApps, getApp, deleteApp } = await import('firebase/app');
+          const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
+          
+          // Configuração do projeto
+          const firebaseConfig = {
+            apiKey: "AIzaSyAzG2dnGzcipvraVdXEKJOj4JdjR8vRmzs",
+            authDomain: "agenda-servicos-2139d.firebaseapp.com",
+            projectId: "agenda-servicos-2139d",
+            storageBucket: "agenda-servicos-2139d.firebasestorage.app",
+            messagingSenderId: "2644975059",
+            appId: "1:2644975059:web:90810802bf4473a90c2326",
+            measurementId: "G-3F0TDM3BLB"
+          };
+          
+          // Criar/Obter app secundário com nome único
+          const secondaryAppName = `secondary-${Date.now()}`;
+          const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+          const secondaryAuth = getAuth(secondaryApp);
+          
+          console.log('[Equipe] App secundário criado:', secondaryAppName);
+          
+          // Criar usuário no auth secundário (não afeta o auth principal!)
+          const userCredential = await createUserWithEmailAndPassword(
+            secondaryAuth,
+            dados.email,
+            senhaTemporaria
+          );
+          
+          console.log('[Equipe] Conta Firebase Auth criada no app secundário:', userCredential.user.uid);
+          
+          // Deletar o app secundário após uso (limpeza)
+          try {
+            await deleteApp(secondaryApp);
+            console.log('[Equipe] App secundário deletado');
+          } catch (e) {
+            console.log('[Equipe] Erro ao deletar app secundário (não crítico):', e);
+          }
+          
+        } catch (authErr) {
+          const err = authErr as { code?: string; message?: string };
+          if (err.code === 'auth/email-already-in-use') {
+            console.log('[Equipe] Email já existe no Auth, continuando...');
+          } else if (err.code === 'auth/weak-password') {
+            alert('Erro: Senha muito fraca. Use pelo menos 6 caracteres.');
+            throw authErr;
+          } else if (err.code === 'auth/invalid-email') {
+            alert('Erro: Email inválido.');
+            throw authErr;
+          } else {
+            console.error('[Equipe] Erro ao criar conta Auth:', authErr);
+            alert('Erro ao criar conta no Firebase Auth: ' + (err.message || 'Erro desconhecido'));
+            throw authErr;
+          }
+        }
         
         const batch = writeBatch(db);
         const now = serverTimestamp();
         
-        // 1. Coleção colaboradores (WEB) - precisa de profissionalId para query no mobile
-        const colabRef = doc(collection(db, 'colaboradores'));
+        // 1. Coleção colaboradores (WEB) - usa CID como ID
+        const colabRef = doc(db, 'colaboradores', colaboradorId);
         batch.set(colabRef, {
           ...dados,
-          uid: uidGenerado,
-          profissionalId: dadosUsuario.uid, // ID do gestor (para mobile buscar)
+          id: colaboradorId,
           conectaId: cid,
+          profissionalId: dadosUsuario.uid, // ID do gestor (para mobile buscar)
           ativo: true,
           precisaTrocarSenha: true,
           criadoEm: now,
+          // Auth info para mobile
+          authEmail: dados.email,
+          authProvider: 'password',
         });
         
-        // 2. Perfil principal do colaborador (MOBILE usa aqui)
+        // 2. Perfil principal do colaborador (MOBILE usa aqui) - usa CID como ID
         const usuarioRef = doc(db, 'usuarios', colaboradorId);
         batch.set(usuarioRef, {
           uid: colaboradorId,
           nome: form.nome.trim(),
           nomeCompleto: form.nome.trim(),
           email: form.email.trim().toLowerCase(),
-          tipo: 'profissional',
-          perfil: 'colaborador',
+          tipo: 'profissional',  // IMPORTANTE: Para mobile reconhecer como profissional
+          perfil: 'colaborador', // IMPORTANTE: Identifica que é colaborador
           clinicaId: dadosUsuario.uid, // ID do gestor
           conectaId: cid,
           fotoUrl: fotoUrl || null,
@@ -440,13 +559,14 @@ export default function EquipePage() {
           bannerPerfil: bannerUrl || null, // Compatibilidade AgendamentoFinal.js
           telefone: form.telefone.trim() || null,
           cargo: form.cargo.trim() || null,
+          escala: form.escala,
           servicosHabilitados: form.servicos, // Mobile usa IDs de serviço
           nivelAcesso: form.nivelAcesso,
           ativo: true,
           createdAt: now,
         });
         
-        // 3. Subcoleção na equipe do gestor (MOBILE usa aqui)
+        // 3. Subcoleção na equipe do gestor (MOBILE usa aqui) - usa CID como ID
         const subcolabRef = doc(db, 'usuarios', dadosUsuario.uid, 'colaboradores', colaboradorId);
         batch.set(subcolabRef, {
           id: colaboradorId,
@@ -457,13 +577,14 @@ export default function EquipePage() {
           bannerUrl: bannerUrl || null,
           fotoPerfil: fotoUrl || null,     // Compatibilidade AgendamentoFinal.js
           bannerPerfil: bannerUrl || null, // Compatibilidade AgendamentoFinal.js
+          escala: form.escala,
           servicosHabilitados: form.servicos,
           nivelAcesso: form.nivelAcesso,
           ativo: true,
           dataCriacao: now,
         });
         
-        // 4. Saldo inicial (MOBILE cria isso)
+        // 4. Saldo inicial (MOBILE cria isso) - usa CID como ID
         const saldoRef = doc(db, 'saldos', colaboradorId);
         batch.set(saldoRef, {
           usuarioId: colaboradorId,
@@ -473,15 +594,15 @@ export default function EquipePage() {
         });
         
         await batch.commit();
-        console.log('[Equipe] Batch commit realizado com sucesso');
+        console.log('[Equipe] Batch commit realizado com sucesso. CID:', cid);
         toast.success(`Colaborador adicionado! CID: ${cid}`);
       }
       
       fecharModal();
       await carregarDados();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Equipe] Erro detalhado ao salvar:', err);
-      if (err.code === 'permission-denied') {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'permission-denied') {
         toast.error('Erro de permissão: Sua sessão pode ter expirado.');
       } else {
         toast.error('Não foi possível salvar os dados.');
@@ -501,12 +622,71 @@ export default function EquipePage() {
   };
 
   const excluir = async (c: Colaborador) => {
-    if (!confirm(`Remover ${c.nome} da equipe?`)) return;
+    if (!confirm(`Remover ${c.nome} da equipe?\n\nIsso excluirá todos os dados do colaborador.`)) return;
+    
+    console.log('[Equipe] Iniciando exclusão do colaborador:', c.id);
+    const startTime = Date.now();
+    const erros: string[] = [];
+    
     try {
-      await deleteDoc(doc(db, 'colaboradores', c.id));
-      toast.success('Colaborador removido.');
+      // Deleta um por um para identificar qual está falhando
+      
+      // 1. Coleção colaboradores (web)
+      try {
+        await deleteDoc(doc(db, 'colaboradores', c.id));
+        console.log('[Equipe] ✓ Deletado: colaboradores/', c.id);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+        console.log('[Equipe] ✗ Falha ao deletar colaboradores/', c.id, '-', msg);
+        erros.push('colaboradores: ' + msg);
+      }
+      
+      // 2. Perfil principal do colaborador
+      try {
+        await deleteDoc(doc(db, 'usuarios', c.id));
+        console.log('[Equipe] ✓ Deletado: usuarios/', c.id);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+        console.log('[Equipe] ✗ Falha ao deletar usuarios/', c.id, '-', msg);
+        erros.push('usuarios: ' + msg);
+      }
+      
+      // 3. Subcoleção na equipe do gestor
+      const gestorId = c.clinicaId || dadosUsuario?.uid;
+      if (gestorId) {
+        try {
+          await deleteDoc(doc(db, 'usuarios', gestorId, 'colaboradores', c.id));
+          console.log('[Equipe] ✓ Deletado: usuarios/', gestorId, '/colaboradores/', c.id);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+          console.log('[Equipe] ✗ Falha ao deletar subcoleção/', c.id, '-', msg);
+          erros.push('subcoleção: ' + msg);
+        }
+      }
+      
+      // 4. Saldo do colaborador
+      try {
+        await deleteDoc(doc(db, 'saldos', c.id));
+        console.log('[Equipe] ✓ Deletado: saldos/', c.id);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+        console.log('[Equipe] ✗ Falha ao deletar saldos/', c.id, '-', msg);
+        erros.push('saldos: ' + msg);
+      }
+      
+      const elapsed = Date.now() - startTime;
+      console.log(`[Equipe] Exclusão concluída em ${elapsed}ms. Erros:`, erros);
+      
+      if (erros.length > 0) {
+        toast('Colaborador parcialmente removido. Alguns dados podem permanecer.', { icon: '⚠️' });
+      } else {
+        toast.success('Colaborador removido com sucesso!');
+      }
       carregarDados();
-    } catch { toast.error('Erro ao remover.'); }
+    } catch (err: unknown) {
+      console.error('[Equipe] Erro geral ao excluir:', err);
+      toast.error('Erro ao remover: ' + (err instanceof Error ? err.message : 'Tente novamente'));
+    }
   };
 
   const ativos   = colaboradores.filter(c => c.ativo !== false);
@@ -591,13 +771,13 @@ export default function EquipePage() {
             {ativos.length > 0 && (
               <div className="eq-secao">
                 <h2 className="eq-secao-titulo"><CheckCircle size={15} className="eq-icon--verde" /> Ativos</h2>
-                <div className="eq-grid">{ativos.map(c => <CardColaborador key={c.id} c={c} iniciais={c.nome?.[0] || 'C'} onEditar={() => abrirModal(c)} onExcluir={() => excluir(c)} onAlternar={() => alternarAtivo(c)} planoVerified={planoInfo?.verifiedBadge} />)}</div>
+                <div className="eq-grid">{ativos.map(c => <CardColaborador key={c.conectaId || c.id} c={c} iniciais={c.nome?.[0] || 'C'} onEditar={() => abrirModal(c)} onExcluir={() => excluir(c)} onAlternar={() => alternarAtivo(c)} planoVerified={planoInfo?.verifiedBadge} />)}</div>
               </div>
             )}
             {inativos.length > 0 && (
               <div className="eq-secao">
                 <h2 className="eq-secao-titulo"><XCircle size={15} /> Inativos</h2>
-                <div className="eq-grid">{inativos.map(c => <CardColaborador key={c.id} c={c} iniciais={c.nome?.[0] || 'C'} onEditar={() => abrirModal(c)} onExcluir={() => excluir(c)} onAlternar={() => alternarAtivo(c)} planoVerified={planoInfo?.verifiedBadge} />)}</div>
+                <div className="eq-grid">{inativos.map(c => <CardColaborador key={c.conectaId || c.id} c={c} iniciais={c.nome?.[0] || 'C'} onEditar={() => abrirModal(c)} onExcluir={() => excluir(c)} onAlternar={() => alternarAtivo(c)} planoVerified={planoInfo?.verifiedBadge} />)}</div>
               </div>
             )}
           </>
@@ -705,6 +885,83 @@ export default function EquipePage() {
                     </select>
                     <p className="campo-hint" style={{ color: NIVEIS[form.nivelAcesso].cor }}>{NIVEIS[form.nivelAcesso].descricao}</p>
                   </div>
+                </div>
+              </div>
+
+              {/* SEÇÃO: ESCALA DE HORÁRIOS */}
+              <div className="eq-secao-modal">
+                <div className="eq-secao-header">
+                  <Calendar size={14} />
+                  <span>Escala de Atendimento</span>
+                </div>
+                <p className="campo-hint" style={{ marginBottom: '12px' }}>
+                  Defina os horários de trabalho para cada dia da semana
+                </p>
+                <div className="eq-escala-grid">
+                  {[
+                    { key: 'segunda', label: 'Segunda' },
+                    { key: 'terca', label: 'Terça' },
+                    { key: 'quarta', label: 'Quarta' },
+                    { key: 'quinta', label: 'Quinta' },
+                    { key: 'sexta', label: 'Sexta' },
+                    { key: 'sabado', label: 'Sábado' },
+                    { key: 'domingo', label: 'Domingo' },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="eq-escala-item">
+                      <label className="eq-escala-dia">
+                        <input
+                          type="checkbox"
+                          checked={form.escala[key as keyof EscalaHorarios].ativo}
+                          onChange={(e) => setForm(f => ({
+                            ...f,
+                            escala: {
+                              ...f.escala,
+                              [key]: {
+                                ...f.escala[key as keyof EscalaHorarios],
+                                ativo: e.target.checked
+                              }
+                            }
+                          }))}
+                        />
+                        <span>{label}</span>
+                      </label>
+                      {form.escala[key as keyof EscalaHorarios].ativo && (
+                        <div className="eq-escala-horarios">
+                          <input
+                            type="time"
+                            className="campo-input campo-input--time"
+                            value={form.escala[key as keyof EscalaHorarios].inicio}
+                            onChange={(e) => setForm(f => ({
+                              ...f,
+                              escala: {
+                                ...f.escala,
+                                [key]: {
+                                  ...f.escala[key as keyof EscalaHorarios],
+                                  inicio: e.target.value
+                                }
+                              }
+                            }))}
+                          />
+                          <span>às</span>
+                          <input
+                            type="time"
+                            className="campo-input campo-input--time"
+                            value={form.escala[key as keyof EscalaHorarios].fim}
+                            onChange={(e) => setForm(f => ({
+                              ...f,
+                              escala: {
+                                ...f.escala,
+                                [key]: {
+                                  ...f.escala[key as keyof EscalaHorarios],
+                                  fim: e.target.value
+                                }
+                              }
+                            }))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 

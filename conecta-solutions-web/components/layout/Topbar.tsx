@@ -15,7 +15,7 @@ interface TopbarProps {
 }
 
 export default function Topbar({ title, subtitle, action }: TopbarProps) {
-  const { dadosUsuario } = useAuth();
+  const { dadosUsuario, ehColaborador } = useAuth();
 
   // Saudação dinâmica
   const hora = new Date().getHours();
@@ -31,7 +31,8 @@ export default function Topbar({ title, subtitle, action }: TopbarProps) {
       <div className="topbar-actions">
         {action && <div className="topbar-page-action">{action}</div>}
 
-        <NotificacoesDropdown />
+        {/* Não mostrar notificações para colaboradores */}
+        {!ehColaborador && <NotificacoesDropdown />}
 
         <div className="topbar-user">
           <span className="topbar-greeting">

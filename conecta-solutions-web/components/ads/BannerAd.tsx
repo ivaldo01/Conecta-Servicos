@@ -12,14 +12,20 @@ interface BannerAdProps {
 }
 
 export default function BannerAd({ tipo, className = '', fallback = null }: BannerAdProps) {
-  const { user } = useAuth();
+  const { user, ehColaborador } = useAuth();
   const [anuncio, setAnuncio] = useState<Anuncio | null>(null);
   const [loading, setLoading] = useState(true);
   const [impressaoRegistrada, setImpressaoRegistrada] = useState(false);
   const bannerRef = useRef<HTMLDivElement>(null);
 
-  // Buscar anúncio ativo
+  // Buscar anúncio ativo (não buscar para colaboradores)
   useEffect(() => {
+    // Não buscar anúncios para colaboradores (evita erros de permissão)
+    if (ehColaborador) {
+      setLoading(false);
+      return;
+    }
+
     const buscarAnuncio = async () => {
       try {
         console.log('[BannerAd] Buscando anúncios tipo:', tipo);
@@ -41,7 +47,7 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
     };
 
     buscarAnuncio();
-  }, [tipo]);
+  }, [tipo, ehColaborador]);
 
   // Registrar impressão quando banner entra na viewport
   useEffect(() => {

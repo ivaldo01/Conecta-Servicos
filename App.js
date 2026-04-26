@@ -707,47 +707,81 @@ function MainTabs() {
 
       docRef,
 
-      (docSnap) => {
+      async (docSnap) => {
+
+        let dados = null;
 
         if (docSnap.exists()) {
-
-          const dados = docSnap.data() || {};
-
-          const profissional = isPerfilProfissional(dados);
-
-
-
-          console.log('Perfil carregado no App:', {
-
-            uid: user.uid,
-
-            profissional,
-
-            tipo: dados?.tipo,
-
-            perfil: dados?.perfil,
-
-            tipoUsuario: dados?.tipoUsuario,
-
-            role: dados?.role,
-
-            cnpj: dados?.cnpj ? 'preenchido' : 'vazio',
-
-          });
-
-
-
-          setIsProfissional(profissional);
-
+          dados = docSnap.data() || {};
         } else {
+          // Não encontrou pelo UID - verificar se é colaborador pelo email
+          console.log('App: Usuário não encontrado pelo UID, verificando colaboradores por email:', user.email);
+          try {
+            const colabQuery = query(
+              collection(db, 'colaboradores'),
+              where('email', '==', user.email)
+            );
+            const colabSnap = await getDocs(colabQuery);
+            console.log('App: colabSnap.size:', colabSnap.size);
 
-          console.log('Usuário sem documento em usuarios/, assumindo cliente.');
-
-          setIsProfissional(false);
-
+            if (!colabSnap.empty) {
+              const colabDoc = colabSnap.docs[0];
+              dados = colabDoc.data();
+              console.log('App: Colaborador encontrado por email:', dados.nome, {
+                tipo: dados.tipo,
+                perfil: dados.perfil,
+                profissionalId: dados.profissionalId,
+              });
+            } else {
+              console.log('App: Colaborador não encontrado por email, tentando usuarios/ por email');
+              // Tentar buscar em usuários por email também
+              const userQuery = query(
+                collection(db, 'usuarios'),
+                where('email', '==', user.email)
+              );
+              const userSnap = await getDocs(userQuery);
+              console.log('App: userSnap.size:', userSnap.size);
+              if (!userSnap.empty) {
+                const userDoc = userSnap.docs[0];
+                dados = userDoc.data();
+                console.log('App: Usuário encontrado por email em usuarios/:', dados.nome, {
+                  tipo: dados.tipo,
+                  perfil: dados.perfil,
+                  clinicaId: dados.clinicaId,
+                });
+              }
+            }
+          } catch (err) {
+            console.log('App: Erro ao buscar por email:', err.message);
+          }
         }
 
+        if (dados) {
+          // Verificação explícita para colaboradores
+          const ehColaborador = dados?.perfil === 'colaborador' || dados?.tipo === 'colaborador';
+          const profissional = ehColaborador || isPerfilProfissional(dados);
 
+          console.log('Perfil carregado no App:', {
+            uid: user.uid,
+            profissional,
+            ehColaborador,
+            tipo: dados?.tipo,
+            perfil: dados?.perfil,
+            tipoUsuario: dados?.tipoUsuario,
+            role: dados?.role,
+            clinicaId: dados?.clinicaId,
+            nome: dados?.nome,
+          });
+
+          if (ehColaborador) {
+            console.log('App: Usuário identificado como COLABORADOR');
+          }
+
+          setIsProfissional(profissional);
+        } else {
+          console.log('App: Usuário não encontrado nem por UID nem por email, assumindo cliente.');
+          setIsProfissional(false);
+        }
 
         setLoadingPerfil(false);
 

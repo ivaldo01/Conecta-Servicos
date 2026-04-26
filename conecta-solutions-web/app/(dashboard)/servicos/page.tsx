@@ -54,10 +54,28 @@ export default function ServicosPage() {
 
   // Carrega serviços do Firestore
   const carregarServicos = useCallback(async () => {
-    if (!dadosUsuario?.uid) return;
+    // Para colaboradores, usar clinicaId (ID do gestor)
+    // Para gestores, usar o próprio uid
+    const ehColaborador = dadosUsuario?.perfil === 'colaborador';
+    const gestorId = ehColaborador ? dadosUsuario?.clinicaId : dadosUsuario?.uid;
+    
+    console.log('[Serviços] Carregando:', {
+      ehColaborador,
+      clinicaId: dadosUsuario?.clinicaId,
+      profissionalId: dadosUsuario?.profissionalId,
+      gestorId,
+      uid: dadosUsuario?.uid,
+    });
+    
+    if (!gestorId) {
+      console.warn('[Serviços] gestorId não encontrado');
+      return;
+    }
+    
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'usuarios', dadosUsuario.uid, 'servicos'));
+      const snap = await getDocs(collection(db, 'usuarios', gestorId, 'servicos'));
+      console.log('[Serviços] Encontrados:', snap.docs.length);
       setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() } as Servico)));
     } catch (err) {
       console.error('[Serviços]', err);

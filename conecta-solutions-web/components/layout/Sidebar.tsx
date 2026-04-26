@@ -12,7 +12,7 @@ import {
   Star, User, MessageCircle, Search, FileText,
   Heart, ChevronRight, LogOut, Crown,
   Shield, Bell, Radio, Stethoscope,
-  Megaphone, Building2, Mail
+  Megaphone, Building2, Mail, DollarSign
 } from 'lucide-react';
 
 // ============================================================
@@ -57,6 +57,18 @@ const navAdmin: NavItem[] = [
 ];
 
 // ============================================================
+// ITENS DE MENU — COLABORADOR (acesso limitado)
+// ============================================================
+const navColaborador: NavItem[] = [
+  { label: 'Dashboard',       href: '/dashboard',       icon: <Activity size={18} /> },
+  { label: 'Agenda',          href: '/agenda',           icon: <Calendar size={18} /> },
+  { label: 'Financeiro',      href: '/financeiro',      icon: <DollarSign size={18} /> },
+  { label: 'Avaliações',      href: '/avaliacoes',      icon: <Star size={18} /> },
+  { label: 'Suporte',         href: '/suporte',         icon: <MessageCircle size={18} /> },
+  { label: 'Perfil',          href: '/perfil',          icon: <User size={18} /> },
+];
+
+// ============================================================
 // ITENS DE MENU — CLIENTE
 // ============================================================
 const navCliente: NavItem[] = [
@@ -75,7 +87,7 @@ const navCliente: NavItem[] = [
 // COMPONENTE PRINCIPAL — SIDEBAR
 // ============================================================
 export default function Sidebar() {
-  const { dadosUsuario, ehProfissional, ehAdmin, logout } = useAuth();
+  const { dadosUsuario, ehProfissional, ehAdmin, ehColaborador, logout } = useAuth();
   const { config, loading } = useConfig();
   const pathname = usePathname();
   
@@ -85,6 +97,7 @@ export default function Sidebar() {
   let navItems = navCliente;
   if (ehAdmin) navItems = navAdmin;
   else if (ehProfissional) navItems = navProfissional;
+  else if (ehColaborador) navItems = navColaborador;
 
   // Iniciais do nome para o avatar (lógica resiliente)
   const iniciais = (dadosUsuario?.nome || 'C')
@@ -132,7 +145,7 @@ export default function Sidebar() {
           <div className="sidebar-user-info-premium">
             <p className="sidebar-user-name-premium">{dadosUsuario?.nome || 'Usuário'}</p>
             <p className="sidebar-user-role-premium">
-              {ehAdmin ? 'Administrador' : ehProfissional ? 'Profissional' : 'Cliente'}
+              {ehAdmin ? 'Administrador' : ehProfissional ? 'Profissional' : ehColaborador ? 'Colaborador' : 'Cliente'}
             </p>
           </div>
         </div>
@@ -141,7 +154,7 @@ export default function Sidebar() {
       {/* ===== NAVEGAÇÃO ===== */}
       <nav className="sidebar-nav">
         <p className="sidebar-nav-label">
-          {ehAdmin ? 'Administração' : ehProfissional ? 'Minha Gestão' : 'Menu Principal'}
+          {ehAdmin ? 'Administração' : ehProfissional ? 'Minha Gestão' : ehColaborador ? 'Área do Colaborador' : 'Menu Principal'}
         </p>
 
         {navItems.map((item) => {

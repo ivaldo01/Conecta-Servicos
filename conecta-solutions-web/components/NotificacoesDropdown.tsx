@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Megaphone, Tag, Calendar, Ticket, ExternalLink } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, Timestamp, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/lib/auth';
 
 interface Notificacao {
@@ -37,33 +37,65 @@ export default function NotificacoesDropdown() {
       return;
     }
 
+    // Detectar se é colaborador (sem email = login anônimo/colaborador)
+    const isColaborador = !user.email;
+    
+    if (isColaborador) {
+      console.log('[NotificacoesDropdown] Colaborador detectado - desativando notificações');
+      setNotificacoes([]);
+      return; // Não carrega notificações para colaboradores (evita erros de permissão)
+    }
+
     console.log('[NotificacoesDropdown] Iniciando listener para:', user.uid);
     
-    // Query simplificada - Firestore cria índice automático para subcoleções
-    const notificacoesRef = collection(db, 'usuarios', user.uid, 'notificacoes');
-    const q = query(notificacoesRef, orderBy('createdAt', 'desc'));
+    let unsubscribe: (() => void) | null = null;
+    let mounted = true;
+    
+    const setupListener = () => {
+      try {
+        const notificacoesRef = collection(db, 'usuarios', user.uid, 'notificacoes');
+        const q = query(notificacoesRef, orderBy('createdAt', 'desc'));
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        console.log('[NotificacoesDropdown] Snapshot recebido:', snapshot.size, 'notificações');
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Notificacao[];
-        setNotificacoes(data);
-      },
-      (error) => {
-        console.error('[NotificacoesDropdown] Erro ao buscar notificações:', error);
-        console.error('[NotificacoesDropdown] Código do erro:', error.code);
-        console.error('[NotificacoesDropdown] Mensagem:', error.message);
-        if (error.code === 'permission-denied') {
-          console.error('[NotificacoesDropdown] UID do usuário:', user?.uid);
-          console.error('[NotificacoesDropdown] Coleção:', 'usuarios/' + user?.uid + '/notificacoes');
+        unsubscribe = onSnapshot(q, 
+          (snapshot) => {
+            if (!mounted) return;
+            console.log('[NotificacoesDropdown] Snapshot recebido:', snapshot.size, 'notificações');
+            const data = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            })) as Notificacao[];
+            setNotificacoes(data);
+          },
+          (error) => {
+            if (!mounted) return;
+            // Silenciar erros de permissão
+            if (error.code === 'permission-denied') {
+              console.log('[NotificacoesDropdown] Sem permissão para notificações');
+              setNotificacoes([]);
+            } else {
+              console.error('[NotificacoesDropdown] Erro:', error.code);
+            }
+          }
+        );
+      } catch (err) {
+        console.error('[NotificacoesDropdown] Erro ao iniciar listener:', err);
+      }
+    };
+
+    // Delay para evitar race conditions
+    const timeoutId = setTimeout(setupListener, 500);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+      if (unsubscribe) {
+        try {
+          unsubscribe();
+        } catch (e) {
+          // Ignora erros de cleanup
         }
       }
-    );
-
-    return () => unsubscribe();
+    };
   }, [user?.uid]);
 
   // Fechar ao clicar fora
@@ -120,6 +152,11 @@ export default function NotificacoesDropdown() {
     }
     return <Megaphone size={16} className="text-pink-400" />;
   };
+
+  // Não renderiza nada para colaboradores (evita erros de permissão)
+  if (!user?.email) {
+    return null;
+  }
 
   return (
     <div className="notificacoes-container" ref={dropdownRef}>

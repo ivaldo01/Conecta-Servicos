@@ -10,7 +10,8 @@ import {
   Calendar, Users, Clock, DollarSign, Star, ArrowRight,
   Zap, Shield, MapPin, Wrench, Activity, 
   Trash, Search, Settings, User, ChevronRight, CheckCircle,
-  TrendingUp, TrendingDown, Plus, Wallet, BarChart3, Sparkles
+  TrendingUp, TrendingDown, Plus, Wallet, BarChart3, Sparkles,
+  Percent
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -56,7 +57,7 @@ interface Avaliacao {
 // DASHBOARD PRINCIPAL
 // ============================================================
 export default function DashboardPage() {
-  const { user, dadosUsuario, ehProfissional, loading: authLoading } = useAuth();
+  const { user, dadosUsuario, ehProfissional, ehColaborador, loading: authLoading } = useAuth();
   const router = useRouter();
   
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
@@ -70,6 +71,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (authLoading || !user?.uid) return;
+
+    // Não criar listeners para colaboradores
+    if (ehColaborador) {
+      setLoading(false);
+      return;
+    }
 
     const userId = user.uid;
     let unsubscribe: () => void;
@@ -124,6 +131,190 @@ export default function DashboardPage() {
     carregarDados();
     return () => { if (unsubscribe) unsubscribe(); };
   }, [user?.uid, ehProfissional, authLoading]);
+
+  // --- COMPONENTE: DASHBOARD DO COLABORADOR ---
+  const renderDashboardColaborador = () => {
+    const proximos = agendamentos
+      .filter((a: Agendamento) => a.status !== 'cancelado' && a.status !== 'concluido')
+      .slice(0, 5);
+
+    // Cálculos financeiros
+    const atendimentosConcluidos = agendamentos.filter(a => a.status === 'concluido');
+    const atendimentosHoje = agendamentos.filter(a => {
+      const dataHora = a.dataHora?.toDate ? a.dataHora.toDate() : new Date(a.dataHora as any);
+      return dataHora.toDateString() === new Date().toDateString();
+    });
+    
+    // Comissão estimada (assumindo 50% como padrão, pode vir do perfil)
+    const comissaoPercentual = dadosUsuario?.comissaoPercentual || 50;
+    const totalReceita = atendimentosConcluidos.reduce((acc, a) => acc + (Number(a.valor) || 0), 0);
+    const totalComissao = totalReceita * (comissaoPercentual / 100);
+    const receitaHoje = atendimentosHoje.reduce((acc, a) => acc + (Number(a.valor) || 0), 0);
+    const comissaoHoje = receitaHoje * (comissaoPercentual / 100);
+
+    return (
+      <div className="dashboard-profissional">
+        {/* Banner informativo */}
+        <div style={{
+          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+          borderRadius: '16px',
+          padding: '24px',
+          marginBottom: '24px',
+          color: 'white'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+            <Users size={24} />
+            <h2 style={{ fontSize: '20px', fontWeight: '700', margin: 0 }}>Área do Colaborador</h2>
+          </div>
+          <p style={{ fontSize: '14px', opacity: 0.9, margin: 0 }}>
+            Esta é uma conta gerenciada por {dadosUsuario?.profissionalNome || 'seu profissional'}. 
+            Você pode visualizar seus agendamentos e acessar a agenda.
+          </p>
+        </div>
+
+        {/* RESUMO FINANCEIRO - Simplificado */}
+        <div className="dashboard-section" style={{ marginBottom: '24px' }}>
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title"><DollarSign size={20} /> Resumo Financeiro</h2>
+            <Link href="/financeiro" style={{ fontSize: '14px', color: '#3b82f6' }}>Ver detalhes →</Link>
+          </div>
+          <div style={{ 
+            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%)',
+            borderRadius: '16px',
+            padding: '20px',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '12px', 
+                background: 'rgba(34, 197, 94, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#22c55e'
+              }}>
+                <Wallet size={24} />
+              </div>
+              <div>
+                <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>Sua Comissão Total</p>
+                <p style={{ color: '#fff', fontSize: '24px', fontWeight: '700', margin: '4px 0' }}>
+                  R$ {totalComissao.toFixed(2).replace('.', ',')}
+                </p>
+                <p style={{ color: '#64748b', fontSize: '12px', margin: 0 }}>
+                  {comissaoPercentual}% de comissão • {atendimentosConcluidos.length} atendimentos
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => router.push('/financeiro')}
+              style={{
+                padding: '12px 20px',
+                background: '#22c55e',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Ver Extrato
+            </button>
+          </div>
+        </div>
+
+        {/* Estatísticas simplificadas */}
+        <div className="dashboard-stats">
+          <div className="stat-card" style={{ background: 'rgba(34, 197, 94, 0.15)', borderLeft: '4px solid #22c55e' }}>
+            <div className="stat-icon" style={{ color: '#22c55e' }}><Calendar size={24} /></div>
+            <div className="stat-info">
+              <p className="stat-label" style={{ color: '#94a3b8' }}>Agendamentos Hoje</p>
+              <p className="stat-value" style={{ color: '#fff' }}>{agendamentos.filter(a => a.dataHora?.toDate?.().toDateString() === new Date().toDateString()).length}</p>
+            </div>
+          </div>
+          <div className="stat-card" style={{ background: 'rgba(59, 130, 246, 0.15)', borderLeft: '4px solid #3b82f6' }}>
+            <div className="stat-icon" style={{ color: '#3b82f6' }}><Clock size={24} /></div>
+            <div className="stat-info">
+              <p className="stat-label" style={{ color: '#94a3b8' }}>Próximos</p>
+              <p className="stat-value" style={{ color: '#fff' }}>{proximos.length}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Ações rápidas do colaborador */}
+        <div className="dashboard-section" style={{ marginTop: '24px' }}>
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title"><Sparkles size={20} /> Acesso Rápido</h2>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', padding: '16px', flexWrap: 'wrap' }}>
+            <button 
+              onClick={() => router.push('/agenda')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '14px 24px',
+                background: '#3b82f6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '15px',
+                fontWeight: '600',
+                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              <Calendar size={18} /> Minha Agenda
+            </button>
+          </div>
+        </div>
+
+        {/* Próximos Atendimentos */}
+        <div className="dashboard-section" style={{ marginTop: '24px' }}>
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title"><Activity size={20} /> Seus Próximos Atendimentos</h2>
+            <Link href="/agenda" style={{ fontSize: '14px', color: '#3b82f6' }}>Ver todos</Link>
+          </div>
+          <div className="appointments-list">
+            {proximos.length === 0 ? (
+              <p className="appointments-empty">Sem agendamentos para você.</p>
+            ) : (
+              proximos.map(ag => {
+                const dataHora = ag.dataHora?.toDate ? ag.dataHora.toDate() : new Date(ag.dataHora as any);
+                const dataStr = dataHora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                const horaStr = dataHora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                
+                return (
+                  <Link key={ag.id} href={`/agendamentos/${ag.id}`} className="appointment-card">
+                    <div className="appointment-avatar">{ag.clienteNome?.[0] || 'C'}</div>
+                    <div className="appointment-info">
+                      <p className="appointment-name">{ag.clienteNome || 'Cliente'}</p>
+                      <p className="appointment-service">{ag.servico || 'Serviço'}</p>
+                      <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                        {dataStr} às {horaStr}
+                        {ag.valor && ` • R$ ${Number(ag.valor).toFixed(2).replace('.', ',')}`}
+                      </p>
+                    </div>
+                    <div className="appointment-right">
+                      <span className={`status-badge-mini status--${ag.status}`}>{ag.status}</span>
+                      <ChevronRight size={16} />
+                    </div>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // --- COMPONENTE: HOME DO CLIENTE ---
   const renderHomeCliente = () => (
@@ -497,15 +688,21 @@ export default function DashboardPage() {
   return (
     <div className="dashboard-page">
       <Topbar 
-        title={ehProfissional ? 'Painel Profissional' : `Olá, ${dadosUsuario?.nome?.split(' ')[0] || 'Cliente'}`} 
+        title={ehProfissional ? 'Painel Profissional' : ehColaborador ? 'Área do Colaborador' : `Olá, ${dadosUsuario?.nome?.split(' ')[0] || 'Cliente'}`} 
         subtitle={hojeStr} 
       />
       <div className="p-6">
-        {/* Banner Patrocinado */}
-        <div className="mb-6">
-          <BannerAd tipo="banner_superior" />
-        </div>
-        {loading ? <p>Carregando...</p> : (ehProfissional ? renderDashboardProf() : renderHomeCliente())}
+        {/* Banner Patrocinado - não mostrar para colaboradores */}
+        {!ehColaborador && (
+          <div className="mb-6">
+            <BannerAd tipo="banner_superior" />
+          </div>
+        )}
+        {loading ? <p>Carregando...</p> : (
+          ehColaborador ? renderDashboardColaborador() : 
+          ehProfissional ? renderDashboardProf() : 
+          renderHomeCliente()
+        )}
       </div>
     </div>
   );

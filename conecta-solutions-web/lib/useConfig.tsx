@@ -84,8 +84,41 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('[ConfigProvider] Iniciando listener de configurações...');
+    console.log('[ConfigProvider] Carregando configurações...');
     
+    // Verificar se é colaborador (sem auth ou com ID de colaborador no sessionStorage)
+    const isColaborador = typeof window !== 'undefined' && sessionStorage.getItem('colab_uid') !== null;
+    
+    if (isColaborador) {
+      // Para colaboradores, usar getDoc (fetch único) em vez de onSnapshot
+      const fetchConfig = async () => {
+        try {
+          const docRef = doc(db, 'configuracoes', 'sistema');
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data() as DocumentData;
+            setConfig({
+              geral: { ...defaultConfig.geral, ...data.geral },
+              notificacoes: { ...defaultConfig.notificacoes, ...data.notificacoes },
+              pagamentos: { ...defaultConfig.pagamentos, ...data.pagamentos },
+              seguranca: { ...defaultConfig.seguranca, ...data.seguranca },
+            });
+          } else {
+            setConfig(defaultConfig);
+          }
+        } catch (err) {
+          console.log('[ConfigProvider] Erro ao carregar (usando padrão):', err);
+          setConfig(defaultConfig);
+        }
+        setLoading(false);
+      };
+      
+      fetchConfig();
+      return;
+    }
+    
+    // Para gestores/clientes, usar onSnapshot (real-time)
     const unsubscribe = onSnapshot(
       doc(db, 'configuracoes', 'sistema'),
       (docSnap) => {

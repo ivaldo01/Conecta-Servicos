@@ -7,6 +7,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import { ConfigProvider } from '@/lib/useConfig';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { getAuth, updatePassword } from 'firebase/auth';
 import { Lock, Check, X, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '@/styles/dashboard-layout.css';
@@ -74,18 +75,32 @@ function ModalTrocaSenha({ uid }: { uid: string }) {
 
     setSalvando(true);
     try {
-      // Atualiza o documento do colaborador
+      // 1. Atualiza a senha no Firebase Auth
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await updatePassword(currentUser, novaSenha);
+        console.log('[ModalTrocaSenha] Senha atualizada no Firebase Auth');
+      }
+
+      // 2. Atualiza o documento do colaborador no Firestore
       const colabRef = doc(db, 'colaboradores', uid);
       await updateDoc(colabRef, {
-        senhaTemporaria: novaSenha, // No nosso sistema híbrido, a senha oficial é essa
-        precisaTrocarSenha: false // Libera o acesso
+        senhaTemporaria: novaSenha,
+        precisaTrocarSenha: false
       });
 
       toast.success('Senha definida com sucesso! Bem-vindo.');
-      // O onSnapshot no lib/auth vai detectar a mudança e fechar o modal automaticamente
-    } catch (err) {
-      console.error(err);
-      toast.error('Erro ao atualizar senha.');
+      
+      // Recarrega para atualizar o auth context
+      window.location.reload();
+    } catch (err: any) {
+      console.error('[ModalTrocaSenha] Erro:', err);
+      if (err.code === 'auth/requires-recent-login') {
+        toast.error('Por segurança, faça login novamente antes de trocar a senha.');
+      } else {
+        toast.error('Erro ao atualizar senha.');
+      }
     } finally {
       setSalvando(false);
     }
@@ -142,62 +157,154 @@ function ModalTrocaSenha({ uid }: { uid: string }) {
         .modal-forced-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(15, 23, 42, 0.9);
-          backdrop-filter: blur(8px);
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.98) 100%);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
           z-index: 9999;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 20px;
+          animation: fadeIn 0.4s ease-out;
         }
         .modal-forced-card {
-          background: white;
+          background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
           width: 100%;
-          max-width: 400px;
-          border-radius: 24px;
-          padding: 32px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          max-width: 440px;
+          border-radius: 28px;
+          padding: 40px 36px;
+          box-shadow: 
+            0 25px 50px -12px rgba(0, 0, 0, 0.4),
+            0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+            0 20px 40px -15px rgba(99, 102, 241, 0.15);
           text-align: center;
-          animation: scaleUp 0.3s ease-out;
+          animation: scaleUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          position: relative;
+          overflow: hidden;
+        }
+        .modal-forced-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%);
         }
         .modal-forced-icon {
-          background: #FFF7ED;
-          width: 64px;
-          height: 64px;
+          background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+          width: 72px;
+          height: 72px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin: 0 auto 20px;
+          margin: 0 auto 24px;
+          box-shadow: 
+            0 10px 25px -5px rgba(245, 158, 11, 0.3),
+            0 0 0 4px rgba(245, 158, 11, 0.1);
+          animation: pulseIcon 2s ease-in-out infinite;
         }
         .modal-forced-header h2 {
-          font-size: 20px;
+          font-size: 24px;
           font-weight: 800;
-          color: #1E293B;
-          margin-bottom: 8px;
+          color: #0f172a;
+          margin-bottom: 12px;
+          letter-spacing: -0.02em;
         }
         .modal-forced-header p {
-          font-size: 14px;
-          color: #64748B;
-          margin-bottom: 24px;
-          line-height: 1.5;
+          font-size: 15px;
+          color: #64748b;
+          margin-bottom: 32px;
+          line-height: 1.6;
+          max-width: 320px;
+          margin-left: auto;
+          margin-right: auto;
         }
         .modal-forced-form {
           text-align: left;
         }
-        .w-full { width: 100%; margin-top: 10px; }
+        .campo-grupo {
+          margin-bottom: 20px;
+        }
+        .campo-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #475569;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .campo-input {
+          width: 100%;
+          padding: 14px 16px;
+          font-size: 15px;
+          color: #0f172a;
+          background: #ffffff;
+          border: 2px solid #e2e8f0;
+          border-radius: 12px;
+          transition: all 0.2s ease;
+          outline: none;
+        }
+        .campo-input:hover {
+          border-color: #cbd5e1;
+        }
+        .campo-input:focus {
+          border-color: #6366f1;
+          box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+        .campo-input::placeholder {
+          color: #94a3b8;
+        }
+        .btn-primary {
+          width: 100%;
+          padding: 16px 24px;
+          font-size: 16px;
+          font-weight: 700;
+          color: #ffffff;
+          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+          border: none;
+          border-radius: 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+          margin-top: 16px;
+        }
+        .btn-primary:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.5);
+        }
+        .btn-primary:active:not(:disabled) {
+          transform: translateY(0);
+        }
+        .btn-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
         .modal-forced-footer {
-          margin-top: 24px;
-          padding-top: 20px;
-          border-top: 1px solid #F1F5F9;
+          margin-top: 28px;
+          padding-top: 24px;
+          border-top: 1px solid #e2e8f0;
         }
         .modal-forced-footer p {
-          font-size: 12px;
-          color: #94A3B8;
+          font-size: 13px;
+          color: #94a3b8;
+          line-height: 1.5;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         @keyframes scaleUp {
-          from { transform: scale(0.9); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
+          from { transform: scale(0.9) translateY(20px); opacity: 0; }
+          to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes pulseIcon {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
       `}</style>
     </div>

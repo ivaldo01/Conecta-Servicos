@@ -123,7 +123,7 @@ function ValidatedTextarea({
 }
 
 export default function PerfilPage() {
-  const { user, dadosUsuario, ehProfissional } = useAuth();
+  const { user, dadosUsuario, ehProfissional, ehColaborador } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('dados');
@@ -170,12 +170,19 @@ export default function PerfilPage() {
 
   useEffect(() => {
     async function loadPerfil() {
-      if (!user?.uid) {
+      // Para colaboradores: precisamos de dadosUsuario.uid (CID)
+      // Para outros: usamos user.uid (Firebase Auth UID)
+      const documentId = ehColaborador ? dadosUsuario?.uid : user?.uid;
+      
+      if (!documentId) {
         if (user === null) setLoading(false);
         return;
       }
       try {
-        const snap = await getDoc(doc(db, 'usuarios', user.uid));
+        // Colaboradores: buscar na coleção 'colaboradores'
+        // Outros perfis: buscar na coleção 'usuarios'
+        const collectionName = ehColaborador ? 'colaboradores' : 'usuarios';
+        const snap = await getDoc(doc(db, collectionName, documentId));
         if (snap.exists()) {
           const d = snap.data();
           setFormData({
@@ -191,13 +198,15 @@ export default function PerfilPage() {
             fotoBanner: d.bannerPerfil || d.banner || d.bannerUrl || d.fotoBanner || ''
           });
 
-          // ID único — gera se ainda não existir
-          if (d.platformUID) {
-            setPlatformUID(d.platformUID as string);
-          } else {
-            const novoUID = gerarPlatformUID();
-            await updateDoc(doc(db, 'usuarios', user.uid), { platformUID: novoUID });
-            setPlatformUID(novoUID);
+          // ID único — gera se ainda não existir (apenas para usuários, não colaboradores)
+          if (!ehColaborador) {
+            if (d.platformUID) {
+              setPlatformUID(d.platformUID as string);
+            } else {
+              const novoUID = gerarPlatformUID();
+              await updateDoc(doc(db, 'usuarios', user.uid), { platformUID: novoUID });
+              setPlatformUID(novoUID);
+            }
           }
         }
       } catch (err) {
@@ -207,7 +216,7 @@ export default function PerfilPage() {
       }
     }
     loadPerfil();
-  }, [user]);
+  }, [user, ehColaborador, dadosUsuario?.uid]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, tipo: 'perfil' | 'banner') => {
     const file = e.target.files?.[0];
@@ -229,12 +238,35 @@ export default function PerfilPage() {
       
       if (result.secure_url) {
         const url = result.secure_url;
-        const uRef = doc(db, 'usuarios', user.uid);
         
-        // Sincronização Mobile: Grava em todos os campos usados pelo App
+        // Colaboradores: salvar na coleção 'colaboradores' usando CID (dadosUsuario.uid)
+        // Outros perfis: salvar na coleção 'usuarios' usando Firebase Auth UID
+        const collectionName = ehColaborador ? 'colaboradores' : 'usuarios';
+        const documentId = ehColaborador ? dadosUsuario?.uid : user?.uid;
+        const uRef = doc(db, collectionName, documentId);
+        
+        // Sincronização Mobile: Grava em TODOS os campos usados pelo App
+        // PerfilScreen.js busca: fotoPerfil || foto || avatar || photoURL || photoUrl || fotoUrl || imageUrl
+        // Banner busca: bannerPerfil || banner || capaPerfil || capa || bannerUrl || imagemBanner || fotoBanner
         const updateFields = tipo === 'perfil' 
-          ? { fotoPerfil: url, foto: url, avatar: url, fotoUrl: url }
-          : { bannerPerfil: url, banner: url, bannerUrl: url, fotoBanner: url };
+          ? { 
+              fotoPerfil: url, 
+              foto: url, 
+              avatar: url, 
+              photoURL: url,
+              photoUrl: url,
+              fotoUrl: url,
+              imageUrl: url
+            }
+          : { 
+              bannerPerfil: url, 
+              banner: url, 
+              capaPerfil: url,
+              capa: url,
+              bannerUrl: url, 
+              imagemBanner: url,
+              fotoBanner: url 
+            };
         
         await updateDoc(uRef, { ...updateFields, atualizadoEm: serverTimestamp() });
         
@@ -287,7 +319,11 @@ export default function PerfilPage() {
         atualizadoEm: serverTimestamp()
       };
       
-      await updateDoc(doc(db, 'usuarios', user.uid), dataToSave);
+      // Colaboradores: salvar na coleção 'colaboradores' usando CID (dadosUsuario.uid)
+      // Outros perfis: salvar na coleção 'usuarios' usando Firebase Auth UID
+      const collectionName = ehColaborador ? 'colaboradores' : 'usuarios';
+      const documentId = ehColaborador ? dadosUsuario?.uid : user?.uid;
+      await updateDoc(doc(db, collectionName, documentId), dataToSave);
       toast.success('Perfil atualizado com sucesso!', {
         icon: <CheckCircle2 className="text-green-500" />,
         duration: 3000,
@@ -414,14 +450,14 @@ export default function PerfilPage() {
                     placeholder="UF"
                   />
                   
-                  {ehProfissional && (
+                  {(ehProfissional || ehColaborador) && (
                     <>
                       <ValidatedInput
-                        label="Especialidade Principal"
+                        label={ehColaborador ? "Cargo / Função" : "Especialidade Principal"}
                         value={formData.especialidade}
                         onChange={(value) => setFormData({...formData, especialidade: value})}
                         maxLength={50}
-                        placeholder="Ex: Barbeiro, Manicure, Cabeleireira"
+                        placeholder={ehColaborador ? "Ex: Barbeiro, Manicure, Recepcionista" : "Ex: Barbeiro, Manicure, Cabeleireira"}
                       />
                       
                       <ValidatedTextarea

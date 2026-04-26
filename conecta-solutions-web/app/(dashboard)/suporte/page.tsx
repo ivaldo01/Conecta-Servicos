@@ -75,7 +75,7 @@ interface Mensagem {
 // SUPORTE — Chat com Suporte a Anexos (Imagens e PDFs)
 // ============================================================
 export default function SuportePage() {
-  const { dadosUsuario, ehProfissional } = useAuth();
+  const { user, dadosUsuario, ehProfissional, ehColaborador } = useAuth();
   const [mensagens, setMensagens]         = useState<Mensagem[]>([]);
   const [novaMensagem, setNovaMensagem]   = useState('');
   const [loading, setLoading]             = useState(true);
@@ -99,6 +99,12 @@ export default function SuportePage() {
   // Escuta mensagens
   useEffect(() => {
     if (!uid) return;
+    
+    // Não criar listeners para colaboradores
+    if (ehColaborador) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(true);
     const mensagensRef = collection(db, 'suporte', uid, 'mensagens');
