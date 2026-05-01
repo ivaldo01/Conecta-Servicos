@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import {
   collection, query, where, getDocs,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
-  writeBatch, getDoc, Timestamp
+  updateDoc, deleteDoc, doc, serverTimestamp,
+  writeBatch, Timestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
-import { getAuth, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import Topbar from '@/components/layout/Topbar';
 import {
   Users, Plus, X, Edit2, Trash2,
@@ -50,6 +50,7 @@ interface Colaborador {
   criadoEm?: Timestamp;
   conectaId?: string; // CID do mobile
   fonte?: 'web' | 'mobile';
+  escala?: EscalaHorarios;
 }
 
 interface HorarioDia {
@@ -98,11 +99,6 @@ const FORM_VAZIO: FormColaborador = {
 // ============================================================
 // HELPERS
 // ============================================================
-function gerarUID(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const rand = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `CS-${rand(4)}-${rand(6)}`;
-}
 
 /** Gera senha temporária segura */
 function gerarSenhaAleatoria(): string {
@@ -217,7 +213,7 @@ export default function EquipePage() {
         } as Colaborador));
         allColabsRaw = [...allColabsRaw, ...colabsWeb];
         console.log(`[Equipe] Colaboradores (web): ${colabsWeb.length}`);
-      } catch (e) {
+      } catch {
         console.warn('[Equipe] Coleção colaboradores não encontrada');
       }
 
@@ -231,7 +227,7 @@ export default function EquipePage() {
         } as Colaborador));
         allColabsRaw = [...allColabsRaw, ...colabsMobile];
         console.log(`[Equipe] Colaboradores (mobile): ${colabsMobile.length}`);
-      } catch (e) {
+      } catch {
         console.warn('[Equipe] Subcoleção colaboradores não encontrada');
       }
       
@@ -459,9 +455,9 @@ export default function EquipePage() {
         await updateDoc(doc(db, 'colaboradores', editando.id), dados);
         toast.success('Colaborador atualizado!');
       } else {
-        // NOVO: Cria em múltiplos lugares usando CID como ID do documento
+        // NOVO: Cria em múltiplos lugares usando o UID do Firebase Auth como ID
         const cid = await gerarConectaIdUnico();
-        const colaboradorId = cid; // ID único da plataforma (CID)
+        let colaboradorId = cid; // Temporário, será substituído pelo UID do Auth
         
         // CRIAR CONTA NO FIREBASE AUTH usando app secundário (igual ao mobile)
         // Isso evita deslogar o gestor principal
@@ -469,7 +465,7 @@ export default function EquipePage() {
         
         try {
           // Criar app Firebase secundário (igual ao mobile)
-          const { initializeApp, getApps, getApp, deleteApp } = await import('firebase/app');
+          const { initializeApp, deleteApp } = await import('firebase/app');
           const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
           
           // Configuração do projeto
@@ -497,6 +493,7 @@ export default function EquipePage() {
             senhaTemporaria
           );
           
+          colaboradorId = userCredential.user.uid; // ATUALIZANDO PARA O UID DO FIREBASE AUTH!
           console.log('[Equipe] Conta Firebase Auth criada no app secundário:', userCredential.user.uid);
           
           // Deletar o app secundário após uso (limpeza)
@@ -510,7 +507,8 @@ export default function EquipePage() {
         } catch (authErr) {
           const err = authErr as { code?: string; message?: string };
           if (err.code === 'auth/email-already-in-use') {
-            console.log('[Equipe] Email já existe no Auth, continuando...');
+            alert('Erro: Este email já possui uma conta no sistema. Peça ao colaborador para usar outro email ou exclua a conta anterior.');
+            throw authErr;
           } else if (err.code === 'auth/weak-password') {
             alert('Erro: Senha muito fraca. Use pelo menos 6 caracteres.');
             throw authErr;
@@ -747,7 +745,7 @@ export default function EquipePage() {
         </div>
 
         <div className="eq-legend">
-          {(Object.entries(NIVEIS) as [NivelAcesso, any][]).map(([key, val]) => (
+          {(Object.entries(NIVEIS) as [NivelAcesso, { label: string; cor: string; descricao: string }][]).map(([key, val]) => (
             <div key={key} className="eq-legend-item">
               <span className="eq-legend-dot" style={{ background: val.cor }} />
               <span className="eq-legend-label"><strong>{val.label}</strong> — {val.descricao}</span>
@@ -805,6 +803,7 @@ export default function EquipePage() {
                 <div className="eq-banner-container">
                   <div className="eq-banner-full">
                     {bannerPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={bannerPreview} alt="Banner" />
                     ) : (
                       <div className="eq-banner-placeholder-full">
@@ -822,6 +821,7 @@ export default function EquipePage() {
                   <div className="eq-foto-overlay">
                     <div className="eq-foto-preview eq-foto-preview--overlay">
                       {fotoPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={fotoPreview} alt="Preview" />
                       ) : (
                         <div className="eq-foto-placeholder">{form.nome?.[0]?.toUpperCase() || '?'}</div>
@@ -881,7 +881,7 @@ export default function EquipePage() {
                   <div className="campo-grupo">
                     <label className="campo-label"><Shield size={12} /> Nível de Acesso</label>
                     <select className="campo-input campo-input--select" value={form.nivelAcesso} onChange={setField('nivelAcesso')}>
-                      {(Object.entries(NIVEIS) as [NivelAcesso, any][]).map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
+                      {(Object.entries(NIVEIS) as [NivelAcesso, { label: string; cor: string; descricao: string }][]).map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
                     </select>
                     <p className="campo-hint" style={{ color: NIVEIS[form.nivelAcesso].cor }}>{NIVEIS[form.nivelAcesso].descricao}</p>
                   </div>
@@ -1016,7 +1016,7 @@ function CardColaborador({ c, iniciais, onEditar, onExcluir, onAlternar, planoVe
   return (
     <div className={`eq-card ${c.ativo === false ? 'eq-card--inativo' : ''} ${isMobile ? 'eq-card--mobile' : ''}`}>
       <div className="eq-card-topo">
-        {c.fotoUrl ? <img src={c.fotoUrl} alt={c.nome} className="eq-avatar-foto" /> : <div className="eq-avatar">{iniciais}</div>}
+        {c.fotoUrl ? <Image src={c.fotoUrl} alt={c.nome || 'Foto do colaborador'} width={48} height={48} className="eq-avatar-foto" unoptimized /> : <div className="eq-avatar">{iniciais}</div>}
         <div className="eq-card-info">
           <h3 className="eq-card-nome">
             {c.nome}

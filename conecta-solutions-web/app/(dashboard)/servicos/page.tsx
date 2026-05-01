@@ -74,9 +74,17 @@ export default function ServicosPage() {
     
     setLoading(true);
     try {
-      const snap = await getDocs(collection(db, 'usuarios', gestorId, 'servicos'));
+      const snap = await getDocs(collection(db, 'usuarios', gestorId!, 'servicos'));
       console.log('[Serviços] Encontrados:', snap.docs.length);
-      setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() } as Servico)));
+      setServicos(snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          preco: typeof data.preco === 'number' ? data.preco : parseFloat(data.preco || '0'),
+          duracao: typeof data.duracao === 'number' ? data.duracao : parseInt(data.duracao || '60'),
+        };
+      }) as Servico[]);
     } catch (err) {
       console.error('[Serviços]', err);
       toast.error('Erro ao carregar serviços.');

@@ -11,7 +11,6 @@
    7. Header do form e logo mobile
    ============================================================ */
 
-
 /* ============================================================
    1. CONTAINER RAIZ — Mesma estrutura da tela de login
    ============================================================ */
@@ -21,24 +20,23 @@
   background-color: var(--bg-page);
 }
 
-
 /* ============================================================
    2. PAINEL ESQUERDO — Marca
    ============================================================ */
 .cadastro-brand {
   flex: 0 0 42%;
-  background: linear-gradient(160deg, #1A1B2E 0%, #0F1729 60%, #1A3A6B 100%);
+  background: linear-gradient(160deg, #1a1b2e 0%, #0f1729 60%, #1a3a6b 100%);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--space-2xl) var(--space-xl);
+  padding: 60px var(--space-xl) var(--space-2xl);
   position: relative;
   overflow: hidden;
 }
 
 /* Círculo decorativo de fundo */
 .cadastro-brand::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 400px;
   height: 400px;
@@ -54,7 +52,6 @@
   z-index: 1;
   max-width: 360px;
 }
-
 
 /* ============================================================
    3. LOGO DA MARCA (painel esquerdo)
@@ -73,7 +70,7 @@
 .cadastro-brand-headline {
   font-size: 24px;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #ffffff;
   line-height: 1.3;
   margin-bottom: var(--space-md);
 }
@@ -84,7 +81,6 @@
   line-height: 1.7;
   margin-bottom: var(--space-xl);
 }
-
 
 /* ============================================================
    4. SELETOR DE TIPO DE CONTA
@@ -103,9 +99,9 @@
   gap: 6px;
   padding: 16px 12px;
   border-radius: 12px;
-  border: 1.5px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   transition: var(--transition-fast);
   text-align: center;
@@ -114,12 +110,12 @@
 .cadastro-tipo-card span {
   font-size: 14px;
   font-weight: 700;
-  color: rgba(255,255,255,0.9);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .cadastro-tipo-card small {
   font-size: 11px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
   line-height: 1.4;
 }
 
@@ -127,18 +123,17 @@
 .cadastro-tipo-card--ativo {
   border-color: var(--color-primary);
   background: rgba(25, 113, 194, 0.25);
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .cadastro-tipo-card--ativo span {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .cadastro-tipo-card:hover:not(.cadastro-tipo-card--ativo) {
-  background: rgba(255,255,255,0.10);
-  border-color: rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
 }
-
 
 /* ============================================================
    5. PAINEL DIREITO — Área do formulário
@@ -152,7 +147,6 @@
   background: var(--bg-page);
   overflow-y: auto;
 }
-
 
 /* ============================================================
    6. CARD DO FORMULÁRIO
@@ -175,7 +169,6 @@
   margin-top: var(--space-lg);
 }
 
-
 /* ============================================================
    7. LOGO MOBILE E HEADER DO FORM
    ============================================================ */
@@ -186,12 +179,22 @@
 }
 
 @media (max-width: 768px) {
-  .cadastro-brand { display: none; }
-  .cadastro-card-logo { display: flex; }
-  .cadastro-form-card { box-shadow: none; border: none; padding: var(--space-xl) var(--space-md); }
+  .cadastro-brand {
+    display: none;
+  }
+  .cadastro-card-logo {
+    display: flex;
+  }
+  .cadastro-form-card {
+    box-shadow: none;
+    border: none;
+    padding: var(--space-xl) var(--space-md);
+  }
 }
 
-.cadastro-form-header { margin-bottom: var(--space-md); }
+.cadastro-form-header {
+  margin-bottom: var(--space-md);
+}
 
 .cadastro-form-title {
   font-size: 22px;
@@ -207,4 +210,287 @@
 
 .cadastro-form-subtitle strong {
   color: var(--color-primary);
+}
+
+/* ============================================================
+   9. SELETOR DE TIPO DE PROFISSIONAL (Autônomo / Empresa)
+   ============================================================ */
+.cadastro-tipo-pro-cards {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.cadastro-tipo-pro-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cadastro-tipo-pro-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cadastro-tipo-pro-card--ativo {
+  background: rgba(47, 158, 68, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(47, 158, 68, 0.2);
+}
+
+.cadastro-tipo-pro-card svg {
+  color: var(--color-primary);
+}
+
+.cadastro-tipo-pro-card span {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cadastro-tipo-pro-card small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* ============================================================
+   10. TOGGLE ENDEREÇO E CAMPOS DE ENDEREÇO
+   ============================================================ */
+.cadastro-toggle-endereco {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  justify-content: center;
+  margin: var(--space-sm) 0;
+}
+
+.cadastro-toggle-endereco:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(47, 158, 68, 0.05);
+}
+
+.cadastro-endereco-fields {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.cadastro-endereco-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+/* Textarea */
+.login-field-input--textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.login-field-input-wrap--textarea {
+  align-items: flex-start;
+  padding-top: 12px;
+}
+
+/* ============================================================
+   11. ESTILOS ADICIONAIS PARA CAMPOS DE FORMULÁRIO
+   ============================================================ */
+
+/* Container do formulário */
+.cadastro-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+/* Campo individual */
+.cadastro-form .login-field {
+  margin-bottom: 2px;
+}
+
+/* Label */
+.cadastro-form .login-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cadastro-form .login-field-label small {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Input wrapper */
+.cadastro-form .login-field-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  transition: var(--transition-fast);
+}
+
+.cadastro-form .login-field-input-wrap:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* Ícone */
+.cadastro-form .login-field-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Input base */
+.cadastro-form .login-field-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px 0 44px;
+  font-size: 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.cadastro-form .login-field-input::placeholder {
+  color: var(--text-disabled);
+}
+
+.cadastro-form .login-field-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Textarea específica */
+.cadastro-form .login-field-input--textarea {
+  min-height: 90px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.cadastro-form .login-field-input-wrap--textarea {
+  align-items: flex-start;
+  padding-top: 8px;
+}
+
+.cadastro-form .login-field-input-wrap--textarea .login-field-icon {
+  top: 14px;
+}
+
+/* Sem ícone (para campos de endereço que não têm ícone) */
+.cadastro-form .login-field-input--no-icon {
+  padding-left: 14px;
+}
+
+/* Campos de endereço em grid */
+.cadastro-endereco-row .login-field {
+  margin: 0;
+}
+
+.cadastro-endereco-row .login-field-label {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.cadastro-endereco-row .login-field-input-wrap {
+  height: 44px;
+}
+
+.cadastro-endereco-row .login-field-input {
+  height: 44px;
+  font-size: 13px;
+}
+
+/* ============================================================
+   11b. CHECKBOX DE TERMOS DE USO
+   ============================================================ */
+.cadastro-termos {
+  margin: var(--space-sm) 0;
+}
+
+.cadastro-termos-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.cadastro-termos-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cadastro-termos-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cadastro-termos-texto {
+  flex: 1;
+}
+
+.cadastro-termos-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.cadastro-termos-link:hover {
+  opacity: 0.8;
+}
+
+/* ============================================================
+   12. RESPONSIVO
+   ============================================================ */
+@media (max-width: 900px) {
+  .cadastro-tipo-pro-cards {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .cadastro-endereco-row {
+    grid-template-columns: 1fr;
+  }
 }

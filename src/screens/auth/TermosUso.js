@@ -14,7 +14,7 @@ import { auth, db } from '../../services/firebaseConfig';
 import { doc, updateDoc } from 'firebase/firestore';
 import colors from '../../constants/colors';
 
-const VERSAO_TERMOS = '4.0.0';
+const VERSAO_TERMOS = '5.0.0';
 
 export default function TermosUso({ navigation }) {
     const [aceito, setAceito] = useState(false);
@@ -88,19 +88,19 @@ export default function TermosUso({ navigation }) {
 
                     <Text style={styles.sectionTitle}>2. Cadastro e Elegibilidade</Text>
                     <Text style={styles.text}>
-                        2.1. Para utilizar a plataforma, o usuário deve ter pelo menos 18 anos de idade ou ser emancipado legalmente.{"\n"}
-                        2.2. <Text style={styles.bold}>Cadastro de Dependentes (Menores)</Text>: Clientes podem cadastrar no aplicativo perfis secundários para seus dependentes menores de idade. O titular da conta assume responsabilidade civil, legal e financeira total sobre agendamentos, serviços prestados e uso de dados dos dependentes. O consentimento do responsável é explicitamente exigido e presumido a cada agendamento associado a um menor sob sua tutela.{"\n"}
-                        2.3. O cadastro requer informações verídicas e atualizadas, incluindo nome, CPF/CNPJ válido, e-mail e telefone verificados.{"\n"}
-                        2.4. Cada usuário pode possuir apenas uma conta, exceto em casos de contas colaborador vinculadas a uma conta principal de gestão corporativa.{"\n"}
-                        2.5. A Conecta Solutions reserva-se o direito de suspender ou remover contas com informações falsas ou duplicadas.{"\n"}
+                        2.1. <Text style={styles.bold}>Requisitos Básicos</Text>: Para utilizar a plataforma, o usuário deve ter pelo menos 18 anos de idade ou ser emancipado legalmente. O cadastro requer informações verídicas incluindo nome, CPF/CNPJ válido, e-mail e telefone verificados.{"\n"}{"\n"}
+                        2.2. <Text style={styles.bold}>Cadastro de Dependentes (Menores)</Text>: Clientes podem cadastrar no aplicativo perfis secundários para dependentes menores de idade. O titular da conta assume responsabilidade civil, legal e financeira total sobre agendamentos, serviços prestados e uso de dados dos dependentes. O consentimento do responsável é explicitamente exigido e presumido a cada agendamento.{"\n"}{"\n"}
+                        2.3. <Text style={styles.bold}>Verificação de Identidade</Text>: A Conecta Solutions pode solicitar documentação adicional para verificação, especialmente para profissionais. Contas com informações falsas serão suspensas ou removidas sem aviso prévio.{"\n"}{"\n"}
+                        2.4. Cada usuário pode possuir apenas uma conta principal, exceto colaboradores vinculados a uma conta de gestão corporativa.{"\n"}
                     </Text>
 
                     <Text style={styles.sectionTitle}>3. Funcionalidades da Plataforma</Text>
                     <Text style={styles.text}>
-                        3.1. <Text style={styles.bold}>Agendamentos e Check-in</Text>: O sistema gerencia horários e compromissos. Profissionais podem usar recursos interativos de check-in para formalizar o início do atendimento com os clientes.{"\n"}
-                        3.2. <Text style={styles.bold}>Comunicações</Text>: A comunicação pode ocorrer via chat integrado ou links automatizados para o WhatsApp. A Conecta Solutions não tem acesso nem se responsabiliza por conversas, mídias e acordos firmados através de aplicativos externos ou mensageiros de terceiros.{"\n"}
-                        3.3. <Text style={styles.bold}>Pagamentos e Recorrências</Text>: A plataforma suporta processamento contínuo de transações avulsas e contratos de assinaturas/planos mensais entre o profissional e o cliente, facilitado por ferramentas integradas como Asaas.{"\n"}
-                        3.4. <Text style={styles.bold}>Qualidade e Portfólio</Text>: Sistema de avaliações pós-atendimento e galeria para profissionais exporem seus portfólios fotográficos de trabalhos.{"\n"}
+                        3.1. <Text style={styles.bold}>Agendamentos e Check-in</Text>: Sistema completo de agendamento com horários configuráveis, check-in digital para formalizar atendimento, e lembretes automáticos.{"\n"}{"\n"}
+                        3.2. <Text style={styles.bold}>Comunicações</Text>: Chat integrado e links para WhatsApp. A Conecta Solutions não tem acesso nem se responsabiliza por conversas e acordos fora da plataforma.{"\n"}{"\n"}
+                        3.3. <Text style={styles.bold}>Pagamentos</Text>: Processamento via Asaas com criptografia, suportando pagamentos avulsos e recorrentes (assinaturas). Carteira digital com saldo e saques.{"\n"}{"\n"}
+                        3.4. <Text style={styles.bold}>Avaliações</Text>: Sistema de avaliações pós-atendimento (1-5 estrelas) e portfólio fotográfico para profissionais.{"\n"}{"\n"}
+                        3.5. <Text style={styles.bold}>Inteligência Artificial</Text>: Utilizamos IA para recomendação de profissionais, detecção de fraudes, otimização de horários e análise de conteúdo. Decisões automatizadas significativas passam por revisão humana.{"\n"}
                     </Text>
 
                     <Text style={styles.sectionTitle}>4. Planos de Assinatura e Monetização</Text>
@@ -148,46 +148,64 @@ export default function TermosUso({ navigation }) {
                         7.3. <Text style={styles.bold}>Bypass de Plataforma</Text>: É estritamente proibido o uso da infraestrutura (chats/visibilidade) para angariar serviços que fujam da tributação e faturamento originais operando fora da agenda do sistema com intenção de fraude às taxas.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>8. Privacidade e Proteção de Dados (LGPD)</Text>
+                    <Text style={styles.sectionTitle}>8. Segurança da Conta</Text>
                     <Text style={styles.text}>
-                        8.1. <Text style={styles.bold}>Tratamento de Dados</Text>: Nossa estrutura coleta dados sensíveis exigidos regulatoriamente em transações financeiras, localização e autenticação civil de dependentes.{"\n"}
-                        8.2. <Text style={styles.bold}>Isolamento</Text>: Garantimos que nenhuma listagem ou informação fiscal seja vazada para domínios de terceiros exceto pela intermediação necessária na rede bancária homologada.{"\n"}
-                        8.3. <Text style={styles.bold}>Exclusão de Conta</Text>: O usuário tem total controle sobre seus rastros de dados, possuindo ferramenta automatizada no "Perfil" para exclusão absoluta, restando apenas os logs mantidos inibidos sob proteção da lei (guarda fiscal de 5 anos).{"\n"}
+                        8.1. <Text style={styles.bold}>Credenciais</Text>: Você é responsável por manter a confidencialidade de sua senha. Não compartilhe credenciais com terceiros. Notifique imediatamente sobre uso não autorizado.{"\n"}{"\n"}
+                        8.2. <Text style={styles.bold}>Autenticação</Text>: A plataforma pode implementar 2FA (autenticação de dois fatores). Use senhas fortes (mínimo 6 caracteres no cadastro, recomendado 8+ com símbolos).{"\n"}{"\n"}
+                        8.3. <Text style={styles.bold}>Monitoramento</Text>: Monitoramos atividades suspeitas e podemos bloquear acesso temporariamente em casos de tentativas de invasão. Contas inativas por 12 meses podem ser desativadas.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>9. Propriedade Intelectual</Text>
+                    <Text style={styles.sectionTitle}>9. Privacidade e Proteção de Dados (LGPD)</Text>
                     <Text style={styles.text}>
-                        9.1. Toda inovação, arquitetura de software, layouts, dinâmicas de assinatura e elementos de marca da Conecta Solutions estão sob custódia de copyright irrevogável.{"\n"}
-                        9.2. A postagem de portfólios no App gera uma licença permissiva e global mas não exclusiva à Plataforma, permitindo uso dos ativos e evidências publicadas (fotos) em anúncios da empresa para promover o ecossistema.{"\n"}
+                        9.1. <Text style={styles.bold}>Tratamento de Dados</Text>: Coletamos dados necessários para funcionamento: cadastro, transações financeiras, histórico de agendamentos. Dados são criptografados em trânsito e repouso.{"\n"}{"\n"}
+                        9.2. <Text style={styles.bold}>Compartilhamento</Text>: Compartilhamos apenas com parceiros essenciais (gateway de pagamento). Não vendemos dados a terceiros.{"\n"}{"\n"}
+                        9.3. <Text style={styles.bold}>Seus Direitos</Text>: Você pode acessar, corrigir e excluir seus dados através do Perfil. Dados fiscais são retidos por 5 anos conforme lei.{"\n"}{"\n"}
+                        9.4. <Text style={styles.bold}>Cookies</Text>: Utilizamos cookies para manter sessão, preferências, análise de uso e segurança. Ao usar a plataforma, você aceita o uso de cookies essenciais.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>10. Limitação de Responsabilidade</Text>
+                    <Text style={styles.sectionTitle}>10. Disponibilidade do Serviço</Text>
                     <Text style={styles.text}>
-                        10.1. A Conecta Solutions é um provedor de software e tecnologia de pagamentos convergentes. A má execução manual (física ou intelectual) de um serviço prestado está 100% amparada nos contratos particulares entre o CNPJ/CPF do Profissional e o Cliente lesado.{"\n"}
+                        10.1. <Text style={styles.bold}>Uptime</Text>: Nos esforçamos para manter 99.9% de disponibilidade. Manutenções programadas serão comunicadas com antecedência.{"\n"}{"\n"}
+                        10.2. <Text style={styles.bold}>Limitações</Text>: Não garantimos serviço ininterrupto ou livre de erros. Eventos de força maior estão fora do nosso controle.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>11. Rescisão e Encerramento</Text>
+                    <Text style={styles.sectionTitle}>11. Propriedade Intelectual</Text>
                     <Text style={styles.text}>
-                        11.1. A rescisão (banimento) pode não apresentar aviso prévio se for configurado esquema de estelionato, lavagem de capital, injúria racial, crime sob o estatuto da criança ou quebra sistêmica do uso limpo do software.{"\n"}
+                        11.1. Toda inovação, software, layouts, marca e elementos da Conecta Solutions estão protegidos por copyright.{"\n"}{"\n"}
+                        11.2. Ao postar fotos ou conteúdo, você concede licença não exclusiva para uso promocional da plataforma.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>12. Modificações dos Termos</Text>
+                    <Text style={styles.sectionTitle}>12. Limitação de Responsabilidade</Text>
                     <Text style={styles.text}>
-                        12.1. Alterações neste Termo de Licença, sobretudo causadas pela implantação contínua de novos braços mecânicos (contratos modulares, features Asaas e gestão de Colaboradores) serão publicadas digitalmente e valerão automaticamente após uso orgânico da nova versão do sistema.{"\n"}
+                        12.1. A Conecta Solutions é provedor de software. A execução física dos serviços agendados é responsabilidade exclusiva do profissional.{"\n"}{"\n"}
+                        12.2. Não nos responsabilizamos por danos diretos, indiretos ou perda de lucros decorrentes do uso da plataforma.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>13. Disposições Legais e Foro</Text>
+                    <Text style={styles.sectionTitle}>13. Rescisão e Encerramento</Text>
                     <Text style={styles.text}>
-                        13.1. Questões irreconciliáveis amparadas pelas leis brasileiras seguirão exclusivamente regidas no foro comarcano correspondente de São Paulo/SP.{"\n"}
-                        13.2. Para mais contestações: conectasolutionstec@gmail.com{"\n"}
+                        13.1. Você pode encerrar sua conta a qualquer momento. Dados fiscais são retidos por 5 anos.{"\n"}{"\n"}
+                        13.2. Podemos suspender contas por violação dos termos, fraude, ou ordem judicial. Casos graves podem resultar em banimento imediato.{"\n"}
                     </Text>
 
-                    <Text style={styles.sectionTitle}>14. Termo de Consentimento Explícito</Text>
+                    <Text style={styles.sectionTitle}>14. Modificações dos Termos</Text>
                     <Text style={styles.text}>
-                        Apertando em "Aceitar Contrato", ratifico:{"\n"}
-                        • Permitir gestão de faturas, cartões atrelados a planos de assinaturas e disparo de dados para plataformas WhatsApp/Asaas quando requisenciado.{"\n"}
-                        • Declarar responsabilidade verídica sobre menores de idade acoplados a conta na qualidade de dependentes agendados.{"\n"}
-                        • Submissão automática aos enquadramentos legais da lei geral de dados.{"\n"}
+                        14.1. Alterações serão publicadas e notificadas por e-mail/push. Alterações significativas terão aviso prévio de 15 dias.{"\n"}{"\n"}
+                        14.2. O uso continuado após alterações constitui aceitação.{"\n"}
+                    </Text>
+
+                    <Text style={styles.sectionTitle}>15. Disposições Legais</Text>
+                    <Text style={styles.text}>
+                        15.1. <Text style={styles.bold}>Foro</Text>: Questões judiciais serão processadas no foro de São Paulo/SP, salvo competência do domicílio do consumidor.{"\n"}{"\n"}
+                        15.2. <Text style={styles.bold}>Contato</Text>: conectasolutionstec@gmail.com | dpo@conectasolutions.com.br{"\n"}
+                    </Text>
+
+                    <Text style={styles.sectionTitle}>16. Termo de Consentimento</Text>
+                    <Text style={styles.text}>
+                        Ao aceitar, confirmo:{"\n"}
+                        • Li e aceito os Termos de Uso e Política de Privacidade{"\n"}
+                        • Autorizo o tratamento dos meus dados conforme descrito{"\n"}
+                        • Aceito receber notificações sobre agendamentos e serviços{"\n"}
+                        • Declaro responsabilidade por dependentes menores cadastrados{"\n"}
                     </Text>
                 </View>
 

@@ -1,10 +1,10 @@
 /* ============================================================
-   PERFIL PROFISSIONAL PÚBLICO — PREMIUM ENTERPRISE
+   PERFIL PROFISSIONAL PÚBLICO — PREMIUM ENTERPRISE DARK
    ============================================================ */
 
 .prof-page-enterprise {
     min-height: 100vh;
-    background-color: #F8FAFC;
+    background-color: #0B0F1A;
     padding-bottom: 80px;
 }
 
@@ -16,19 +16,19 @@
 
 /* --- HERO SECTION --- */
 .prof-hero-premium {
-    background: #fff;
+    background: rgba(21, 25, 37, 0.95);
     border-radius: 0 0 40px 40px;
     overflow: hidden;
-    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.1);
+    box-shadow: 0 20px 40px -20px rgba(0,0,0,0.3);
     margin-bottom: 48px;
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.2);
     border-top: none;
 }
 
 .prof-banner-wrap {
     height: 320px;
     width: 100%;
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    background: linear-gradient(135deg, #151925 0%, #1E293B 100%);
     position: relative;
 }
 
@@ -41,7 +41,7 @@
 .prof-banner-placeholder {
     width: 100%;
     height: 100%;
-    background: repeating-linear-gradient(45deg, #0f172a, #0f172a 20px, #162035 20px, #162035 40px);
+    background: repeating-linear-gradient(45deg, #151925, #151925 20px, #1E293B 20px, #1E293B 40px);
 }
 
 .prof-identity-header {
@@ -58,9 +58,9 @@
     width: 180px;
     height: 180px;
     border-radius: 40px;
-    background: #fff;
-    border: 8px solid #fff;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    background: rgba(59, 130, 246, 0.2);
+    border: 8px solid rgba(59, 130, 246, 0.3);
+    box-shadow: 0 10px 40px rgba(59, 130, 246, 0.3);
     overflow: hidden;
     flex-shrink: 0;
 }
@@ -79,7 +79,7 @@
     justify-content: center;
     font-size: 64px;
     font-weight: 800;
-    background: #F1F5F9;
+    background: rgba(59, 130, 246, 0.1);
     color: #3B82F6;
 }
 
@@ -95,30 +95,32 @@
 }
 
 .badge-verified {
-    background: #DBEAFE;
-    color: #1E40AF;
+    background: rgba(59, 130, 246, 0.2);
+    color: #3B82F6;
     font-size: 11px;
     font-weight: 800;
     padding: 4px 12px;
     border-radius: 50px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .badge-category {
-    background: #F1F5F9;
-    color: #475569;
+    background: rgba(30, 41, 59, 0.5);
+    color: #94A3B8;
     font-size: 11px;
     font-weight: 800;
     padding: 4px 12px;
     border-radius: 50px;
     text-transform: uppercase;
+    border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .prof-name-huge {
     font-size: 42px;
     font-weight: 900;
-    color: #1E293B;
+    color: #F1F5F9;
     letter-spacing: -1px;
     margin-bottom: 8px;
 }
@@ -133,19 +135,19 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #475569;
+    color: #94A3B8;
     font-size: 14px;
 }
 
 .metric-item strong {
     font-size: 16px;
-    color: #1E293B;
+    color: #F1F5F9;
 }
 
 .metric-divider {
     width: 1px;
     height: 16px;
-    background: #E2E8F0;
+    background: rgba(59, 130, 246, 0.2);
 }
 
 .prof-action-header {
@@ -153,7 +155,7 @@
 }
 
 .btn-primary-enterprise {
-    background: #1971C2;
+    background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
     color: #fff;
     padding: 16px 32px;
     border-radius: 16px;
@@ -162,29 +164,30 @@
     font-weight: 800;
     letter-spacing: 1px;
     cursor: pointer;
-    box-shadow: 0 10px 20px rgba(25, 113, 194, 0.2);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
     transition: all 0.3s;
 }
 
 .btn-primary-enterprise:hover {
     transform: translateY(-4px);
-    box-shadow: 0 20px 30px rgba(25, 113, 194, 0.3);
-    background: #1864AB;
+    box-shadow: 0 20px 30px rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
 }
 
 /* --- BIO SECTION --- */
 .prof-bio-enterprise {
-    background: #fff;
+    background: rgba(21, 25, 37, 0.9);
     padding: 48px;
     border-radius: 32px;
     margin-bottom: 32px;
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .section-title-enterprise {
     font-size: 20px;
     font-weight: 800;
-    color: #1E293B;
+    color: #F1F5F9;
     margin-bottom: 20px;
     position: relative;
     padding-left: 16px;
@@ -195,23 +198,24 @@
     position: absolute;
     left: 0; top: 0;
     width: 4px; height: 100%;
-    background: #3B82F6;
+    background: linear-gradient(180deg, #3B82F6 0%, #8B5CF6 100%);
     border-radius: 4px;
 }
 
 .bio-text-enterprise {
     font-size: 16px;
-    color: #475569;
+    color: #94A3B8;
     line-height: 1.8;
 }
 
 /* --- SERVICES & REVIEWS SECTION --- */
 .prof-servicos-section, .prof-avaliacoes-section {
-    background: #fff;
+    background: rgba(21, 25, 37, 0.9);
     padding: 48px;
     border-radius: 32px;
     margin-bottom: 32px;
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .prof-section-header {
@@ -221,7 +225,7 @@
 .prof-section-title {
     font-size: 24px;
     font-weight: 900;
-    color: #1E293B;
+    color: #F1F5F9;
 }
 
 .prof-section-sub {
@@ -241,23 +245,57 @@
     justify-content: space-between;
     align-items: center;
     padding: 24px 32px;
-    background: #F8FAFC;
+    background: rgba(30, 41, 59, 0.5);
     border-radius: 20px;
-    border: 1px solid #E2E8F0;
+    border: 1px solid rgba(59, 130, 246, 0.15);
     transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
 }
 
 .prof-servico-card:hover {
     border-color: #3B82F6;
-    background: #fff;
+    background: rgba(59, 130, 246, 0.1);
     transform: translateX(8px);
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
+}
+
+.prof-servico-selected {
+    border-color: #3B82F6;
+    background: rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.prof-servico-checkbox {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(59, 130, 246, 0.5);
+    background: rgba(21, 25, 37, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.prof-servico-selected .prof-servico-checkbox {
+    background: #3B82F6;
+    border-color: #3B82F6;
+}
+
+.prof-servico-check {
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 .prof-servico-nome {
     font-size: 18px;
     font-weight: 800;
-    color: #1E293B;
+    color: #F1F5F9;
     margin-bottom: 4px;
 }
 
@@ -272,7 +310,7 @@
     gap: 20px;
     font-size: 14px;
     font-weight: 700;
-    color: #334155;
+    color: #94A3B8;
 }
 
 .prof-servico-foto-wrap {
@@ -282,7 +320,7 @@
     border-radius: 16px;
     overflow: hidden;
     margin-bottom: 16px;
-    background: #F1F5F9;
+    background: rgba(30, 41, 59, 0.5);
 }
 
 .prof-servico-foto {
@@ -297,8 +335,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
-    color: #94A3B8;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.5) 100%);
+    color: #64748B;
 }
 
 .prof-servico-categoria {
@@ -318,7 +356,7 @@
 .btn-agendar-serv {
     width: 100%;
     padding: 14px 24px;
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
     color: #fff;
     border: none;
     border-radius: 16px;
@@ -331,20 +369,22 @@
     gap: 8px;
     transition: all 0.3s;
     margin-top: auto;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
 }
 
 .btn-agendar-serv:hover {
     transform: scale(1.02);
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
 }
 
 /* --- REVIEWS SECTION REDESIGN --- */
 .prof-avaliacoes-section-premium {
-    background: #fff;
+    background: rgba(21, 25, 37, 0.9);
     padding: 48px;
     border-radius: 32px;
     margin-bottom: 32px;
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .prof-avaliacoes-grid-premium {
@@ -354,10 +394,10 @@
 }
 
 .prof-avaliacao-card-premium {
-    background: #F8FAFC;
+    background: rgba(30, 41, 59, 0.5);
     border-radius: 20px;
     padding: 24px;
-    border: 1px solid #E2E8F0;
+    border: 1px solid rgba(59, 130, 246, 0.15);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -365,9 +405,9 @@
 }
 
 .prof-avaliacao-card-premium:hover {
-    background: #fff;
+    background: rgba(59, 130, 246, 0.1);
     border-color: #3B82F6;
-    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2);
 }
 
 .av-card-header {
@@ -387,7 +427,7 @@
     height: 40px;
     border-radius: 12px;
     overflow: hidden;
-    background: #E2E8F0;
+    background: rgba(30, 41, 59, 0.5);
 }
 
 .av-avatar-small img {
@@ -410,7 +450,7 @@
 .av-nome {
     font-size: 14px;
     font-weight: 800;
-    color: #1E293B;
+    color: #F1F5F9;
 }
 
 .av-servico-tag {
@@ -435,16 +475,16 @@
 .av-nota-text {
     font-size: 10px;
     font-weight: 800;
-    color: #1E293B;
-    background: #fff;
+    color: #F1F5F9;
+    background: rgba(30, 41, 59, 0.5);
     padding: 2px 6px;
     border-radius: 4px;
-    border: 1px solid #E2E8F0;
+    border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .av-comentario-premium {
     font-size: 14px;
-    color: #475569;
+    color: #94A3B8;
     font-style: italic;
     line-height: 1.5;
 }
@@ -455,12 +495,12 @@
     align-items: center;
     margin-top: auto;
     padding-top: 12px;
-    border-top: 1px solid #E2E8F0;
+    border-top: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .av-data-tag {
     font-size: 12px;
-    color: #94A3B8;
+    color: #64748B;
     display: flex;
     align-items: center;
     gap: 4px;
@@ -469,17 +509,18 @@
 .av-verified-badge {
     font-size: 10px;
     font-weight: 800;
-    color: #10B981;
-    background: #DCFCE7;
+    color: #22C55E;
+    background: rgba(34, 197, 94, 0.15);
     padding: 2px 8px;
     border-radius: 50px;
+    border: 1px solid rgba(34, 197, 94, 0.3);
 }
 
 .prof-vazio-premium {
     grid-column: 1 / -1;
     text-align: center;
     padding: 40px;
-    color: #94A3B8;
+    color: #64748B;
 }
 
 @media (max-width: 900px) {

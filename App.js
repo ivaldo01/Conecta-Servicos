@@ -10,7 +10,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { Ionicons } from '@expo/vector-icons';
 
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, query, collection, where, getDocs } from 'firebase/firestore';
 
 import { Platform } from 'react-native';
 
@@ -712,8 +712,17 @@ function MainTabs() {
         let dados = null;
 
         if (docSnap.exists()) {
-          dados = docSnap.data() || {};
-        } else {
+          const docData = docSnap.data() || {};
+          const temPerfil = docData.nome || docData.tipo || docData.perfil || docData.tipoUsuario || docData.role;
+          if (temPerfil) {
+            dados = docData;
+            console.log('App: Perfil encontrado pelo UID:', dados.nome);
+          } else {
+            console.log('App: Documento existe mas sem dados de perfil');
+          }
+        }
+
+        if (!dados) {
           // Não encontrou pelo UID - verificar se é colaborador pelo email
           console.log('App: Usuário não encontrado pelo UID, verificando colaboradores por email:', user.email);
           try {

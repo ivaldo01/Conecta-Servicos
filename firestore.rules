@@ -36,7 +36,10 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
-      allow read: if estaLogado();
+      // Permitir leitura: qualquer um (necessário para verificar duplicidade ANTES do cadastro, quando usuário ainda não está logado)
+      // ATENÇÃO: Isso expõe a lista de usuários, mas apenas permite verificar duplicidade de CPF/CNPJ/telefone
+      allow read: if true;
+      // Permitir criação: qualquer usuário autenticado
       allow create: if estaLogado();
       allow update: if ehDono(userId) || ehAdmin();
       // Permitir delete se: admin, dono da conta, ou qualquer usuario autenticado (para colaboradores)
@@ -200,12 +203,8 @@ service cloud.firestore {
     // COLEÇÃO COLABORADORES (nível raiz) - Criada pelo web
     // ============================================================
     match /colaboradores/{colabId} {
-      // Permitir leitura: próprio colaborador, gestor (profissionalId), ou admin
-      allow read: if estaLogado() && (
-        uidAtual() == colabId ||
-        resource.data.profissionalId == uidAtual() ||
-        ehAdmin()
-      );
+      // Permitir leitura: qualquer usuário autenticado (necessário para login por email)
+      allow read: if estaLogado();
       
       // Permitir criação: qualquer usuário logado (gestor cria colaborador)
       // O gestor é identificado pelo profissionalId no documento
@@ -389,6 +388,12 @@ service cloud.firestore {
       allow read: if estaLogado();
       allow create: if estaLogado();
       allow update, delete: if false;
+    }
+
+    // Coleção contadores - usada para contadores do sistema (ex: número de profissionais)
+    // Permite leitura/escrita para qualquer usuário autenticado (necessário para geração de ID sequencial no cadastro)
+    match /config/{configId} {
+      allow read, write: if estaLogado();
     }
 
     match /{document=**} {

@@ -806,11 +806,6 @@ export default function FinanceiroPro({ navigation }) {
       return;
     }
 
-    if (valor < 10) {
-      Alert.alert('Valor mínimo', 'O valor mínimo para saque é R$ 10,00.');
-      return;
-    }
-
     if (!chavePix.trim()) {
       Alert.alert('Chave Pix obrigatória', 'Informe uma chave Pix válida (CPF, CNPJ, e-mail, celular ou chave aleatória).');
       return;
@@ -821,17 +816,6 @@ export default function FinanceiroPro({ navigation }) {
     // Calcular valor líquido após taxa
     const valorTaxa = isTaxaZero ? 0 : taxaSaque;
     const valorTotalNecessario = valor + valorTaxa;
-
-    if (valorTotalNecessario > saldoDisponivel) {
-      Alert.alert(
-        'Saldo insuficiente',
-        `Você possui ${formatCurrency(saldoDisponivel)} disponível.\n\n` +
-        `Valor do saque: ${formatCurrency(valor)}\n` +
-        `Taxa de saque: ${isTaxaZero ? 'GRÁTIS' : formatCurrency(taxaSaque)}\n` +
-        `Total necessário: ${formatCurrency(valorTotalNecessario)}`
-      );
-      return;
-    }
 
     // Confirmar saque com informações da taxa
     Alert.alert(

@@ -10,7 +10,11 @@ import {
   doc,
   getDoc,
   limit,
-  Timestamp
+  Timestamp,
+  updateDoc,
+  setDoc,
+  increment,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
@@ -32,7 +36,9 @@ import {
   RefreshCw,
   ExternalLink,
   Webhook,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Plus,
+  User
 } from 'lucide-react';
 import '@/styles/admin-financeiro.css';
 
@@ -164,10 +170,19 @@ export default function FinanceiroAdminPage() {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'assinaturas' | 'pagamentos' | 'saques' | 'webhooks' | 'agendamentos'>('agendamentos');
+  const [activeTab, setActiveTab] = useState<'assinaturas' | 'pagamentos' | 'saques' | 'webhooks' | 'agendamentos' | 'saldos'>('agendamentos');
   const [agendamentosPagos, setAgendamentosPagos] = useState([]);
   const [busca, setBusca] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+  
+  // Modal para adicionar saldo
+  const [modalSaldoOpen, setModalSaldoOpen] = useState(false);
+  const [saldoUserId, setSaldoUserId] = useState('');
+  const [saldoUserName, setSaldoUserName] = useState('');
+  const [saldoValor, setSaldoValor] = useState('');
+  const [saldoTipo, setSaldoTipo] = useState<'disponivel' | 'pendente' | 'bloqueado'>('disponivel');
+  const [loadingSaldo, setLoadingSaldo] = useState(false);
+  const [saldos, setSaldos] = useState<any[]>([]);
 
   // Buscar dados do Backend (Firestore)
   useEffect(() => {
@@ -273,6 +288,33 @@ export default function FinanceiroAdminPage() {
           console.error('[Financeiro] Erro ao carregar webhooks:', error);
         });
 
+        // Saldos
+        const qSaldos = query(collection(db, 'saldos'), orderBy('ultimaAtualizacao', 'desc'));
+        const unsubSaldos = onSnapshot(qSaldos, async (snapshot) => {
+          console.log(`[Financeiro] Saldos carregados: ${snapshot.docs.length}`);
+          const data = await Promise.all(snapshot.docs.map(async (docSnap) => {
+            const data = docSnap.data();
+            try {
+              const userDoc = await getDoc(doc(db, 'usuarios', data.usuarioId));
+              const userData = userDoc.data();
+              return {
+                id: docSnap.id,
+                ...data,
+                userNome: userData?.nome || userData?.razaoSocial || 'Usuário não encontrado'
+              };
+            } catch (e) {
+              return {
+                id: docSnap.id,
+                ...data,
+                userNome: 'Erro ao buscar usuário'
+              };
+            }
+          }));
+          setSaldos(data);
+        }, (error) => {
+          console.error('[Financeiro] Erro ao carregar saldos:', error);
+        });
+
         // Agendamentos Pagos (cobranças dos agendamentos) - query simplificada sem orderBy
         const qAgendamentos = query(
           collection(db, 'agendamentos'), 
@@ -347,6 +389,7 @@ export default function FinanceiroAdminPage() {
           unsubPagamentos();
           unsubSaques();
           unsubWebhooks();
+          unsubSaldos();
           unsubAgendamentos();
         };
       } catch (err) {
@@ -358,6 +401,70 @@ export default function FinanceiroAdminPage() {
 
     carregarDados();
   }, []);
+
+  // Função para adicionar saldo manualmente
+  const adicionarSaldo = async () => {
+    if (!saldoUserId || !saldoValor) {
+      alert('Preencha todos os campos.');
+      return;
+    }
+
+    const valorNumerico = parseFloat(saldoValor);
+    if (isNaN(valorNumerico) || valorNumerico <= 0) {
+      alert('Valor inválido.');
+      return;
+    }
+
+    setLoadingSaldo(true);
+    try {
+      const saldoRef = doc(db, 'saldos', saldoUserId);
+      const campoSaldo = saldoTipo === 'disponivel' ? 'saldoDisponivel' : 
+                         saldoTipo === 'pendente' ? 'saldoPendente' : 'saldoBloqueado';
+
+      // Verifica se o documento existe
+      const snap = await getDoc(saldoRef);
+      
+      if (snap.exists()) {
+        // Atualiza saldo existente
+        await updateDoc(saldoRef, {
+          [campoSaldo]: increment(valorNumerico),
+          ultimaAtualizacao: serverTimestamp()
+        });
+        alert(`Saldo adicionado com sucesso! R$ ${valorNumerico.toFixed(2)} adicionado ao ${campoSaldo} do usuário.`);
+      } else {
+        // Cria documento de saldo
+        await setDoc(saldoRef, {
+          usuarioId: saldoUserId,
+          saldoDisponivel: saldoTipo === 'disponivel' ? valorNumerico : 0,
+          saldoPendente: saldoTipo === 'pendente' ? valorNumerico : 0,
+          saldoBloqueado: saldoTipo === 'bloqueado' ? valorNumerico : 0,
+          ultimaAtualizacao: serverTimestamp()
+        });
+        alert(`Documento de saldo criado com sucesso! R$ ${valorNumerico.toFixed(2)} adicionado ao ${campoSaldo}.`);
+      }
+
+      // Limpa e fecha modal
+      setModalSaldoOpen(false);
+      setSaldoUserId('');
+      setSaldoUserName('');
+      setSaldoValor('');
+      setSaldoTipo('disponivel');
+    } catch (error) {
+      console.error('[Adicionar Saldo] Erro:', error);
+      alert('Erro ao adicionar saldo. Verifique o console.');
+    } finally {
+      setLoadingSaldo(false);
+    }
+  };
+
+  // Função para abrir modal com usuário pré-selecionado
+  const abrirModalSaldo = (userId?: string, userName?: string) => {
+    setSaldoUserId(userId || '');
+    setSaldoUserName(userName || '');
+    setSaldoValor('');
+    setSaldoTipo('disponivel');
+    setModalSaldoOpen(true);
+  };
 
   // Estatísticas
   const stats = {
@@ -564,6 +671,13 @@ export default function FinanceiroAdminPage() {
         >
           <Webhook size={16} />
           Webhooks ({webhooks.length})
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'saldos' ? 'active' : ''}`}
+          onClick={() => setActiveTab('saldos')}
+        >
+          <Wallet size={16} />
+          Saldos ({saldos.length})
         </button>
       </div>
 
@@ -789,6 +903,132 @@ export default function FinanceiroAdminPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Tabela Saldos */}
+      {activeTab === 'saldos' && (
+        <div className="data-table-container">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a1a' }}>Saldos dos Usuários</h3>
+            <button className="btn-primary" onClick={() => abrirModalSaldo()}>
+              <Plus size={16} />
+              Adicionar Saldo
+            </button>
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>User ID</th>
+                <th>Saldo Disponível</th>
+                <th>Saldo Pendente</th>
+                <th>Saldo Bloqueado</th>
+                <th>Última Atualização</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {saldos.length === 0 ? (
+                <tr><td colSpan={7} className="empty-cell"><div className="empty-state"><Wallet size={48} /><p>Nenhum saldo encontrado</p></div></td></tr>
+              ) : (
+                saldos
+                  .filter(s => s.userNome?.toLowerCase().includes(busca.toLowerCase()))
+                  .map(s => (
+                    <tr key={s.id}>
+                      <td>{s.userNome}</td>
+                      <td><code className="code-small">{s.usuarioId?.slice(0, 15)}...</code></td>
+                      <td style={{ color: '#16A34A', fontWeight: '600' }}>R$ {(s.saldoDisponivel || 0).toFixed(2)}</td>
+                      <td style={{ color: '#F59E0B', fontWeight: '600' }}>R$ {(s.saldoPendente || 0).toFixed(2)}</td>
+                      <td style={{ color: '#EF4444', fontWeight: '600' }}>R$ {(s.saldoBloqueado || 0).toFixed(2)}</td>
+                      <td>{formatDate(s.ultimaAtualizacao)}</td>
+                      <td>
+                        <button 
+                          className="btn-small"
+                          onClick={() => abrirModalSaldo(s.usuarioId, s.userNome)}
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                          <Plus size={12} />
+                          Adicionar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal para Adicionar Saldo */}
+      {modalSaldoOpen && (
+        <div className="modal-overlay" onClick={() => setModalSaldoOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Adicionar Saldo</h3>
+              <button onClick={() => setModalSaldoOpen(false)} className="modal-close">×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>ID do Usuário</label>
+                <input
+                  type="text"
+                  value={saldoUserId}
+                  onChange={(e) => setSaldoUserId(e.target.value)}
+                  placeholder="ID do usuário no Firebase"
+                />
+              </div>
+              {saldoUserName && (
+                <div className="form-group">
+                  <label>Nome do Usuário</label>
+                  <input
+                    type="text"
+                    value={saldoUserName}
+                    onChange={(e) => setSaldoUserName(e.target.value)}
+                    placeholder="Nome do usuário"
+                  />
+                </div>
+              )}
+              <div className="form-group">
+                <label>Valor (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={saldoValor}
+                  onChange={(e) => setSaldoValor(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="form-group">
+                <label>Tipo de Saldo</label>
+                <select
+                  value={saldoTipo}
+                  onChange={(e) => setSaldoTipo(e.target.value as any)}
+                >
+                  <option value="disponivel">Saldo Disponível</option>
+                  <option value="pendente">Saldo Pendente</option>
+                  <option value="bloqueado">Saldo Bloqueado</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn-secondary" 
+                onClick={() => setModalSaldoOpen(false)}
+                disabled={loadingSaldo}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={adicionarSaldo}
+                disabled={loadingSaldo}
+              >
+                {loadingSaldo ? 'Processando...' : 'Adicionar Saldo'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

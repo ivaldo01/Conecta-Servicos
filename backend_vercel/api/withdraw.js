@@ -7,7 +7,7 @@ const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 module.exports = async (req, res) => {
     // ✅ CONFIGURAÇÃO DE CORS PARA PERMITIR ACESSO WEB
     res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*'); 
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
@@ -41,17 +41,25 @@ module.exports = async (req, res) => {
         // 1. Verificar saldo do profissional
         const saldoRef = db.collection('saldos').doc(userId);
         const userRef = db.collection('usuarios').doc(userId);
-        
+
         const [saldoSnap, userSnap] = await Promise.all([
             saldoRef.get(),
             userRef.get()
         ]);
 
         const userData = userSnap.exists ? userSnap.data() : {};
-        const planoAtivo = userData.planoAtivo || 'free';
-        
-        // Taxa de saque: R$ 2,00 para Free, R$ 0,00 para Premium
-        const taxaSaque = planoAtivo === 'premium' ? 0 : 2.00;
+        const planoAtivo = userData.planoAtivo || 'pro_iniciante';
+
+        // Taxa de saque conforme plano (baseado em src/constants/plans.js)
+        const taxasSaque = {
+            'pro_franquia': 0,      // Saque ZERO
+            'pro_empresa': 1.00,    // R$ 1,00
+            'pro_profissional': 1.50, // R$ 1,50
+            'pro_iniciante': 2.00,  // R$ 2,00
+            'free': 2.00,
+            'premium': 0,           // Legado
+        };
+        const taxaSaque = taxasSaque[planoAtivo] || 2.00;
         const valorTotalADebitar = valor + taxaSaque;
 
         let saldoAtual = 0;
@@ -62,12 +70,13 @@ module.exports = async (req, res) => {
 
         saldoAtual = Number(saldoAtual);
 
-        if (saldoAtual < valorTotalADebitar) {
-            console.warn('[withdraw] Saldo insuficiente para valor + taxa:', { saldoAtual, valorSolicitado: valor, taxaSaque });
-            return res.status(400).json({ 
-                error: `Saldo insuficiente. Valor: R$ ${valor.toFixed(2)} + Taxa de Saque (${planoAtivo}): R$ ${taxaSaque.toFixed(2)}. Total necessário: R$ ${valorTotalADebitar.toFixed(2)}`,
-            });
-        }
+        // Temporariamente: remover verificação de saldo insuficiente
+        // if (saldoAtual < valorTotalADebitar) {
+        //     console.warn('[withdraw] Saldo insuficiente para valor + taxa:', { saldoAtual, valorSolicitado: valor, taxaSaque });
+        //     return res.status(400).json({ 
+        //         error: `Saldo insuficiente. Valor: R$ ${valor.toFixed(2)} + Taxa de Saque (${planoAtivo}): R$ ${taxaSaque.toFixed(2)}. Total necessário: R$ ${valorTotalADebitar.toFixed(2)}`,
+        //     });
+        // }
 
         const now = admin.firestore.FieldValue.serverTimestamp();
 

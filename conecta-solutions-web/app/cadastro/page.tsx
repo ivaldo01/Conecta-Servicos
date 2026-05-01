@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Building2, Briefcase } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Building2, Briefcase, MapPin, FileText, AlignLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -17,17 +17,28 @@ import '@/styles/cadastro.css';
 // TIPOS DE CONTA
 // ============================================================
 type TipoConta = 'profissional' | 'cliente';
+type TipoCadastroProfissional = 'autonomo' | 'empresa';
 
 interface FormCadastro {
   nome: string;
+  nomeNegocio: string;
   email: string;
   telefone: string;
   senha: string;
   confirmarSenha: string;
+  cpfCnpj: string;
+  especialidade: string;
+  bio: string;
+  endereco: string;
+  cep: string;
+  cidade: string;
+  estado: string;
+  pais: string;
 }
 
 const FORM_INICIAL: FormCadastro = {
-  nome: '', email: '', telefone: '', senha: '', confirmarSenha: ''
+  nome: '', nomeNegocio: '', email: '', telefone: '', senha: '', confirmarSenha: '',
+  cpfCnpj: '', especialidade: '', bio: '', endereco: '', cep: '', cidade: '', estado: '', pais: 'Brasil'
 };
 
 // ============================================================
@@ -39,9 +50,12 @@ export default function CadastroPage() {
   const router = useRouter();
 
   const [tipo, setTipo] = useState<TipoConta>('cliente');
+  const [tipoProfissional, setTipoProfissional] = useState<TipoCadastroProfissional>('autonomo');
   const [form, setForm] = useState<FormCadastro>(FORM_INICIAL);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mostrarEndereco, setMostrarEndereco] = useState(false);
+  const [aceitaTermos, setAceitaTermos] = useState(false);
 
   const set = (campo: keyof FormCadastro) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -50,10 +64,20 @@ export default function CadastroPage() {
   // Validações antes de cadastrar
   const validar = (): string | null => {
     if (!form.nome.trim())  return 'Informe seu nome completo.';
+    if (tipo === 'profissional' && tipoProfissional === 'empresa' && !form.nomeNegocio.trim()) {
+      return 'Informe o nome do negócio/empresa.';
+    }
     if (!form.email.trim()) return 'Informe seu e-mail.';
     if (!form.telefone.trim()) return 'Informe seu telefone/WhatsApp.';
+    if (tipo === 'profissional' && !form.cpfCnpj.trim()) {
+      return tipoProfissional === 'empresa' ? 'Informe o CNPJ.' : 'Informe o CPF.';
+    }
+    if (tipo === 'profissional' && !form.especialidade.trim()) {
+      return 'Informe sua especialidade/categoria.';
+    }
     if (form.senha.length < 6) return 'A senha deve ter ao menos 6 caracteres.';
     if (form.senha !== form.confirmarSenha) return 'As senhas não coincidem.';
+    if (!aceitaTermos) return 'Você precisa aceitar os Termos de Uso e Política de Privacidade.';
     return null;
   };
 
@@ -84,17 +108,23 @@ export default function CadastroPage() {
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let currentCount = 1;
-        
+
         if (counterDoc.exists()) {
           currentCount = (counterDoc.data().usuarios || 0) + 1;
         }
 
         const codigoConecta = `CS-BR-${String(currentCount).padStart(6, '0')}`;
-        
+
+        // Define nome de exibição baseado no tipo
+        const nomeExibicao = tipo === 'profissional' && tipoProfissional === 'empresa'
+          ? form.nomeNegocio.trim()
+          : form.nome.trim();
+
         transaction.set(counterRef, { usuarios: currentCount }, { merge: true });
-        transaction.set(userRef, {
+
+        const dadosPerfil: Record<string, unknown> = {
           uid:          user.uid,
-          nome:         form.nome.trim(),
+          nome:         nomeExibicao,
           nomeCompleto: form.nome.trim(),
           email:        form.email.trim().toLowerCase(),
           whatsapp:     form.telefone.trim(),
@@ -103,11 +133,36 @@ export default function CadastroPage() {
           perfil:       tipo,
           planoAtivo:   tipo === 'profissional' ? 'pro_iniciante' : 'free',
           codigoConecta: codigoConecta, // ID OFICIAL GERADO
-          aceitouTermos: true,
+          aceitouTermos: aceitaTermos,
           ativo:        true,
           criadoEm:     serverTimestamp(),
+          dataCriacao:  serverTimestamp(),
           criadoVia:    'web',
-        });
+          verificado:   false,
+          avaliacaoMedia: 0,
+          totalAvaliacoes: 0,
+          fotoPerfil:   '',
+          pushToken:    '',
+        };
+
+        // Campos específicos para profissionais
+        if (tipo === 'profissional') {
+          dadosPerfil.tipoCadastroProfissional = tipoProfissional;
+          dadosPerfil.cpfCnpj = form.cpfCnpj.trim();
+          dadosPerfil.especialidade = form.especialidade.trim();
+          dadosPerfil.nomeNegocio = form.nomeNegocio.trim();
+          dadosPerfil.responsavel = form.nome.trim();
+          dadosPerfil.bio = form.bio.trim();
+          dadosPerfil.endereco = form.endereco.trim();
+          dadosPerfil.localizacao = {
+            pais: form.pais || 'Brasil',
+            estado: form.estado,
+            cidade: form.cidade,
+            cep: form.cep
+          };
+        }
+
+        transaction.set(userRef, dadosPerfil);
       });
 
       toast.success('Conta criada com sucesso! Bem-vindo(a)!');
@@ -160,6 +215,30 @@ export default function CadastroPage() {
               <small>Agende serviços com facilidade</small>
             </button>
           </div>
+
+          {/* Seletor de tipo de profissional */}
+          {tipo === 'profissional' && (
+            <div className="cadastro-tipo-pro-cards">
+              <button
+                type="button"
+                className={`cadastro-tipo-pro-card ${tipoProfissional === 'autonomo' ? 'cadastro-tipo-pro-card--ativo' : ''}`}
+                onClick={() => setTipoProfissional('autonomo')}
+              >
+                <User size={18} />
+                <span>Autônomo</span>
+                <small>Profissional individual</small>
+              </button>
+              <button
+                type="button"
+                className={`cadastro-tipo-pro-card ${tipoProfissional === 'empresa' ? 'cadastro-tipo-pro-card--ativo' : ''}`}
+                onClick={() => setTipoProfissional('empresa')}
+              >
+                <Building2 size={18} />
+                <span>Empresa</span>
+                <small>Negócio com CNPJ</small>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -183,15 +262,28 @@ export default function CadastroPage() {
             {/* Nome */}
             <div className="login-field">
               <label htmlFor="nome" className="login-field-label">
-                {tipo === 'profissional' ? 'Nome ou Nome do Negócio' : 'Nome Completo'}
+                {tipo === 'profissional' && tipoProfissional === 'empresa' ? 'Nome do Responsável' : 'Nome Completo'}
               </label>
               <div className="login-field-input-wrap">
-                {tipo === 'profissional' ? <Building2 size={16} className="login-field-icon" /> : <User size={16} className="login-field-icon" />}
+                <User size={16} className="login-field-icon" />
                 <input id="nome" type="text" className="login-field-input"
-                  placeholder={tipo === 'profissional' ? 'Ex: Barbearia do João' : 'Seu nome completo'}
+                  placeholder="Seu nome completo"
                   value={form.nome} onChange={set('nome')} disabled={loading} />
               </div>
             </div>
+
+            {/* Nome do Negócio (apenas para empresa) */}
+            {tipo === 'profissional' && tipoProfissional === 'empresa' && (
+              <div className="login-field">
+                <label htmlFor="nomeNegocio" className="login-field-label">Nome do Negócio</label>
+                <div className="login-field-input-wrap">
+                  <Building2 size={16} className="login-field-icon" />
+                  <input id="nomeNegocio" type="text" className="login-field-input"
+                    placeholder="Ex: Barbearia do João"
+                    value={form.nomeNegocio} onChange={set('nomeNegocio')} disabled={loading} />
+                </div>
+              </div>
+            )}
 
             {/* E-mail */}
             <div className="login-field">
@@ -214,6 +306,104 @@ export default function CadastroPage() {
                   onChange={set('telefone')} disabled={loading} />
               </div>
             </div>
+
+            {/* Campos específicos para Profissionais */}
+            {tipo === 'profissional' && (
+              <>
+                {/* CPF/CNPJ */}
+                <div className="login-field">
+                  <label htmlFor="cpfCnpj" className="login-field-label">
+                    {tipoProfissional === 'empresa' ? 'CNPJ' : 'CPF'}
+                  </label>
+                  <div className="login-field-input-wrap">
+                    <FileText size={16} className="login-field-icon" />
+                    <input id="cpfCnpj" type="text" className="login-field-input"
+                      placeholder={tipoProfissional === 'empresa' ? '00.000.000/0000-00' : '000.000.000-00'}
+                      value={form.cpfCnpj} onChange={set('cpfCnpj')} disabled={loading} />
+                  </div>
+                </div>
+
+                {/* Especialidade/Categoria */}
+                <div className="login-field">
+                  <label htmlFor="especialidade" className="login-field-label">Especialidade / Categoria</label>
+                  <div className="login-field-input-wrap">
+                    <Briefcase size={16} className="login-field-icon" />
+                    <input id="especialidade" type="text" className="login-field-input"
+                      placeholder="Ex: Barbearia, Manicure, Massagem..."
+                      value={form.especialidade} onChange={set('especialidade')} disabled={loading} />
+                  </div>
+                </div>
+
+                {/* Bio/Descrição */}
+                <div className="login-field">
+                  <label htmlFor="bio" className="login-field-label">Bio / Descrição <small>(opcional)</small></label>
+                  <div className="login-field-input-wrap login-field-input-wrap--textarea">
+                    <AlignLeft size={16} className="login-field-icon" />
+                    <textarea id="bio" className="login-field-input login-field-input--textarea"
+                      placeholder="Conte um pouco sobre você ou seu negócio..."
+                      value={form.bio} onChange={(e) => setForm(prev => ({ ...prev, bio: e.target.value }))}
+                      disabled={loading} rows={3} />
+                  </div>
+                </div>
+
+                {/* Toggle Endereço */}
+                <button
+                  type="button"
+                  className="cadastro-toggle-endereco"
+                  onClick={() => setMostrarEndereco(!mostrarEndereco)}
+                >
+                  <MapPin size={16} />
+                  {mostrarEndereco ? 'Ocultar endereço' : 'Adicionar endereço (opcional)'}
+                </button>
+
+                {/* Endereço (opcional) */}
+                {mostrarEndereco && (
+                  <div className="cadastro-endereco-fields">
+                    <div className="login-field">
+                      <label htmlFor="endereco" className="login-field-label">Endereço</label>
+                      <div className="login-field-input-wrap">
+                        <MapPin size={16} className="login-field-icon" />
+                        <input id="endereco" type="text" className="login-field-input"
+                          placeholder="Rua, número, bairro"
+                          value={form.endereco} onChange={set('endereco')} disabled={loading} />
+                      </div>
+                    </div>
+                    <div className="cadastro-endereco-row">
+                      <div className="login-field">
+                        <label htmlFor="cep" className="login-field-label">CEP</label>
+                        <div className="login-field-input-wrap">
+                          <input id="cep" type="text" className="login-field-input login-field-input--no-icon"
+                            placeholder="00000-000" value={form.cep} onChange={set('cep')} disabled={loading} />
+                        </div>
+                      </div>
+                      <div className="login-field">
+                        <label htmlFor="cidade" className="login-field-label">Cidade</label>
+                        <div className="login-field-input-wrap">
+                          <input id="cidade" type="text" className="login-field-input login-field-input--no-icon"
+                            placeholder="Sua cidade" value={form.cidade} onChange={set('cidade')} disabled={loading} />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="cadastro-endereco-row">
+                      <div className="login-field">
+                        <label htmlFor="estado" className="login-field-label">Estado</label>
+                        <div className="login-field-input-wrap">
+                          <input id="estado" type="text" className="login-field-input login-field-input--no-icon"
+                            placeholder="UF" value={form.estado} onChange={set('estado')} disabled={loading} maxLength={2} />
+                        </div>
+                      </div>
+                      <div className="login-field">
+                        <label htmlFor="pais" className="login-field-label">País</label>
+                        <div className="login-field-input-wrap">
+                          <input id="pais" type="text" className="login-field-input login-field-input--no-icon"
+                            placeholder="País" value={form.pais} onChange={set('pais')} disabled={loading} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Senha */}
             <div className="login-field">
@@ -241,6 +431,29 @@ export default function CadastroPage() {
                   placeholder="Repita a senha" value={form.confirmarSenha}
                   onChange={set('confirmarSenha')} disabled={loading} />
               </div>
+            </div>
+
+            {/* Termos de Uso */}
+            <div className="cadastro-termos">
+              <label className="cadastro-termos-label">
+                <input
+                  type="checkbox"
+                  checked={aceitaTermos}
+                  onChange={(e) => setAceitaTermos(e.target.checked)}
+                  disabled={loading}
+                  className="cadastro-termos-checkbox"
+                />
+                <span className="cadastro-termos-texto">
+                  Li e aceito os{' '}
+                  <Link href="/termos" target="_blank" className="cadastro-termos-link">
+                    Termos de Uso
+                  </Link>{' '}
+                  e{' '}
+                  <Link href="/privacidade" target="_blank" className="cadastro-termos-link">
+                    Política de Privacidade
+                  </Link>
+                </span>
+              </label>
             </div>
 
             <button type="submit"

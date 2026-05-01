@@ -9,6 +9,7 @@ import {
     ScrollView,
     TextInput,
     Platform,
+    Image,
     useWindowDimensions,
 } from 'react-native';
 import { auth, db } from "../../services/firebaseConfig";
@@ -583,6 +584,20 @@ export default function AgendamentoFinal({ route, navigation }) {
         const noAlmoco = estaNoHorarioDeAlmoco(agenda, horario, diaSemanaSelecionado);
         const foraExpediente = estaForaDoExpediente(agenda, horario, diaSemanaSelecionado, date);
 
+        // Debug
+        console.log('[Horario Check]', {
+            colaborador: colab.nome,
+            horario,
+            trabalhaDia,
+            trabalhaHora,
+            fazServicos,
+            servicosHabilitados: colab.servicosHabilitados,
+            servicosIds: servicos.map(s => s.id),
+            jaAgendado,
+            noAlmoco,
+            foraExpediente,
+        });
+
         return Boolean(trabalhaDia && trabalhaHora && fazServicos && !jaAgendado && !noAlmoco && !foraExpediente);
     };
 
@@ -646,7 +661,7 @@ export default function AgendamentoFinal({ route, navigation }) {
     // Estado de cada horário baseado EXCLUSIVAMENTE no profissional selecionado
     const getEstadoHorario = (h) => {
         if (horarioJaPassouHoje(h)) return 'passado';
-        if (!colaboradorEscolhido) return 'passado';
+        if (!colaboradorEscolhido) return 'ocupado';
 
         const agenda = agendaDoColaborador(colaboradorEscolhido);
         const noAlmoco = estaNoHorarioDeAlmoco(agenda, h, diaSemanaSelecionado);
@@ -1146,6 +1161,41 @@ export default function AgendamentoFinal({ route, navigation }) {
                         </View>
                     )}
 
+                    <Text style={styles.sectionLabel}>Profissional</Text>
+                    <View style={styles.colabSection}>
+                        {equipe.length === 0 ? (
+                            <View style={styles.emptyBox}>
+                                <Text style={styles.emptyBoxText}>Nenhum profissional disponível.</Text>
+                            </View>
+                        ) : (
+                            equipe.map((colab) => (
+                                <TouchableOpacity
+                                    key={colab.id}
+                                    style={[styles.colabCard, colaboradorEscolhido?.id === colab.id && styles.colabSelected]}
+                                    onPress={() => setColaboradorEscolhido(colab)}
+                                    activeOpacity={0.9}
+                                >
+                                    {colab.fotoPerfil ? (
+                                        <Image source={{ uri: colab.fotoPerfil }} style={styles.colabAvatar} />
+                                    ) : (
+                                        <View style={[styles.colabAvatar, colaboradorEscolhido?.id === colab.id && styles.colabAvatarSelected]}>
+                                            <Text style={styles.colabAvatarText}>
+                                                {colab.nome?.charAt(0) || 'P'}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    <View style={styles.colabInfo}>
+                                        <Text style={styles.colabNome}>{colab.nome}</Text>
+                                        <Text style={styles.colabCargo}>{colab.cargo || colab.especialidade || 'Profissional'}</Text>
+                                    </View>
+                                    {colaboradorEscolhido?.id === colab.id && (
+                                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            ))
+                        )}
+                    </View>
+
                     <Text style={styles.sectionLabel}>Data e Horário</Text>
                     <TouchableOpacity style={styles.dateSelector} onPress={() => setShowPicker(true)}>
                         <Ionicons name="calendar-outline" size={22} color={colors.primary} />
@@ -1166,31 +1216,6 @@ export default function AgendamentoFinal({ route, navigation }) {
                         />
                     )}
 
-                    <Text style={styles.sectionLabel}>Profissional</Text>
-                    <View style={styles.colabSection}>
-                        {colaboradoresDisponivelNoDia.map((colab) => (
-                            <TouchableOpacity
-                                key={colab.id}
-                                style={[styles.colabCard, colaboradorEscolhido?.id === colab.id && styles.colabSelected]}
-                                onPress={() => setColaboradorEscolhido(colab)}
-                            >
-                                <View style={[styles.colabAvatar, colaboradorEscolhido?.id === colab.id && styles.colabAvatarSelected]}>
-                                    <Text style={[styles.colabAvatarText, colaboradorEscolhido?.id === colab.id && { color: '#FFF' }]}>
-                                        {colab.nome?.charAt(0)}
-                                    </Text>
-                                </View>
-                                <View style={styles.colabInfo}>
-                                    <Text style={styles.colabNome}>{colab.nome}</Text>
-                                </View>
-                                {colaboradorEscolhido?.id === colab.id && (
-                                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                <View style={styles.formColumn}>
                     <Text style={styles.sectionLabel}>Horários Disponíveis</Text>
                     <View style={styles.horariosLegenda}>
                         <View style={styles.legendaItem}>
@@ -1650,56 +1675,58 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     colabSection: {
-        gap: 12,
+        gap: 16,
+        marginBottom: 16,
+        marginLeft: 4,
     },
     colabCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF',
+        backgroundColor: 'rgba(21, 25, 37, 0.9)',
         borderRadius: 16,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: 'rgba(59, 130, 246, 0.2)',
         elevation: 2,
         shadowColor: '#000',
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.2,
         shadowRadius: 8,
+        marginBottom: 12,
     },
     colabSelected: {
-        borderColor: colors.primary,
-        backgroundColor: `${colors.primary}05`,
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: '#3B82F6',
     },
     colabAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#EEF2FF',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
     },
     colabAvatarSelected: {
-        backgroundColor: colors.primary,
+        backgroundColor: '#3B82F6',
     },
     colabAvatarText: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '800',
-        color: colors.primary,
+        color: '#3B82F6',
     },
     colabInfo: {
         flex: 1,
     },
     colabNome: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#1E293B',
+        color: '#F1F5F9',
+        marginBottom: 4,
     },
-    horariosLegenda: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-        marginBottom: 16,
-        marginLeft: 4,
+    colabCargo: {
+        fontSize: 14,
+        color: '#94A3B8',
+        marginTop: 2,
     },
     legendaItem: {
         flexDirection: 'row',

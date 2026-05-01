@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,8 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { auth, db } from "../../services/firebaseConfig";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +27,7 @@ export default function ConfigurarAgenda({ route }) {
   const [horaFim, setHoraFim] = useState("18:00");
   const [intervaloMinutos, setIntervaloMinutos] = useState(60);
   const [configAlmoco, setConfigAlmoco] = useState({}); // { "1": { ativo: true, inicio, fim, usarHorarioDiferenciado, ... } }
-  
+
   // Estado para templates da UI (não salvos diretamente, mas usados para atualizar a config)
   const [almocoTemplate, setAlmocoTemplate] = useState({ inicio: '12:00', fim: '13:00' });
   const [especialTemplate, setEspecialTemplate] = useState({ ativo: true, inicio: '08:00', fim: '12:00' });
@@ -52,16 +52,97 @@ export default function ConfigurarAgenda({ route }) {
     return horarios;
   }, []);
 
-  const pickerItems = useMemo(() => {
-    return listaHorariosDisponiveis.map(h => (
-      <Picker.Item 
-        key={h} 
-        label={h} 
-        value={h} 
-        color={Platform.OS === 'android' ? '#222' : '#222'}
-      />
-    ));
-  }, [listaHorariosDisponiveis]);
+  // Estados para controlar modais de seleção
+  const [modalHorario, setModalHorario] = useState(null); // 'inicio', 'fim', 'almocoInicio', 'almocoFim', 'especialInicio', 'especialFim'
+
+  // Função para renderizar modal de seleção de horário
+  const renderModalHorario = () => {
+    if (!modalHorario) return null;
+
+    let onSelect, valorAtual;
+    let titulo = 'Selecionar Horário';
+
+    switch (modalHorario) {
+      case 'inicio':
+        onSelect = setHoraInicio;
+        valorAtual = horaInicio;
+        titulo = 'Hora Inicial';
+        break;
+      case 'fim':
+        onSelect = setHoraFim;
+        valorAtual = horaFim;
+        titulo = 'Hora Final';
+        break;
+      case 'almocoInicio':
+        onSelect = (v) => setAlmocoTemplate(prev => ({ ...prev, inicio: v }));
+        valorAtual = almocoTemplate.inicio;
+        titulo = 'Início da Pausa';
+        break;
+      case 'almocoFim':
+        onSelect = (v) => setAlmocoTemplate(prev => ({ ...prev, fim: v }));
+        valorAtual = almocoTemplate.fim;
+        titulo = 'Fim da Pausa';
+        break;
+      case 'especialInicio':
+        onSelect = (v) => setEspecialTemplate(prev => ({ ...prev, inicio: v }));
+        valorAtual = especialTemplate.inicio;
+        titulo = 'Abrir às';
+        break;
+      case 'especialFim':
+        onSelect = (v) => setEspecialTemplate(prev => ({ ...prev, fim: v }));
+        valorAtual = especialTemplate.fim;
+        titulo = 'Fechar às';
+        break;
+      default:
+        return null;
+    }
+
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={!!modalHorario}
+        onRequestClose={() => setModalHorario(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{titulo}</Text>
+            <ScrollView style={styles.modalScroll}>
+              {listaHorariosDisponiveis.map((hora) => (
+                <TouchableOpacity
+                  key={hora}
+                  style={[
+                    styles.modalItem,
+                    valorAtual === hora && styles.modalItemSelected
+                  ]}
+                  onPress={() => {
+                    onSelect(hora);
+                    setModalHorario(null);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalItemText,
+                    valorAtual === hora && styles.modalItemTextSelected
+                  ]}>
+                    {hora}
+                  </Text>
+                  {valorAtual === hora && (
+                    <Ionicons name="checkmark" size={20} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => setModalHorario(null)}
+            >
+              <Text style={styles.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   const gerarHorarios = (inicio, fim, intervalo) => {
     const [hIni, mIni] = inicio.split(':').map(Number);
@@ -163,15 +244,15 @@ export default function ConfigurarAgenda({ route }) {
   const toggleAlmocoDia = (idx) => {
     const diaKey = String(idx);
     setConfigAlmoco(prev => {
-      const configAtual = prev[diaKey] || { 
-        ativo: false, 
-        inicio: almocoTemplate.inicio, 
+      const configAtual = prev[diaKey] || {
+        ativo: false,
+        inicio: almocoTemplate.inicio,
         fim: almocoTemplate.fim,
         usarHorarioDiferenciado: false,
         inicioExpediente: horaInicio,
         fimExpediente: horaFim
       };
-      
+
       return {
         ...prev,
         [diaKey]: {
@@ -187,17 +268,17 @@ export default function ConfigurarAgenda({ route }) {
   const toggleEspecialDia = (idx) => {
     const diaKey = String(idx);
     setConfigAlmoco(prev => {
-      const configAtual = prev[diaKey] || { 
-        ativo: false, 
-        inicio: almocoTemplate.inicio, 
+      const configAtual = prev[diaKey] || {
+        ativo: false,
+        inicio: almocoTemplate.inicio,
         fim: almocoTemplate.fim,
         usarHorarioDiferenciado: false,
         inicioExpediente: especialTemplate.inicio,
         fimExpediente: especialTemplate.fim
       };
-      
+
       const novoStatus = !configAtual.usarHorarioDiferenciado;
-      
+
       // Se tiver ativando especial e estiver em modo "Não Atendo", removemos o dia da agenda principal
       if (novoStatus && !especialTemplate.ativo) {
         setDiasSelecionados(prev => prev.filter(d => d !== idx));
@@ -251,10 +332,10 @@ export default function ConfigurarAgenda({ route }) {
       // Calcula a união de todos os horários possíveis para garantir que 
       // qualquer slot de qualquer dia esteja no array principal
       let todosHoras = new Set();
-      
+
       // Adiciona horários do expediente geral
       gerarHorarios(horaInicio, horaFim, intervaloMinutos).forEach(h => todosHoras.add(h));
-      
+
       // Adiciona horários de expedientes customizados
       Object.values(configAlmoco).forEach(conf => {
         if (conf.usarHorarioDiferenciado && conf.inicioExpediente && conf.fimExpediente) {
@@ -390,69 +471,46 @@ export default function ConfigurarAgenda({ route }) {
         </Text>
 
         <Text style={styles.label}>Hora Inicial</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={horaInicio}
-            onValueChange={(itemValue) => setHoraInicio(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={colors.primary}
-            itemStyle={styles.pickerItem}
-            enabled={!ehColaborador}
-            mode="dropdown"
-          >
-            {listaHorariosDisponiveis.map((hora) => (
-              <Picker.Item
-                key={hora}
-                label={hora}
-                value={hora}
-                color={Platform.OS === 'android' ? '#222' : '#222'}
-              />
-            ))}
-          </Picker>
-        </View>
+        <TouchableOpacity
+          style={[styles.timeButton, ehColaborador && styles.disabledAction]}
+          onPress={() => !ehColaborador && setModalHorario('inicio')}
+          disabled={ehColaborador}
+        >
+          <Text style={styles.timeButtonText}>{horaInicio}</Text>
+          <Ionicons name="time-outline" size={20} color={colors.primary} />
+        </TouchableOpacity>
 
         <Text style={styles.label}>Hora Final</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={horaFim}
-            onValueChange={(itemValue) => setHoraFim(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={colors.primary}
-            itemStyle={styles.pickerItem}
-            enabled={!ehColaborador}
-            mode="dropdown"
-          >
-            {listaHorariosDisponiveis.map((hora) => (
-              <Picker.Item
-                key={hora}
-                label={hora}
-                value={hora}
-                color={Platform.OS === 'android' ? '#222' : '#222'}
-              />
-            ))}
-          </Picker>
-        </View>
+        <TouchableOpacity
+          style={[styles.timeButton, ehColaborador && styles.disabledAction]}
+          onPress={() => !ehColaborador && setModalHorario('fim')}
+          disabled={ehColaborador}
+        >
+          <Text style={styles.timeButtonText}>{horaFim}</Text>
+          <Ionicons name="time-outline" size={20} color={colors.primary} />
+        </TouchableOpacity>
 
         <Text style={styles.label}>Intervalo</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={intervaloMinutos}
-            onValueChange={(itemValue) => setIntervaloMinutos(itemValue)}
-            style={styles.picker}
-            dropdownIconColor={colors.primary}
-            itemStyle={styles.pickerItem}
-            enabled={!ehColaborador}
-            mode="dropdown"
-          >
-            {intervalosDisponiveis.map((intervalo) => (
-              <Picker.Item
-                key={intervalo}
-                label={`${intervalo} minutos`}
-                value={intervalo}
-                color={Platform.OS === 'android' ? '#222' : '#222'}
-              />
-            ))}
-          </Picker>
+        <View style={styles.intervalContainer}>
+          {intervalosDisponiveis.map((intervalo) => (
+            <TouchableOpacity
+              key={intervalo}
+              style={[
+                styles.intervalButton,
+                intervaloMinutos === intervalo && styles.intervalButtonSelected,
+                ehColaborador && styles.disabledAction
+              ]}
+              onPress={() => !ehColaborador && setIntervaloMinutos(intervalo)}
+              disabled={ehColaborador}
+            >
+              <Text style={[
+                styles.intervalButtonText,
+                intervaloMinutos === intervalo && styles.intervalButtonTextSelected
+              ]}>
+                {intervalo} min
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -462,35 +520,29 @@ export default function ConfigurarAgenda({ route }) {
           <Ionicons name="restaurant-outline" size={18} /> Pausas e Almoço
         </Text>
         <Text style={styles.smallSubtitle}>Ajuste os horários e toque nos dias para aplicar a pausa.</Text>
-        
+
         <View style={styles.templatePickerRow}>
           <View style={styles.templateInputBox}>
             <Text style={styles.breakLabel}>Início</Text>
-            <View style={styles.miniPickerContainer}>
-              <Picker
-                selectedValue={almocoTemplate.inicio}
-                onValueChange={(v) => setAlmocoTemplate(prev => ({ ...prev, inicio: v }))}
-                style={styles.miniPicker}
-                enabled={!ehColaborador}
-                mode="dropdown"
-              >
-                {pickerItems}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              style={[styles.timeButtonSmall, ehColaborador && styles.disabledAction]}
+              onPress={() => !ehColaborador && setModalHorario('almocoInicio')}
+              disabled={ehColaborador}
+            >
+              <Text style={styles.timeButtonTextSmall}>{almocoTemplate.inicio}</Text>
+              <Ionicons name="time-outline" size={16} color={colors.primary} />
+            </TouchableOpacity>
           </View>
           <View style={styles.templateInputBox}>
             <Text style={styles.breakLabel}>Fim</Text>
-            <View style={styles.miniPickerContainer}>
-              <Picker
-                selectedValue={almocoTemplate.fim}
-                onValueChange={(v) => setAlmocoTemplate(prev => ({ ...prev, fim: v }))}
-                style={styles.miniPicker}
-                enabled={!ehColaborador}
-                mode="dropdown"
-              >
-                {pickerItems}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              style={[styles.timeButtonSmall, ehColaborador && styles.disabledAction]}
+              onPress={() => !ehColaborador && setModalHorario('almocoFim')}
+              disabled={ehColaborador}
+            >
+              <Text style={styles.timeButtonTextSmall}>{almocoTemplate.fim}</Text>
+              <Ionicons name="time-outline" size={16} color={colors.primary} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -517,15 +569,15 @@ export default function ConfigurarAgenda({ route }) {
         <Text style={styles.sectionTitle}>
           <Ionicons name="calendar-outline" size={18} /> Fins de Semana e Feriados
         </Text>
-        
+
         <View style={styles.statusButtonsRow}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.statusBtn, especialTemplate.ativo && styles.statusBtnAtendo]}
             onPress={() => setEspecialTemplate(prev => ({ ...prev, ativo: true }))}
           >
             <Text style={[styles.statusBtnText, especialTemplate.ativo && styles.statusBtnTextActive]}>ATENDO</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.statusBtn, !especialTemplate.ativo && styles.statusBtnNaoAtendo]}
             onPress={() => setEspecialTemplate(prev => ({ ...prev, ativo: false }))}
           >
@@ -537,29 +589,23 @@ export default function ConfigurarAgenda({ route }) {
           <View style={styles.templatePickerRow}>
             <View style={styles.templateInputBox}>
               <Text style={styles.breakLabel}>Abrir às</Text>
-              <View style={styles.miniPickerContainer}>
-                <Picker
-                  selectedValue={especialTemplate.inicio}
-                  onValueChange={(v) => setEspecialTemplate(prev => ({ ...prev, inicio: v }))}
-                  style={styles.miniPicker}
-                  mode="dropdown"
-                >
-                  {pickerItems}
-                </Picker>
-              </View>
+              <TouchableOpacity
+                style={styles.timeButtonSmall}
+                onPress={() => setModalHorario('especialInicio')}
+              >
+                <Text style={styles.timeButtonTextSmall}>{especialTemplate.inicio}</Text>
+                <Ionicons name="time-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
             </View>
             <View style={styles.templateInputBox}>
               <Text style={styles.breakLabel}>Fechar às</Text>
-              <View style={styles.miniPickerContainer}>
-                <Picker
-                  selectedValue={especialTemplate.fim}
-                  onValueChange={(v) => setEspecialTemplate(prev => ({ ...prev, fim: v }))}
-                  style={styles.miniPicker}
-                  mode="dropdown"
-                >
-                  {pickerItems}
-                </Picker>
-              </View>
+              <TouchableOpacity
+                style={styles.timeButtonSmall}
+                onPress={() => setModalHorario('especialFim')}
+              >
+                <Text style={styles.timeButtonTextSmall}>{especialTemplate.fim}</Text>
+                <Ionicons name="time-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -581,22 +627,22 @@ export default function ConfigurarAgenda({ route }) {
           })}
         </View>
 
-        <TouchableOpacity 
-          style={styles.holidayToggle} 
+        <TouchableOpacity
+          style={styles.holidayToggle}
           onPress={() => setAtenderFeriados(!atenderFeriados)}
         >
-          <Ionicons 
-            name={atenderFeriados ? "checkbox" : "square-outline"} 
-            size={24} 
-            color={atenderFeriados ? colors.primary : "#CCC"} 
+          <Ionicons
+            name={atenderFeriados ? "checkbox" : "square-outline"}
+            size={24}
+            color={atenderFeriados ? colors.primary : "#CCC"}
           />
           <Text style={styles.holidayToggleText}>Aplicar horários especiais aos feriados nacionais</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
-        <TouchableOpacity 
-          style={styles.previewToggleHeader} 
+        <TouchableOpacity
+          style={styles.previewToggleHeader}
           onPress={() => setExibirPrevia(!exibirPrevia)}
         >
           <Text style={styles.sectionTitleNoBorder}>
@@ -615,7 +661,7 @@ export default function ConfigurarAgenda({ route }) {
 
             <View style={styles.horariosGrid}>
               {horariosGerados.length > 0 ? (
-                horariosGerados.map((h) => (
+                horariosGerados.slice(0, 20).map((h) => (
                   <View key={h} style={styles.horaPreview}>
                     <Text style={styles.horaPreviewText}>{h}</Text>
                   </View>
@@ -623,6 +669,11 @@ export default function ConfigurarAgenda({ route }) {
               ) : (
                 <Text style={styles.emptyText}>
                   Ajuste início, fim e intervalo para gerar horários válidos.
+                </Text>
+              )}
+              {horariosGerados.length > 20 && (
+                <Text style={styles.emptyText}>
+                  ...e mais {horariosGerados.length - 20} horários
                 </Text>
               )}
             </View>
@@ -643,6 +694,8 @@ export default function ConfigurarAgenda({ route }) {
           )}
         </TouchableOpacity>
       )}
+
+      {renderModalHorario()}
     </ScrollView>
   );
 }
@@ -1067,5 +1120,127 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.textDark,
+  },
+
+  // Novos estilos para botões de horário
+  timeButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    marginBottom: 15,
+  },
+  timeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#222',
+  },
+  timeButtonSmall: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  timeButtonTextSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#222',
+  },
+  intervalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  intervalButton: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  intervalButtonSelected: {
+    backgroundColor: colors.primary + '15',
+    borderColor: colors.primary,
+  },
+  intervalButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  intervalButtonTextSelected: {
+    color: colors.primary,
+    fontWeight: 'bold',
+  },
+
+  // Estilos para modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+    textAlign: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  modalScroll: {
+    maxHeight: 350,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalItemSelected: {
+    backgroundColor: colors.primary + '08',
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  modalItemTextSelected: {
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  modalCancelBtn: {
+    marginTop: 10,
+    marginHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
 });

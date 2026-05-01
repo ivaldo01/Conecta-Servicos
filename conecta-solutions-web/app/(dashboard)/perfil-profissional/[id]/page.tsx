@@ -54,6 +54,7 @@ export default function PerfilProfissionalPage() {
   const [servicos, setServicos]         = useState<Servico[]>([]);
   const [avaliacoes, setAvaliacoes]   = useState<Avaliacao[]>([]);
   const [loading, setLoading]           = useState(true);
+  const [servicosSelecionados, setServicosSelecionados] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function carregarDados() {
@@ -96,6 +97,27 @@ export default function PerfilProfissionalPage() {
   const fmtBRL = (v: any) => {
     const n = Number(v) || 0;
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const toggleServico = (servicoId: string) => {
+    setServicosSelecionados(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(servicoId)) {
+        newSet.delete(servicoId);
+      } else {
+        newSet.add(servicoId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleAgendar = () => {
+    if (servicosSelecionados.size === 0) {
+      alert('Selecione pelo menos um serviço para agendar.');
+      return;
+    }
+    const servicosIds = Array.from(servicosSelecionados).join(',');
+    router.push(`/agendamentos/novo?prof=${id}&serv=${servicosIds}`);
   };
   
   if (loading) return <div className="prof-loading">Carregando perfil...</div>;
@@ -149,12 +171,12 @@ export default function PerfilProfissionalPage() {
             <div className="prof-action-header">
               <button 
                 className="btn-primary-enterprise"
-                onClick={() => {
-                  const firstServ = servicos[0]?.id;
-                  if (firstServ) router.push(`/agendamentos/novo?prof=${id}&serv=${firstServ}`);
-                }}
+                onClick={handleAgendar}
+                disabled={servicosSelecionados.size === 0}
               >
-                SOLICITAR AGENDAMENTO
+                {servicosSelecionados.size > 0 
+                  ? `SOLICITAR AGENDAMENTO (${servicosSelecionados.size})` 
+                  : 'SOLICITAR AGENDAMENTO'}
               </button>
             </div>
           </div>
@@ -182,7 +204,15 @@ export default function PerfilProfissionalPage() {
               </div>
             ) : (
               servicos.map(s => (
-                <div key={s.id} className="prof-servico-card">
+                <div 
+                  key={s.id} 
+                  className={`prof-servico-card ${servicosSelecionados.has(s.id) ? 'prof-servico-selected' : ''}`}
+                  onClick={() => toggleServico(s.id)}
+                >
+                  <div className="prof-servico-checkbox">
+                    {servicosSelecionados.has(s.id) && <span className="prof-servico-check">✓</span>}
+                  </div>
+                  
                   {/* Foto do Serviço */}
                   <div className="prof-servico-foto-wrap">
                     {s.fotoUrl ? (
@@ -203,12 +233,6 @@ export default function PerfilProfissionalPage() {
                       <span><DollarSign size={14} /> {fmtBRL(s.preco)}</span>
                     </div>
                   </div>
-                  <button 
-                    className="btn-agendar-serv"
-                    onClick={() => router.push(`/agendamentos/novo?prof=${id}&serv=${s.id}`)}
-                  >
-                    Agendar <ChevronRight size={16} />
-                  </button>
                 </div>
               ))
             )}
