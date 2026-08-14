@@ -136,6 +136,17 @@ export default function BuscaPage() {
       <Topbar title="Buscar Profissionais" subtitle="Encontre o profissional ideal para você" />
 
       <div className="busca-body">
+        <section className="busca-intro">
+          <div>
+            <span className="busca-eyebrow">REDE DE ESPECIALISTAS</span>
+            <h1>Encontre profissionais preparados para atender você.</h1>
+            <p>Pesquise por serviço, especialidade ou localização e compare os melhores perfis.</p>
+          </div>
+          <div className="busca-intro-stat">
+            <strong>{profissionaisFiltrados.length}</strong>
+            <span>{profissionaisFiltrados.length === 1 ? 'profissional disponível' : 'profissionais disponíveis'}</span>
+          </div>
+        </section>
 
         {/* ===== BARRA DE BUSCA PRINCIPAL ===== */}
         <div className="busca-hero">
@@ -223,7 +234,9 @@ export default function BuscaPage() {
               {vips.length > 0 && (
                 <h2 className="busca-secao-titulo">Outros Profissionais</h2>
               )}
-              <p className="busca-contador">{profissionaisFiltrados.length} profissional(is) encontrado(s)</p>
+              <p className="busca-contador">
+                {profissionaisFiltrados.length} {profissionaisFiltrados.length === 1 ? 'profissional encontrado' : 'profissionais encontrados'}
+              </p>
               <div className="busca-grid">
                 {outros.map(p => (
                   <CardProfissional 

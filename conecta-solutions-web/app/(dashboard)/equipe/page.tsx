@@ -715,6 +715,19 @@ export default function EquipePage() {
       />
 
       <div className="eq-body">
+        <section className="eq-hero">
+          <div>
+            <span className="eq-hero-kicker">GESTÃO DE PESSOAS</span>
+            <h1>Sua equipe, acessos e serviços em uma única visão.</h1>
+            <p>Organize colaboradores, distribua responsabilidades e mantenha cada atendimento sob controle.</p>
+          </div>
+          <div className="eq-hero-insight">
+            <span>Equipe ativa</span>
+            <strong>{ativos.length}</strong>
+            <small>de {colaboradores.length} colaborador{colaboradores.length === 1 ? '' : 'es'}</small>
+          </div>
+        </section>
+
         {/* Card de limite do plano */}
         {planoInfo && planoInfo.max > 0 && (
           <div className={`eq-limite-banner ${getInfoLimite(planoInfo.id, colaboradores.length).atingiuLimite ? 'eq-limite-atingido' : ''}`}>
@@ -1040,14 +1053,14 @@ function CardColaborador({ c, iniciais, onEditar, onExcluir, onAlternar, planoVe
         <div className="eq-servicos">{c.servicos.map(s => <span key={s} className="eq-servico-tag">{s}</span>)}</div>
       )}
       <div className="eq-acoes">
-        <button className="btn-icon btn-icon--ghost" onClick={onEditar} title="Editar"><Edit2 size={14} /></button>
+        <button className="btn-icon btn-icon--ghost" onClick={onEditar} title="Editar"><Edit2 size={14} /><span>Editar</span></button>
         <button className="btn-icon btn-icon--agenda" onClick={() => window.location.href = `/agenda?colaborador=${c.id}`} title="Configurar Agenda">
-          <Calendar size={14} />
+          <Calendar size={14} /><span>Agenda</span>
         </button>
         <button className={`btn-icon ${c.ativo !== false ? 'btn-icon--warn' : 'btn-icon--ghost'}`} onClick={onAlternar} title={c.ativo !== false ? 'Desativar' : 'Ativar'}>
-          {c.ativo !== false ? <XCircle size={14} /> : <CheckCircle size={14} />}
+          {c.ativo !== false ? <XCircle size={14} /> : <CheckCircle size={14} />}<span>{c.ativo !== false ? 'Desativar' : 'Ativar'}</span>
         </button>
-        <button className="btn-icon btn-icon--delete" onClick={onExcluir} title="Remover"><Trash2 size={14} /></button>
+        <button className="btn-icon btn-icon--delete" onClick={onExcluir} title="Remover"><Trash2 size={14} /><span>Remover</span></button>
       </div>
     </div>
   );

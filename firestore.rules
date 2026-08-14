@@ -16,10 +16,38 @@ service cloud.firestore {
     }
 
     function ehAdmin() {
-      return estaLogado() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && (
-             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true ||
-             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin' ||
-             get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tipo == 'admin');
+      return estaLogado() && (
+        request.auth.token.admin == true ||
+        (
+          // Compatibilidade temporaria enquanto administradores existentes
+          // migram para a custom claim `admin`.
+          exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) && (
+            get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isAdmin == true ||
+            get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin' ||
+            get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tipo == 'admin' ||
+            get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.perfil == 'admin'
+          )
+        )
+      );
+    }
+
+    // Campos que concedem ou representam acesso privilegiado nao podem ser
+    // promovidos pelo proprio cliente. Administradores continuam podendo
+    // gerenciar perfis legados ate a migracao para Firebase Custom Claims.
+    function cadastroUsuarioSemPrivilegiosAdmin() {
+      return request.resource.data.get('isAdmin', false) != true &&
+             request.resource.data.get('role', '') != 'admin' &&
+             request.resource.data.get('tipo', '') != 'admin' &&
+             request.resource.data.get('perfil', '') != 'admin';
+    }
+
+    function camposDeAutorizacaoInalterados() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'isAdmin',
+        'role',
+        'tipo',
+        'perfil'
+      ]);
     }
 
     function participaDoDocumentoFinanceiro(data) {
@@ -36,18 +64,25 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
-      // Permitir leitura: qualquer um (necessário para verificar duplicidade ANTES do cadastro, quando usuário ainda não está logado)
-      // ATENÇÃO: Isso expõe a lista de usuários, mas apenas permite verificar duplicidade de CPF/CNPJ/telefone
-      allow read: if true;
+      // Perfis deixam de ser publicos. A verificacao de duplicidade anterior ao
+      // cadastro e feita pela Cloud Function, sem expor documentos completos.
+      // A leitura autenticada sera refinada por perfil nos proximos itens.
+      allow read: if estaLogado();
       // Permitir criação: qualquer usuário autenticado
-      allow create: if estaLogado();
-      allow update: if ehDono(userId) || ehAdmin();
+      // O cliente so pode criar o proprio perfil e nao pode nascer com
+      // privilegios administrativos. Escritas do Admin SDK ignoram as rules.
+      allow create: if ehDono(userId) && cadastroUsuarioSemPrivilegiosAdmin();
+      // O proprio usuario pode editar dados comuns, mas nao os campos que
+      // determinam seu perfil/permissao.
+      allow update: if ehAdmin() || (
+        ehDono(userId) && camposDeAutorizacaoInalterados()
+      );
       // Permitir delete se: admin, dono da conta, ou qualquer usuario autenticado (para colaboradores)
-      allow delete: if ehAdmin() || ehDono(userId) || estaLogado();
+      allow delete: if ehAdmin() || ehDono(userId);
 
       match /notificacoes/{notificacaoId} {
         // Permitir leitura para qualquer usuário autenticado (suporta colaboradores com login anônimo)
-        allow read: if estaLogado();
+        allow read: if ehDono(userId) || ehAdmin();
         // Criar notificações permitido para qualquer usuário logado
         allow create: if estaLogado();
         // Atualizar/deletar apenas pelo dono ou admin
@@ -126,8 +161,8 @@ service cloud.firestore {
 
     match /agendamentos/{agendamentoId} {
       // Permitir leitura se usuário autenticado (a query já filtra por clinicaId/profissionalId)
-      allow read: if estaLogado();
-      allow create: if estaLogado();
+      allow read: if participaDoDocumentoFinanceiro(resource.data);
+      allow create: if participaDoDocumentoFinanceiro(request.resource.data);
       allow update: if estaLogado() && participaDoDocumentoFinanceiro(resource.data);
       allow delete: if false;
     }
@@ -135,15 +170,21 @@ service cloud.firestore {
      // NOVAS COLEÇÕES - Planos e Contratos Recorrentes
     match /planosRecorrentes/{planoId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.profissionalId == request.auth.uid;
       allow update, delete: if request.auth != null && 
         resource.data.profissionalId == request.auth.uid;
     }
 
     match /contratosRecorrentes/{contratoId} {
       // Permitir leitura para usuários autenticados - a query filtra por profissionalId ou clienteId
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read: if request.auth != null && (
+        resource.data.profissionalId == request.auth.uid ||
+        resource.data.clienteId == request.auth.uid ||
+        ehAdmin()
+      );
+      allow create: if request.auth != null &&
+        request.resource.data.clienteId == request.auth.uid;
       // Para update/delete, verificar se é profissional ou cliente do contrato
       allow update: if request.auth != null && (
         (resource.data.profissionalId == request.auth.uid || resource.data.clienteId == request.auth.uid) ||
@@ -163,7 +204,7 @@ service cloud.firestore {
         !exists(/databases/$(database)/documents/pagamentos/$(pagamentoId)) ||
         participaDoDocumentoFinanceiro(resource.data)
       );
-      allow create: if estaLogado();
+      allow create: if participaDoDocumentoFinanceiro(request.resource.data);
       allow update: if estaLogado() && (
         participaDoDocumentoFinanceiro(resource.data) ||
         participaDoDocumentoFinanceiro(request.resource.data)
@@ -173,7 +214,7 @@ service cloud.firestore {
 
     match /cobrancas/{cobrancaId} {
       allow read: if participaDoDocumentoFinanceiro(resource.data);
-      allow create: if estaLogado();
+      allow create: if participaDoDocumentoFinanceiro(request.resource.data);
       allow update: if
         participaDoDocumentoFinanceiro(resource.data) ||
         participaDoDocumentoFinanceiro(request.resource.data);
@@ -182,21 +223,25 @@ service cloud.firestore {
 
     match /saques/{saqueId} {
       allow read: if participaDoDocumentoFinanceiro(resource.data);
-      allow create: if estaLogado();
+      allow create: if estaLogado() && (
+        request.resource.data.userId == uidAtual() ||
+        request.resource.data.profissionalId == uidAtual() ||
+        ehAdmin()
+      );
       allow update: if participaDoDocumentoFinanceiro(resource.data) || ehAdmin();
       allow delete: if false;
     }
 
     match /saldos/{saldoId} {
-      allow read: if estaLogado();
-      allow create: if estaLogado();
+      allow read: if ehDono(saldoId) || ehAdmin();
+      allow create: if ehDono(saldoId) || ehAdmin();
       allow update: if
         ehDono(saldoId) ||
         participaDoDocumentoFinanceiro(resource.data) ||
         participaDoDocumentoFinanceiro(request.resource.data) ||
         ehAdmin();
       // Permitir delete para qualquer autenticado (simplificado)
-      allow delete: if estaLogado();
+      allow delete: if ehDono(saldoId) || ehAdmin();
     }
 
     // ============================================================
@@ -272,7 +317,9 @@ service cloud.firestore {
     // Leitura: autenticado (a query filtra por profissionalId)
     // Escrita: só o profissional dono da transação
     match /transacoes/{transacaoId} {
-      allow read: if estaLogado();
+      allow read: if estaLogado() && (
+        resource.data.profissionalId == uidAtual() || ehAdmin()
+      );
       allow create: if estaLogado()
         && request.resource.data.profissionalId == uidAtual();
       allow update, delete: if estaLogado()
@@ -285,7 +332,9 @@ service cloud.firestore {
       // Leitura: qualquer autenticado
       allow read: if estaLogado();
       // Criação/Update/Delete: qualquer autenticado (dados protegidos por query no app)
-      allow create, update, delete: if estaLogado();
+      // Regra duplicada legada neutralizada; prevalecem as regras de ownership
+      // da declaracao principal de /colaboradores acima.
+      allow create, update, delete: if false;
     }
 
     // ✅ ASSINATURAS — Coleção para assinaturas VIP (backend Asaas)
@@ -306,7 +355,7 @@ service cloud.firestore {
       // Leitura: apenas admin pode ver logs de webhooks
       allow read: if ehAdmin();
       // Criação: backend pode criar logs
-      allow create: if estaLogado();
+      allow create: if ehAdmin();
       allow update, delete: if ehAdmin();
     }
 
@@ -315,7 +364,8 @@ service cloud.firestore {
       // Leitura: admin pode ler TUDO; usuário comum pode ler apenas SEUS logs
       allow read: if ehAdmin() || (estaLogado() && resource.data.userId == uidAtual());
       // Criação: qualquer usuário logado pode criar log (o app garante que é do próprio user)
-      allow create: if estaLogado();
+      allow create: if estaLogado() &&
+        request.resource.data.userId == uidAtual();
       // Update/Delete: apenas admin
       allow update, delete: if ehAdmin();
     }

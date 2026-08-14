@@ -12,6 +12,16 @@ import { getTaxaServico, getTaxaSaque } from '../constants/plans';
 
 const BACKEND_URL = 'https://backend-vercel-nu-topaz.vercel.app';
 
+async function getAuthenticatedHeaders() {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Usuário não autenticado.');
+    const token = await user.getIdToken();
+    return {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+    };
+}
+
 export const STATUS_PAGAMENTO = {
     AGUARDANDO_COBRANCA: 'aguardando_cobranca',
     GERADA: 'gerada',
@@ -396,11 +406,10 @@ export async function gerarCobrancaAgendamento({ agendamento, creditCard, credit
     let response;
 
     try {
+        const headers = await getAuthenticatedHeaders();
         response = await fetch(`${BACKEND_URL}/api/createPayment`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify(bodyRequest),
         });
     } catch (networkError) {
@@ -492,11 +501,10 @@ export async function criarAssinatura({ userId, planoId, valor, nomePlano, billi
 
     let response;
     try {
+        const headers = await getAuthenticatedHeaders();
         response = await fetch(`${BACKEND_URL}/api/createSubscription`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({
                 userId,
                 planoId,
@@ -532,11 +540,10 @@ export async function solicitarSaqueProfissional({ valor, pixKey, pixKeyType, us
     let response;
 
     try {
+        const headers = await getAuthenticatedHeaders();
         response = await fetch(`${BACKEND_URL}/api/withdraw`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({
                 valor,
                 pixKey,

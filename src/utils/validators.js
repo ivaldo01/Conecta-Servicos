@@ -1,5 +1,5 @@
-import { db } from "../services/firebaseConfig";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { functions } from "../services/firebaseConfig";
+import { httpsCallable } from "firebase/functions";
 
 export function validarCPF(cpf) {
     if (!cpf) return false;
@@ -71,48 +71,8 @@ export function validarTelefone(telefone) {
 }
 
 export async function verificarDadosDuplicados(documento, telefone, uidAtivo = null) {
-    try {
-        if (documento) {
-            const q1 = query(collection(db, "usuarios"), where("cpfCnpj", "==", documento));
-            const q2 = query(collection(db, "usuarios"), where("cpf", "==", documento));
-            const q3 = query(collection(db, "usuarios"), where("cnpj", "==", documento));
-
-            const [s1, s2, s3] = await Promise.all([getDocs(q1), getDocs(q2), getDocs(q3)]);
-            
-            const possuiOutroDoc = (snapshot) => {
-                let existe = false;
-                snapshot.forEach(doc => {
-                    if (doc.id !== uidAtivo) existe = true;
-                });
-                return existe;
-            };
-
-            if (possuiOutroDoc(s1) || possuiOutroDoc(s2) || possuiOutroDoc(s3)) {
-                return { existe: true, tipo: "documento" };
-            }
-        }
-
-        if (telefone) {
-            const qT1 = query(collection(db, "usuarios"), where("telefone", "==", telefone));
-            const qT2 = query(collection(db, "usuarios"), where("whatsapp", "==", telefone));
-            
-            const [st1, st2] = await Promise.all([getDocs(qT1), getDocs(qT2)]);
-
-            const possuiOutroTel = (snapshot) => {
-                let existe = false;
-                snapshot.forEach(doc => {
-                    if (doc.id !== uidAtivo) existe = true;
-                });
-                return existe;
-            };
-            if (possuiOutroTel(st1) || possuiOutroTel(st2)) {
-                return { existe: true, tipo: "telefone" };
-            }
-        }
-
-        return { existe: false };
-    } catch (error) {
-        console.error("Erro ao verificar duplicidade:", error);
-        return { existe: false };
-    }
+    void uidAtivo;
+    const verificar = httpsCallable(functions, "verificarDadosDuplicados");
+    const resposta = await verificar({ documento, telefone });
+    return resposta.data;
 }

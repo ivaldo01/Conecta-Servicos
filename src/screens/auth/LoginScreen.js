@@ -455,11 +455,6 @@ export default function LoginScreen({ navigation }) {
       keyboardDismissMode="on-drag"
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.mobileHeaderArea}>
-        <Text style={styles.subtitle}>
-          A melhor plataforma para contratar e gerenciar seus serviços
-        </Text>
-      </View>
       {renderLoginForm()}
     </ScrollView>
   );
@@ -786,4 +781,3 @@ const styles = StyleSheet.create({
     color: colors.secondary,
   },
 });
-

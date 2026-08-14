@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         width: '100%',
         marginTop: 24,
-        gap: 12,
+        gap: 10,
     },
     actionRowLarge: {
         width: 'auto',
@@ -1093,9 +1093,9 @@ const styles = StyleSheet.create({
         marginLeft: 'auto',
     },
     primaryAction: {
-        flex: 2,
+        flex: 1,
         backgroundColor: '#3B82F6',
-        height: 50,
+        minHeight: 52,
         borderRadius: 14,
         flexDirection: 'row',
         justifyContent: 'center',
@@ -1111,17 +1111,20 @@ const styles = StyleSheet.create({
     },
     primaryActionText: {
         color: '#FFF',
-        fontWeight: '700',
+        fontWeight: '800',
+        fontSize: 14,
         marginLeft: 8,
+        flexShrink: 1,
     },
     secondaryAction: {
         flex: 1,
         backgroundColor: 'rgba(34, 197, 94, 0.15)',
-        height: 50,
+        minHeight: 52,
         borderRadius: 14,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 12,
         borderWidth: 1,
         borderColor: 'rgba(34, 197, 94, 0.3)',
     },
@@ -1131,8 +1134,10 @@ const styles = StyleSheet.create({
     },
     secondaryActionText: {
         color: '#22C55E',
-        fontWeight: '700',
-        marginLeft: 8,
+        fontWeight: '800',
+        fontSize: 14,
+        marginLeft: 6,
+        flexShrink: 1,
     },
     favoriteButton: {
         flexDirection: 'row',
@@ -1175,7 +1180,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     card: {
-        backgroundColor: 'rgba(21, 25, 37, 0.9)',
+        backgroundColor: '#151925',
         borderRadius: 24,
         padding: 24,
         marginBottom: 20,
@@ -1184,7 +1189,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 15,
         borderWidth: 1,
-        borderColor: 'rgba(59, 130, 246, 0.15)',
+        borderColor: 'rgba(71, 85, 105, 0.45)',
     },
     cardTitle: {
         fontSize: 18,
@@ -1194,8 +1199,12 @@ const styles = StyleSheet.create({
     },
     description: {
         fontSize: 15,
-        color: '#94A3B8',
+        color: '#CBD5E1',
         lineHeight: 24,
+    },
+    infoList: {
+        marginTop: 16,
+        gap: 12,
     },
     infoRow: {
         flexDirection: 'row',
@@ -1203,9 +1212,36 @@ const styles = StyleSheet.create({
     },
     infoText: {
         fontSize: 14,
-        color: '#64748B',
+        color: '#AAB7C8',
         marginLeft: 12,
         flex: 1,
+        lineHeight: 20,
+    },
+    emptyBox: {
+        minHeight: 126,
+        borderRadius: 16,
+        paddingVertical: 22,
+        paddingHorizontal: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(30, 41, 59, 0.45)',
+        borderWidth: 1,
+        borderColor: 'rgba(71, 85, 105, 0.35)',
+    },
+    emptyTitle: {
+        color: '#E2E8F0',
+        fontSize: 15,
+        fontWeight: '700',
+        marginTop: 10,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        color: '#94A3B8',
+        fontSize: 13,
+        lineHeight: 19,
+        marginTop: 5,
+        textAlign: 'center',
+        maxWidth: 360,
     },
     galleryGrid: {
         flexDirection: 'row',
@@ -1237,7 +1273,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
+        paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(59, 130, 246, 0.1)',
     },
@@ -1248,7 +1284,8 @@ const styles = StyleSheet.create({
     },
     serviceLeft: {
         flex: 1,
-        marginRight: 16,
+        minWidth: 0,
+        marginRight: 8,
     },
     serviceTextBox: {
         flex: 1,
@@ -1260,13 +1297,14 @@ const styles = StyleSheet.create({
     },
     serviceDescription: {
         fontSize: 13,
-        color: '#64748B',
+        color: '#94A3B8',
         marginTop: 2,
     },
     serviceRight: {
         alignItems: 'flex-end',
         flexDirection: 'row',
-        gap: 12,
+        gap: 8,
+        flexShrink: 0,
     },
     servicePrice: {
         fontSize: 15,
@@ -1288,7 +1326,7 @@ const styles = StyleSheet.create({
     selectionSummaryLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#64748B',
+        color: '#94A3B8',
     },
     selectionSummaryValue: {
         fontSize: 20,
@@ -1386,8 +1424,9 @@ const styles = StyleSheet.create({
     },
     planosCardSubtitle: {
         fontSize: 13,
-        color: '#FBBF24',
+        color: '#FDE68A',
         marginTop: 2,
+        lineHeight: 18,
     },
     headerTitleRow: {
         flexDirection: 'row',

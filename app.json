@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Conecta Solutions",
+    "name": "​",
     "slug": "conecta-solutions",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -66,6 +66,5 @@
       }
     },
     "owner": "ivaldo_silva"
-  },
-  "owner": "ivaldo_silva"
+  }
 }

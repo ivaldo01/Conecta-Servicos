@@ -1,5 +1,6 @@
 const axios = require('axios');
-const { db } = require('../lib/firebaseAdmin');
+const { db, admin } = require('../lib/firebaseAdmin');
+const { authenticateRequest } = require('../lib/authenticateRequest');
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
@@ -11,6 +12,9 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
     }
+
+    const authUser = await authenticateRequest(req, res, admin);
+    if (!authUser) return;
 
     // ✅ Verifica variáveis de ambiente antes de qualquer operação
     if (!ASAAS_API_KEY) {
@@ -41,6 +45,13 @@ module.exports = async (req, res) => {
         }
 
         const contrato = contratoSnap.data();
+        if (
+            contrato.clienteId !== authUser.uid &&
+            contrato.profissionalId !== authUser.uid &&
+            authUser.admin !== true
+        ) {
+            return res.status(403).json({ error: 'Sem acesso a este contrato' });
+        }
 
         // Buscar dados do cliente
         const clienteRef = db.collection('usuarios').doc(contrato.clienteId);

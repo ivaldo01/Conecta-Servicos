@@ -1,46 +1,27 @@
 import React, { useState } from "react";
-import { View, Text, Platform } from "react-native";
-import {
-    BannerAd,
-    BannerAdSize,
-    TestIds,
-} from "react-native-google-mobile-ads";
+import { View } from "react-native";
+import Constants from "expo-constants";
 
+const isExpoGo = Constants.executionEnvironment === "storeClient";
+const ads = isExpoGo ? null : require("react-native-google-mobile-ads");
 const FORCE_PRODUCTION_ADS = process.env.EXPO_PUBLIC_FORCE_PRODUCTION_ADS === "true";
-
-const BANNER_UNIT_ID =
-    !__DEV__ || FORCE_PRODUCTION_ADS
-        ? process.env.EXPO_PUBLIC_ADMOB_BANNER_ID
-        : TestIds.BANNER;
 
 export default function AdBanner({ compact = false, style, enabled = true }) {
     const [error, setError] = useState(false);
 
-    // Se anúncios estiverem desabilitados (usuário com plano pago), não mostrar
-    if (!enabled) {
-        return null;
-    }
+    if (!enabled || !ads || error) return null;
 
-    if (Platform.OS === 'web') {
-        return null;
-    }
-
-    const size = compact
-        ? BannerAdSize.BANNER
-        : BannerAdSize.ANCHORED_ADAPTIVE_BANNER;
-
-    if (!BANNER_UNIT_ID || error) {
-        return null;
-    }
+    const unitId = !__DEV__ || FORCE_PRODUCTION_ADS
+        ? process.env.EXPO_PUBLIC_ADMOB_BANNER_ID
+        : ads.TestIds.BANNER;
+    if (!unitId) return null;
 
     return (
-        <View style={[{ alignItems: "center", marginVertical: 12, minHeight: 60, justifyContent: 'center' }, style]}>
-            <BannerAd
-                unitId={BANNER_UNIT_ID}
-                size={size}
-                requestOptions={{
-                    requestNonPersonalizedAdsOnly: true,
-                }}
+        <View style={[{ alignItems: "center", marginVertical: 12, minHeight: 60, justifyContent: "center" }, style]}>
+            <ads.BannerAd
+                unitId={unitId}
+                size={compact ? ads.BannerAdSize.BANNER : ads.BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+                requestOptions={{ requestNonPersonalizedAdsOnly: true }}
                 onAdFailedToLoad={(err) => {
                     console.log("Erro ao carregar Banner Ad:", err);
                     setError(true);

@@ -5,7 +5,8 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
-import { FileText, Calendar, RefreshCcw, X, CheckCircle, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { FileText, Calendar, RefreshCcw, X, CheckCircle, AlertCircle, ArrowRight, ShieldCheck, CalendarCheck } from 'lucide-react';
 import '@/styles/perfil-contratos-rel.css';
 
 // ============================================================
@@ -18,12 +19,20 @@ interface Contrato {
   clienteId?: string;
   clienteNome?: string;
   planoNome?: string;
-  preco?: any;
+  preco?: number | string;
   periodicidade?: string;
   status?: string;
-  dataInicio?: any;
-  proximaCobranca?: any;
+  dataInicio?: DateValue;
+  proximaCobranca?: DateValue;
   servicos?: string[];
+}
+
+type DateValue = Date | string | number | { toDate: () => Date };
+
+interface StatusBadge {
+  cls: string;
+  icon: React.ReactNode;
+  label: string;
 }
 
 // ============================================================
@@ -56,10 +65,10 @@ export default function ContratosPage() {
   useEffect(() => { carregarContratos(); }, [carregarContratos]);
 
   // Formatação de Data
-  const formatarData = (v: any): string => {
+  const formatarData = (v?: DateValue): string => {
     if (!v) return '—';
     try {
-      const d = v.toDate ? v.toDate() : new Date(v);
+      const d = typeof v === 'object' && 'toDate' in v ? v.toDate() : new Date(v as Date | string | number);
       return d.toLocaleDateString('pt-BR');
     } catch { return '—'; }
   };
@@ -67,7 +76,7 @@ export default function ContratosPage() {
   // Status Badge
   const getStatusBadge = (status = 'ativo') => {
     const s = status.toLowerCase();
-    const mapa: any = {
+    const mapa: Record<string, StatusBadge> = {
       ativo:     { cls: 'ct-badge--ativo',     icon: <CheckCircle size={12} />, label: 'Ativo' },
       pausado:   { cls: 'ct-badge--pausado',   icon: <AlertCircle size={12} />, label: 'Pausado' },
       cancelado: { cls: 'ct-badge--cancelado', icon: <X size={12} />,           label: 'Cancelado' },
@@ -86,6 +95,14 @@ export default function ContratosPage() {
       />
 
       <div className="ct-body">
+        <section className="ct-hero">
+          <div>
+            <span className="ct-eyebrow">PLANOS E RECORRÊNCIAS</span>
+            <h1>Seus serviços recorrentes, em um só lugar.</h1>
+            <p>Acompanhe assinaturas, próximas cobranças e profissionais contratados com total transparência.</p>
+          </div>
+          <div className="ct-hero-icon"><FileText size={28} /></div>
+        </section>
         {/* RESUMO RÁPIDO */}
         <div className="ct-resumo">
           <div className="ct-resumo-card ct-resumo-card--verde">
@@ -106,8 +123,19 @@ export default function ContratosPage() {
           </div>
         ) : contratos.length === 0 ? (
           <div className="ct-vazio">
-            <FileText size={48} strokeWidth={1.5} />
-            <p>Você ainda não possui contratos registrados.</p>
+            <div className="ct-vazio-icon"><FileText size={30} strokeWidth={1.8} /></div>
+            <span className="ct-vazio-eyebrow">SUA ÁREA DE CONTRATOS</span>
+            <h2>Nenhuma assinatura ativa</h2>
+            <p>Quando você contratar um plano recorrente, poderá acompanhar aqui valores, datas e todos os serviços incluídos.</p>
+            <div className="ct-vazio-beneficios">
+              <span><CalendarCheck size={16} /> Horários recorrentes</span>
+              <span><ShieldCheck size={16} /> Gestão segura e transparente</span>
+            </div>
+            {!ehProfissional && (
+              <Link href="/busca" className="ct-vazio-cta">
+                Encontrar profissionais <ArrowRight size={17} />
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -160,7 +188,14 @@ export default function ContratosPage() {
 // ============================================================
 // COMPONENTE: CARD DO CONTRATO
 // ============================================================
-function CardContrato({ c, ehProfissional, formatarData, badge }: any) {
+interface CardContratoProps {
+  c: Contrato;
+  ehProfissional: boolean;
+  formatarData: (value?: DateValue) => string;
+  badge: StatusBadge;
+}
+
+function CardContrato({ c, ehProfissional, formatarData, badge }: CardContratoProps) {
   return (
     <div className="ct-card">
       <div className="ct-card-topo">

@@ -248,7 +248,7 @@ export default function FavoritosCliente({ navigation }) {
                         )}
                     </View>
 
-                    <View style={styles.content}>
+                    <View style={styles.profileContent}>
                         <Text style={styles.nome} numberOfLines={1}>{getNomeProfissional(item)}</Text>
                         <Text style={styles.especialidade} numberOfLines={1}>{getEspecialidade(item)}</Text>
                         <View style={styles.metaRow}>
@@ -286,21 +286,26 @@ export default function FavoritosCliente({ navigation }) {
     const MainContent = (
         <ScrollView
             style={styles.container}
-            contentContainerStyle={[styles.content, isLargeScreen && styles.contentLarge]}
+            contentContainerStyle={[styles.pageContent, isLargeScreen && styles.contentLarge]}
             showsVerticalScrollIndicator={false}
         >
             <View style={[styles.header, isLargeScreen && styles.headerLarge]}>
                 <View style={styles.headerCircle} />
                 <View style={styles.headerCircleTwo} />
                 <View style={[styles.headerContent, isLargeScreen && styles.headerContentLarge]}>
+                    <View style={styles.headerEyebrowRow}>
+                        <Ionicons name="heart-outline" size={14} color="rgba(255,255,255,0.76)" />
+                        <Text style={styles.headerEyebrow}>MINHA SELEÇÃO</Text>
+                    </View>
                     <Text style={styles.title}>Meus Favoritos</Text>
                     <Text style={styles.subtitle}>Profissionais que você salvou para consultar depois</Text>
+                    <View style={styles.headerMetric}>
+                        <Text style={styles.headerMetricNumber}>{favoritos.length}</Text>
+                        <Text style={styles.headerMetricLabel}>
+                            {favoritos.length === 1 ? 'profissional salvo' : 'profissionais salvos'}
+                        </Text>
+                    </View>
                 </View>
-            </View>
-
-            <View style={[styles.summaryCard, isLargeScreen && styles.summaryCardLarge]}>
-                <Text style={styles.summaryNumber}>{favoritos.length}</Text>
-                <Text style={styles.summaryText}>profissional(is) salvo(s) na sua lista</Text>
             </View>
 
             {favoritos.length === 0 ? (
@@ -316,7 +321,7 @@ export default function FavoritosCliente({ navigation }) {
                     </TouchableOpacity>
                 </View>
             ) : (
-                <View style={isLargeScreen ? styles.gridDesktop : null}>
+                <View style={isLargeScreen ? styles.gridDesktop : styles.mobileList}>
                     {favoritos.map((item) => (
                         <View key={item.id} style={isLargeScreen ? styles.gridItemDesktop : null}>
                             {renderItem({ item })}
@@ -348,7 +353,7 @@ export default function FavoritosCliente({ navigation }) {
 const styles = StyleSheet.create({
     screenContainer: {
         flex: 1,
-        backgroundColor: '#F0F3F8',
+        backgroundColor: colors.background,
     },
     webLayout: {
         flex: 1,
@@ -366,7 +371,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    content: {
+    pageContent: {
         paddingBottom: 40,
     },
     contentLarge: {
@@ -380,7 +385,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F0F3F8',
+        backgroundColor: colors.background,
     },
     loadingText: {
         marginTop: 12,
@@ -389,11 +394,11 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 18,
-        paddingTop: 12,
-        paddingBottom: 18,
-        backgroundColor: colors.primary,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        paddingTop: 14,
+        paddingBottom: 20,
+        backgroundColor: colors.primaryDark,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
         overflow: 'hidden',
     },
     headerLarge: {
@@ -422,21 +427,58 @@ const styles = StyleSheet.create({
     headerContent: {
         zIndex: 2,
     },
+    headerEyebrowRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 7,
+    },
+    headerEyebrow: {
+        marginLeft: 6,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1,
+        color: 'rgba(255,255,255,0.76)',
+    },
     headerContentLarge: {
         alignItems: 'center',
         width: '100%',
     },
     title: {
-        fontSize: 24,
+        fontSize: 23,
         fontWeight: '800',
         color: '#FFF',
-        textAlign: 'center',
+        textAlign: 'left',
     },
     subtitle: {
         marginTop: 4,
         fontSize: 13,
         color: 'rgba(255,255,255,0.84)',
-        textAlign: 'center',
+        textAlign: 'left',
+        lineHeight: 19,
+        maxWidth: 330,
+    },
+    headerMetric: {
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 14,
+        paddingHorizontal: 12,
+        height: 34,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+    headerMetricNumber: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '800',
+        marginRight: 7,
+    },
+    headerMetricLabel: {
+        color: 'rgba(255,255,255,0.78)',
+        fontSize: 12,
+        fontWeight: '600',
     },
     scrollContent: {
         flex: 1,
@@ -481,22 +523,26 @@ const styles = StyleSheet.create({
         gap: 20,
         justifyContent: 'flex-start',
     },
+    mobileList: {
+        paddingHorizontal: 16,
+        paddingTop: 18,
+    },
     gridItemDesktop: {
         width: '25%',
         alignItems: 'center',
         marginBottom: 24,
     },
     card: {
-        backgroundColor: '#FFF',
+        backgroundColor: colors.surface,
         borderRadius: 20,
         marginBottom: 14,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
         elevation: 2,
     },
     cardLarge: {
@@ -551,7 +597,7 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: colors.primary,
     },
-    content: {
+    profileContent: {
         alignItems: 'center',
         width: '100%',
         marginBottom: 16,
@@ -602,35 +648,46 @@ const styles = StyleSheet.create({
         color: '#E63946',
     },
     emptyState: {
-        paddingTop: 40,
+        marginHorizontal: 16,
+        marginTop: 18,
+        paddingVertical: 34,
         alignItems: 'center',
-        paddingHorizontal: 26,
+        paddingHorizontal: 24,
+        backgroundColor: colors.surface,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 2,
     },
     emptyIconWrap: {
-        width: 68,
-        height: 68,
-        borderRadius: 34,
-        backgroundColor: `${colors.primary}12`,
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: colors.primarySoft,
         justifyContent: 'center',
         alignItems: 'center',
     },
     emptyTitle: {
-        marginTop: 16,
-        fontSize: 18,
+        marginTop: 18,
+        fontSize: 19,
         fontWeight: '800',
         color: colors.textDark,
     },
     emptySubtitle: {
-        marginTop: 8,
+        marginTop: 7,
         fontSize: 14,
         lineHeight: 21,
         color: colors.secondary,
         textAlign: 'center',
     },
     emptyButton: {
-        marginTop: 18,
-        height: 48,
-        paddingHorizontal: 18,
+        marginTop: 22,
+        height: 50,
+        paddingHorizontal: 20,
         borderRadius: 14,
         backgroundColor: colors.primary,
         flexDirection: 'row',

@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
-import { Plus, Pencil, Trash2, X, Check, Scissors, Clock, DollarSign, Search, Upload, ImageIcon } from 'lucide-react';
+import Image from 'next/image';
+import { Plus, Pencil, Trash2, X, Check, Scissors, Clock, Search, Upload, ArrowRight } from 'lucide-react';
 // Configuração Cloudinary (mesma do mobile)
 const CLOUDINARY_CLOUD_NAME = 'dctnkaktn';
 const CLOUDINARY_UPLOAD_PRESET = 'Conecta-Solutions';
@@ -42,6 +43,7 @@ const FORM_INICIAL: FormServico = { nome: '', preco: '', duracao: '60', descrica
 // ============================================================
 export default function ServicosPage() {
   const { dadosUsuario } = useAuth();
+  const catalogOwnerId = dadosUsuario?.perfil === 'colaborador' ? dadosUsuario?.clinicaId : dadosUsuario?.uid;
   const [servicos, setServicos]       = useState<Servico[]>([]);
   const [loading, setLoading]         = useState(true);
   const [salvando, setSalvando]       = useState(false);
@@ -57,7 +59,7 @@ export default function ServicosPage() {
     // Para colaboradores, usar clinicaId (ID do gestor)
     // Para gestores, usar o próprio uid
     const ehColaborador = dadosUsuario?.perfil === 'colaborador';
-    const gestorId = ehColaborador ? dadosUsuario?.clinicaId : dadosUsuario?.uid;
+    const gestorId = catalogOwnerId;
     
     console.log('[Serviços] Carregando:', {
       ehColaborador,
@@ -91,7 +93,7 @@ export default function ServicosPage() {
     } finally {
       setLoading(false);
     }
-  }, [dadosUsuario]);
+  }, [dadosUsuario, catalogOwnerId]);
 
   useEffect(() => { carregarServicos(); }, [carregarServicos]);
 
@@ -114,7 +116,7 @@ export default function ServicosPage() {
 
   // Salvar (criar ou editar)
   const salvar = async () => {
-    if (!dadosUsuario?.uid) return;
+    if (!catalogOwnerId) return;
     if (!form.nome.trim() || !form.preco || !form.duracao) {
       toast.error('Preencha nome, preço e duração.'); return;
     }
@@ -133,10 +135,10 @@ export default function ServicosPage() {
     setSalvando(true);
     try {
       if (editando) {
-        await updateDoc(doc(db, 'usuarios', dadosUsuario.uid, 'servicos', editando.id), payload);
+        await updateDoc(doc(db, 'usuarios', catalogOwnerId, 'servicos', editando.id), payload);
         toast.success('Serviço atualizado!');
       } else {
-        await addDoc(collection(db, 'usuarios', dadosUsuario.uid, 'servicos'), { ...payload, criadoEm: serverTimestamp() });
+        await addDoc(collection(db, 'usuarios', catalogOwnerId, 'servicos'), { ...payload, criadoEm: serverTimestamp() });
         toast.success('Serviço criado!');
       }
       fecharModal();
@@ -151,10 +153,10 @@ export default function ServicosPage() {
 
   // Excluir serviço
   const excluir = async (s: Servico) => {
-    if (!dadosUsuario?.uid) return;
+    if (!catalogOwnerId) return;
     if (!confirm(`Excluir o serviço "${s.nome}"?`)) return;
     try {
-      await deleteDoc(doc(db, 'usuarios', dadosUsuario.uid, 'servicos', s.id));
+      await deleteDoc(doc(db, 'usuarios', catalogOwnerId, 'servicos', s.id));
       toast.success('Serviço excluído.');
       carregarServicos();
     } catch {
@@ -241,6 +243,14 @@ export default function ServicosPage() {
       <Topbar title="Catálogo de Serviços" subtitle="Defina sua oferta de valor e precificação enterprise" />
 
       <div className="servicos-container-premium">
+        <section className="servicos-intro-premium">
+          <div>
+            <span>PORTFÓLIO COMERCIAL</span>
+            <h1>Apresente seus serviços com clareza.</h1>
+            <p>Organize preços, duração e detalhes para facilitar a decisão dos seus clientes.</p>
+          </div>
+          <button onClick={abrirNovo}>Criar serviço <ArrowRight size={16} /></button>
+        </section>
         
         {/* ===== ESTATÍSTICAS RÁPIDAS ===== */}
         <section className="servicos-stats-row">
@@ -296,8 +306,9 @@ export default function ServicosPage() {
           </div>
         ) : servicosFiltrados.length === 0 ? (
           <div className="vazio-state-premium">
-            <Scissors size={48} className="opacity-10" />
-            <p>{busca ? 'Nenhum resultado para sua busca.' : 'Seu catálogo está vazio.'}</p>
+            <div className="servicos-vazio-icon"><Scissors size={28} /></div>
+            <strong>{busca ? 'Nenhum serviço encontrado' : 'Seu catálogo está vazio'}</strong>
+            <p>{busca ? 'Tente buscar usando outro nome.' : 'Cadastre sua primeira oferta para começar a receber agendamentos.'}</p>
             {!busca && <button className="btn-add-premium" onClick={abrirNovo}>Começar Catálogo</button>}
           </div>
         ) : (
@@ -309,7 +320,7 @@ export default function ServicosPage() {
                 {/* Foto do Serviço */}
                 <div className="servico-foto-wrap">
                   {s.fotoUrl ? (
-                    <img src={s.fotoUrl} alt={s.nome} className="servico-foto" />
+                    <Image src={s.fotoUrl} alt={s.nome} className="servico-foto" fill sizes="(max-width: 800px) 100vw, 420px" unoptimized />
                   ) : (
                     <div className="servico-foto-placeholder">
                       <Scissors size={32} />
@@ -396,7 +407,7 @@ export default function ServicosPage() {
                 <div className="foto-upload-wrap">
                   {form.fotoUrl ? (
                     <div className="foto-preview-container">
-                      <img src={form.fotoUrl} alt="Preview" className="foto-preview" />
+                      <Image src={form.fotoUrl} alt="Preview" className="foto-preview" fill sizes="600px" unoptimized />
                       <button 
                         type="button" 
                         className="btn-remove-foto"

@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
-import { ChevronLeft, ChevronRight, Clock, User, DollarSign, CheckCircle, X, AlertCircle, LayoutGrid, Calendar as CalendarIcon, Eye, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, User, CheckCircle, X, AlertCircle, LayoutGrid, Calendar as CalendarIcon, Eye, CheckCircle2 } from 'lucide-react';
 import '@/styles/agenda.css';
 
 // ============================================================
@@ -115,6 +115,9 @@ export default function AgendaPage() {
     { key: 'cancelado', label: 'Cancelados', color: '#ef4444' },
   ];
 
+  const contagemStatus = (status: StatusFilter) =>
+    status === 'todos' ? agendamentos.length : agendamentos.filter(item => item.status === status).length;
+
   // Agendamentos do dia selecionado
   const agendamentosSelecionados = diaSelecionado ? agendamentosDoDia(diaSelecionado) : [];
 
@@ -134,6 +137,17 @@ export default function AgendaPage() {
   return (
     <div className="agenda-page-enterprise">
       <Topbar title="Gestão de Compromissos" subtitle="Controle total da sua agenda corporativa" />
+
+      <section className="agenda-intro-premium">
+        <div>
+          <span>PLANEJAMENTO OPERACIONAL</span>
+          <h1>Organize seu tempo e cuide de cada atendimento.</h1>
+          <p>Visualize sua disponibilidade, acompanhe os status e mantenha sua rotina sob controle.</p>
+        </div>
+        <button onClick={() => { const agora = new Date(); setMesAtual(agora); setDiaSelecionado(agora); }}>
+          <CalendarIcon size={16} /> Ir para hoje
+        </button>
+      </section>
 
       <div className="agenda-container-premium">
         
@@ -192,6 +206,7 @@ export default function AgendaPage() {
               >
                 <div className="status-dot" style={{ background: f.color }}></div>
                 {f.label}
+                <span>{contagemStatus(f.key)}</span>
               </button>
             ))}
           </div>
@@ -319,8 +334,9 @@ export default function AgendaPage() {
               <div className="loading-state-premium">Carregando timeline...</div>
             ) : agendamentosSelecionados.length === 0 ? (
               <div className="vazio-state-premium">
-                <Clock size={40} className="opacity-20" />
-                <p>Nenhuma atividade para este dia.</p>
+                <div className="vazio-agenda-icon"><Clock size={26} /></div>
+                <strong>Horário disponível</strong>
+                <p>Nenhuma atividade agendada para este dia.</p>
               </div>
             ) : (
               agendamentosSelecionados.map(ag => {

@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test:rules:admin": "firebase emulators:exec --only auth,firestore,functions \"node scripts/test-firestore-admin-rules.js\"",
     "desktop:start": "cross-env NODE_ENV=development electron electron/main.js",
     "desktop:build": "expo export:web && electron-builder build --win --mac"
   },

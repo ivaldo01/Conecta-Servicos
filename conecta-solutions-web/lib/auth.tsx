@@ -22,8 +22,9 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { logAuth, logNavegacao } from "./activityLogger";
-import { auth, db } from "./firebase";
+import { auth, db, functions } from "./firebase";
 
 // =============================================
 // TIPOS
@@ -158,12 +159,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           unsubscribeProfile = onSnapshot(
             doc(db, "usuarios", firebaseUser.uid),
-            (snap) => {
+            async (snap) => {
               if (snap.exists()) {
+                const dadosPerfil = snap.data();
                 setDadosUsuario({
                   uid: firebaseUser.uid,
-                  ...snap.data(),
+                  ...dadosPerfil,
                 } as DadosUsuario);
+
+                const adminLegado =
+                  dadosPerfil.isAdmin === true ||
+                  dadosPerfil.role === "admin" ||
+                  dadosPerfil.tipo === "admin" ||
+                  dadosPerfil.perfil === "admin";
+
+                // Migração transitória: uma conta administrativa já validada
+                // pelo backend recebe a custom claim e renova o próprio token.
+                if (adminLegado && dadosPerfil.adminClaimMigrada !== true) {
+                  try {
+                    const sincronizarClaim = httpsCallable(
+                      functions,
+                      "sincronizarMinhaPermissaoAdmin",
+                    );
+                    await sincronizarClaim();
+                    await firebaseUser.getIdToken(true);
+                  } catch (claimError) {
+                    console.error(
+                      "[Auth] Não foi possível migrar a permissão administrativa:",
+                      claimError,
+                    );
+                  }
+                }
               } else {
                 console.warn("[Auth] Perfil não encontrado no Firestore.");
               }
@@ -331,7 +357,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [dadosUsuario, loading]);
 
   const ehAdmin =
-    dadosUsuario?.perfil === "admin" || dadosUsuario?.isAdmin === true;
+    dadosUsuario?.perfil === "admin" ||
+    dadosUsuario?.role === "admin" ||
+    dadosUsuario?.tipo === "admin" ||
+    dadosUsuario?.isAdmin === true;
   
   const ehColaborador =
     dadosUsuario?.perfil === "colaborador" || (typeof window !== 'undefined' && !!sessionStorage.getItem('colab_uid'));

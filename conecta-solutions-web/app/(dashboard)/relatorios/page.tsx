@@ -520,6 +520,18 @@ export default function RelatoriosPage() {
       </div>
 
       <div className="relatorios-container">
+        <section className="rel-hero-enterprise no-print">
+          <div>
+            <span className="rel-hero-kicker">INTELIGÊNCIA OPERACIONAL</span>
+            <h1>Dados que explicam o presente e orientam o próximo passo.</h1>
+            <p>Compare resultados, acompanhe sua equipe e transforme o histórico financeiro em decisões melhores.</p>
+          </div>
+          <div className="rel-hero-result">
+            <span>Resultado líquido</span>
+            <strong>R$ {(stats.receitaTotal - feesTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+            <small>no período selecionado</small>
+          </div>
+        </section>
         
         {/* BARRA DE AÇÕES EXECUTIVAS */}
         <div className="relatorios-action-header no-print">

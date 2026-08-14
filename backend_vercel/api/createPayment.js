@@ -1,6 +1,7 @@
 
 const axios = require('axios');
-const { db } = require('../lib/firebaseAdmin');
+const { db, admin } = require('../lib/firebaseAdmin');
+const { authenticateRequest } = require('../lib/authenticateRequest');
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
@@ -34,6 +35,9 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Método não permitido' });
     }
 
+    const authUser = await authenticateRequest(req, res, admin);
+    if (!authUser) return;
+
     // ✅ Verifica variáveis de ambiente antes de qualquer operação
     if (!ASAAS_API_KEY) {
         console.error('[createPayment] ASAAS_API_KEY não configurada.');
@@ -61,6 +65,17 @@ module.exports = async (req, res) => {
         if (!agendamentoSnap.exists) {
             console.error(`[createPayment] Agendamento não encontrado: ${agendamentoId}`);
             return res.status(404).json({ error: 'Agendamento não encontrado' });
+        }
+
+        const agendamento = agendamentoSnap.data();
+        const participantes = [
+            agendamento.clienteId,
+            agendamento.profissionalId,
+            agendamento.clinicaId,
+            agendamento.colaboradorId
+        ].filter(Boolean);
+        if (!participantes.includes(authUser.uid) && authUser.admin !== true) {
+            return res.status(403).json({ error: 'Sem acesso a este agendamento' });
         }
 
         console.log(`[createPayment] Iniciando criação de pagamento para agendamento: ${agendamentoId}`, {

@@ -256,44 +256,49 @@ export default function BuscaProfissionais({ navigation, route }) {
         </TouchableOpacity>
 
         <View style={styles.resultContent}>
-          <View style={styles.resultAvatarWrapper}>
+          <View style={styles.resultMainRow}>
             <View style={styles.resultAvatar}>
               {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.resultAvatarImage} /> : (
                 <Text style={styles.resultAvatarText}>{getInitial(getNomeProfissional(item))}</Text>
               )}
             </View>
-          </View>
 
-          <View style={{ marginLeft: 70 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.resultIdentity}>
+              <View style={styles.resultNameRow}>
               <Text style={[styles.resultName, { flexShrink: 1 }]} numberOfLines={1}>{getNomeProfissional(item)}</Text>
               {temSeloVerificado(item?.planoAtivo) && (
-                <Ionicons name="checkmark-circle" size={16} color="#3498DB" style={{ marginLeft: 4 }} />
+                  <Ionicons name="checkmark-circle" size={17} color={colors.primary} style={{ marginLeft: 5 }} />
               )}
+              </View>
+              <Text style={styles.resultSub} numberOfLines={1}>{getEspecialidadeProfissional(item)}</Text>
             </View>
-            <Text style={styles.resultSub} numberOfLines={1}>{getEspecialidadeProfissional(item)}</Text>
+          </View>
 
-            <View style={styles.badgesRow}>
+          <View style={styles.badgesRow}>
               <View style={styles.infoBadge}>
                 <Ionicons name="star" size={12} color="#F4B400" />
-                <Text style={styles.infoBadgeText}>{textoAvaliacao(item)}</Text>
+              <Text style={styles.infoBadgeText} numberOfLines={1}>{textoAvaliacao(item)}</Text>
               </View>
               <View style={styles.infoBadge}>
                 <Ionicons name="location-outline" size={12} color={colors.primary} />
-                <Text style={styles.infoBadgeText}>{getCidadeProfissional(item)}</Text>
+              <Text style={styles.infoBadgeText} numberOfLines={1}>{getCidadeProfissional(item)}</Text>
               </View>
-              <View style={[styles.infoBadge, { backgroundColor: item?.atendendo ? '#DCFCE7' : '#F1F5F9' }]}>
-                <View style={[styles.statusDotSmall, { backgroundColor: item?.atendendo ? '#22C55E' : '#94A3B8' }]} />
-                <Text style={[styles.infoBadgeText, { color: item?.atendendo ? '#166534' : '#64748B', fontWeight: 'bold' }]}>
-                  {item?.atendendo ? 'Online' : 'Offline'}
-                </Text>
-              </View>
+          </View>
+
+          <View style={styles.resultFooter}>
+            <View style={styles.statusRow}>
+              <View style={[styles.statusDotSmall, { backgroundColor: item?.atendendo ? '#22C55E' : '#94A3B8' }]} />
+              <Text style={styles.statusText}>{item?.atendendo ? 'Disponível agora' : 'Ver disponibilidade'}</Text>
             </View>
+            <TouchableOpacity style={styles.profileLink} onPress={() => abrirPerfil(item)}>
+              <Text style={styles.profileLinkText}>Ver perfil</Text>
+              <Ionicons name="arrow-forward" size={15} color={colors.primary} />
+            </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
     );
-  }, [favoritosMap, salvandoFavoritoId, selectedPro, toggleFavorito, textoAvaliacao]);
+  }, [abrirPerfil, favoritosMap, salvandoFavoritoId, selectedPro, toggleFavorito, textoAvaliacao]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -316,17 +321,30 @@ export default function BuscaProfissionais({ navigation, route }) {
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {selectedPro && (
           <TouchableOpacity style={styles.proCard} onPress={() => abrirPerfil(selectedPro)}>
+            <View style={styles.selectedEyebrowRow}>
+              <Ionicons name="sparkles-outline" size={14} color={colors.primary} />
+              <Text style={styles.selectedEyebrow}>PROFISSIONAL EM DESTAQUE</Text>
+            </View>
             <View style={styles.proCardContent}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
-                <Text style={[styles.proName, { marginBottom: 0, flexShrink: 1 }]}>{getNomeProfissional(selectedPro)}</Text>
-                {temSeloVerificado(selectedPro?.planoAtivo) && (
-                  <Ionicons name="checkmark-circle" size={20} color="#FFF" style={{ marginLeft: 6 }} />
+              <View style={styles.selectedAvatar}>
+                {getAvatarUri(selectedPro) ? (
+                  <Image source={{ uri: getAvatarUri(selectedPro) }} style={styles.resultAvatarImage} />
+                ) : (
+                  <Text style={styles.selectedAvatarText}>{getInitial(getNomeProfissional(selectedPro))}</Text>
                 )}
               </View>
-              <Text style={styles.proSpec}>{getEspecialidadeProfissional(selectedPro)}</Text>
+              <View style={styles.selectedInfo}>
+                <View style={styles.resultNameRow}>
+                  <Text style={styles.proName} numberOfLines={1}>{getNomeProfissional(selectedPro)}</Text>
+                {temSeloVerificado(selectedPro?.planoAtivo) && (
+                    <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={{ marginLeft: 5 }} />
+                )}
+              </View>
+                <Text style={styles.proSpec} numberOfLines={1}>{getEspecialidadeProfissional(selectedPro)}</Text>
+              </View>
               <View style={styles.viewBtn}>
-                <Text style={styles.viewBtnText}>Ver Perfil Completo</Text>
-                <Ionicons name="chevron-forward" size={18} color="#FFF" />
+                <Text style={styles.viewBtnText}>Ver perfil</Text>
+                <Ionicons name="arrow-forward" size={16} color="#FFF" />
               </View>
             </View>
           </TouchableOpacity>
@@ -339,7 +357,15 @@ export default function BuscaProfissionais({ navigation, route }) {
         />
 
         <View style={styles.resultsSection}>
-          <Text style={styles.resultsTitle}>Resultados ({profissionaisFiltrados.length})</Text>
+          <View style={styles.resultsHeader}>
+            <View>
+              <Text style={styles.resultsEyebrow}>PROFISSIONAIS</Text>
+              <Text style={styles.resultsTitle}>Resultados</Text>
+            </View>
+            <View style={styles.resultsCountBadge}>
+              <Text style={styles.resultsCountText}>{profissionaisFiltrados.length}</Text>
+            </View>
+          </View>
           {loading ? <ActivityIndicator size="large" color={colors.primary} /> : (
             <FlatList
               data={profissionaisFiltrados}
@@ -355,40 +381,100 @@ export default function BuscaProfissionais({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#EEF3F9' },
-  topArea: { padding: 16, backgroundColor: colors.primary, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  backButton: { marginRight: 12, padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10 },
-  pageTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },
-  pageSubtitle: { fontSize: 13, color: '#DDD' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 15, paddingHorizontal: 15, height: 50 },
-  input: { flex: 1, marginLeft: 10 },
+  container: { flex: 1, backgroundColor: colors.background },
+  topArea: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    backgroundColor: colors.primaryDark,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  backButton: {
+    width: 42,
+    height: 42,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  pageTitle: { fontSize: 21, fontWeight: '800', color: '#FFF', letterSpacing: -0.3 },
+  pageSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.68)', marginTop: 2 },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 54,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
+  },
+  input: { flex: 1, marginLeft: 10, fontSize: 15, color: colors.textDark },
   content: { flex: 1 },
-  contentContainer: { padding: 16 },
-  resultCard: { backgroundColor: '#FFF', borderRadius: 18, padding: 15, marginBottom: 12, elevation: 2, position: 'relative' },
-  resultCardSelected: { borderColor: colors.primary, borderWidth: 2 },
-  badgeDestaque: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', padding: 4, borderRadius: 5, zIndex: 10 },
-  badgeText: { color: '#FFF', fontSize: 9, fontWeight: 'bold', marginLeft: 3 },
-  favoriteFloatButton: { position: 'absolute', top: 10, right: 10, zIndex: 10 },
-  resultAvatarWrapper: { position: 'absolute', left: 15, top: 15 },
-  resultAvatar: { width: 55, height: 55, borderRadius: 27, backgroundColor: '#EEE', overflow: 'hidden', borderWidth: 2, borderColor: '#FFF' },
+  contentContainer: { padding: 16, paddingBottom: 36 },
+  resultCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+  },
+  resultCardSelected: { borderColor: '#93B4F8', backgroundColor: '#FBFDFF' },
+  badgeDestaque: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, zIndex: 10 },
+  badgeText: { color: '#FFF', fontSize: 9, fontWeight: '800', marginLeft: 3, letterSpacing: 0.5 },
+  favoriteFloatButton: { position: 'absolute', top: 12, right: 12, zIndex: 10, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceMuted },
+  resultContent: { paddingTop: 26 },
+  resultMainRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 36 },
+  resultAvatar: { width: 58, height: 58, borderRadius: 18, backgroundColor: colors.primarySoft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   resultAvatarImage: { width: '100%', height: '100%' },
-  resultAvatarText: { fontSize: 20, fontWeight: 'bold', color: colors.primary, textAlign: 'center', lineHeight: 50 },
-  resultName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  resultSub: { fontSize: 13, color: '#777', marginVertical: 3 },
-  badgesRow: { flexDirection: 'row', marginTop: 5 },
-  infoBadge: { flexDirection: 'row', alignItems: 'center', marginRight: 10, backgroundColor: '#F0F0F0', padding: 4, borderRadius: 5 },
-  infoBadgeText: { fontSize: 11, marginLeft: 3, color: '#555' },
+  resultAvatarText: { fontSize: 21, fontWeight: '800', color: colors.primary },
+  resultIdentity: { flex: 1, marginLeft: 13, minWidth: 0 },
+  resultNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  resultName: { fontSize: 17, fontWeight: '800', color: colors.textDark },
+  resultSub: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+  badgesRow: { flexDirection: 'row', marginTop: 14, gap: 8 },
+  infoBadge: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10 },
+  infoBadgeText: { flex: 1, fontSize: 11, marginLeft: 4, color: colors.textSecondary },
+  resultFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  statusRow: { flexDirection: 'row', alignItems: 'center' },
+  statusText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+  profileLink: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
+  profileLinkText: { fontSize: 12, fontWeight: '800', color: colors.primary, marginRight: 5 },
   statusDotSmall: {
     width: 6,
     height: 6,
     borderRadius: 3,
     marginRight: 4,
   },
-  proCard: { backgroundColor: colors.primary, borderRadius: 20, padding: 20, marginBottom: 20 },
-  proName: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  proSpec: { color: '#EEE', fontSize: 14, marginTop: 5 },
-  viewBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 15, backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 10, alignSelf: 'flex-start' },
-  viewBtnText: { color: '#FFF', fontWeight: 'bold', marginRight: 5 },
-  resultsTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#333' }
+  proCard: { backgroundColor: colors.surface, borderRadius: 22, padding: 16, marginBottom: 18, borderWidth: 1, borderColor: colors.border, shadowColor: colors.shadow, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
+  selectedEyebrowRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  selectedEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, color: colors.primary, marginLeft: 6 },
+  proCardContent: { flexDirection: 'row', alignItems: 'center' },
+  selectedAvatar: { width: 54, height: 54, borderRadius: 17, backgroundColor: colors.primarySoft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  selectedAvatarText: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  selectedInfo: { flex: 1, minWidth: 0, marginLeft: 12 },
+  proName: { flexShrink: 1, color: colors.textDark, fontSize: 16, fontWeight: '800' },
+  proSpec: { color: colors.textSecondary, fontSize: 13, marginTop: 3 },
+  viewBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, paddingHorizontal: 12, height: 38, borderRadius: 12, marginLeft: 10 },
+  viewBtnText: { color: '#FFF', fontSize: 12, fontWeight: '800', marginRight: 5 },
+  resultsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 14 },
+  resultsEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: colors.primary, marginBottom: 3 },
+  resultsTitle: { fontSize: 22, fontWeight: '800', color: colors.textDark },
+  resultsCountBadge: { minWidth: 34, height: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  resultsCountText: { fontSize: 13, fontWeight: '800', color: colors.primary },
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   collection, query, addDoc,
   orderBy, serverTimestamp, onSnapshot, doc, setDoc, updateDoc, increment, getDoc, Timestamp
@@ -9,9 +9,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
 import { 
-  Send, MessageCircle, Paperclip, Image, FileText, X, Download, 
-  Megaphone, Ticket, User, Check, CheckCheck, Clock, Calendar, 
-  AlertCircle, ChevronLeft, MoreVertical, Search, Filter, CheckCircle
+  Send, MessageCircle, Paperclip, X, User, Check, CheckCheck, Clock, Calendar, CheckCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '@/styles/suporte-premium.css';
@@ -75,7 +73,7 @@ interface Mensagem {
 // SUPORTE — Chat com Suporte a Anexos (Imagens e PDFs)
 // ============================================================
 export default function SuportePage() {
-  const { user, dadosUsuario, ehProfissional, ehColaborador } = useAuth();
+  const { dadosUsuario, ehProfissional, ehColaborador } = useAuth();
   const [mensagens, setMensagens]         = useState<Mensagem[]>([]);
   const [novaMensagem, setNovaMensagem]   = useState('');
   const [loading, setLoading]             = useState(true);
@@ -88,7 +86,7 @@ export default function SuportePage() {
 
   // Estados para preview e anexos
   const [previewImagem, setPreviewImagem] = useState<string | null>(null);
-  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
+  const [, setArquivoSelecionado] = useState<File | null>(null);
   const [digitando, setDigitando] = useState(false);
   const [mensagensNaoLidas, setMensagensNaoLidas] = useState(0);
   const [ticketInfo, setTicketInfo] = useState<TicketInfo | null>(null);
@@ -154,7 +152,7 @@ export default function SuportePage() {
     });
 
     return () => unsubscribe();
-  }, [uid, mensagens.length]);
+  }, [uid, mensagens.length, ehColaborador]);
 
   // Rola para a última mensagem
   useEffect(() => {
@@ -329,6 +327,15 @@ export default function SuportePage() {
   return (
     <div className="suporte-page-premium">
       <Topbar title="Suporte Técnico" subtitle="Atendimento prioritário Conecta" />
+
+      <section className="suporte-intro-premium">
+        <div>
+          <span>ATENDIMENTO CONECTA</span>
+          <h1>Conte com a gente em cada etapa.</h1>
+          <p>Envie sua dúvida, acompanhe as respostas e compartilhe anexos com segurança.</p>
+        </div>
+        <div className="suporte-online-premium"><i></i> Equipe online</div>
+      </section>
 
       {/* Header com Estatísticas */}
       <div className="suporte-header-stats-premium">

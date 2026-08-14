@@ -12,6 +12,7 @@
 // ============================================================
 
 const admin = require('firebase-admin');
+const { authenticateRequest } = require('../../lib/authenticateRequest');
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -100,6 +101,15 @@ module.exports = async (req, res) => {
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const cronAutorizado = Boolean(
+    process.env.CRON_SECRET && bearer === process.env.CRON_SECRET
+  );
+  if (!cronAutorizado) {
+    const authUser = await authenticateRequest(req, res, admin, { admin: true });
+    if (!authUser) return;
   }
 
   try {

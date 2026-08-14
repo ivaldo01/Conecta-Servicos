@@ -1,21 +1,23 @@
-// Versão para MOBILE (Android/iOS)
-import mobileAds, { AdsConsent } from 'react-native-google-mobile-ads';
+import Constants from "expo-constants";
+
+const isExpoGo = Constants.executionEnvironment === "storeClient";
+const ads = isExpoGo ? null : require("react-native-google-mobile-ads");
 
 export const initializeAds = async () => {
+    if (!ads) return;
     try {
-        await mobileAds().initialize();
-        // console.log('Ads inicializados com sucesso.');
+        await ads.default().initialize();
     } catch (error) {
-        console.log('Erro ao inicializar Ads:', error);
+        console.log("Erro ao inicializar Ads:", error);
     }
 };
 
 export const requestAdsConsent = async () => {
+    if (!ads) return { canRequestAds: false };
     try {
-        const consentInfo = await AdsConsent.gatherConsent();
-        return consentInfo;
+        return await ads.AdsConsent.gatherConsent();
     } catch (error) {
-        console.log('Erro ao coletar consentimento:', error);
+        console.log("Erro ao coletar consentimento:", error);
         return { canRequestAds: false };
     }
 };

@@ -17,6 +17,7 @@ import NativeAdCard from '../../components/NativeAdCard';
 import BannerAd from '../../components/ads/BannerAd';
 import TutorialOnboarding from '../../components/TutorialOnboarding';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import NetInfo from "@react-native-community/netinfo";
 import {
   collection,
@@ -36,31 +37,31 @@ import { temSeloVerificado, temAnuncios } from '../../constants/plans';
 import logo from '../../../assets/logo.png';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CLIENT_SLIDE_WIDTH = Math.min(SCREEN_WIDTH - 44, 300);
-const CLIENT_PRO_CARD_WIDTH = 240;
+const CLIENT_SLIDE_WIDTH = Math.min(SCREEN_WIDTH - 32, 380);
+const CLIENT_PRO_CARD_WIDTH = Math.min(SCREEN_WIDTH - 64, 300);
 const CLIENT_PRO_CARD_HEIGHT = 230;
 
 const FALLBACK_STATS_CLIENTE = [
   {
     id: '1',
-    label: 'Explorar',
-    value: 'Serviço',
+    label: 'Serviços',
+    value: 'Buscar',
     icon: 'search-outline',
     color: colors.primary,
     action: 'buscar',
   },
   {
     id: '2',
-    label: 'Agenda',
-    value: 'Cliente',
+    label: 'Compromissos',
+    value: 'Agenda',
     icon: 'calendar-outline',
     color: colors.success || '#22C55E',
     action: 'agenda',
   },
   {
     id: '3',
-    label: 'Perfil',
-    value: 'Conta',
+    label: 'Minha conta',
+    value: 'Perfil',
     icon: 'person-outline',
     color: '#7C3AED',
     action: 'perfil',
@@ -214,7 +215,7 @@ function QuickStatCard({ label, value, icon, color, onPress }) {
 
 function SlideCard({ item, onPress }) {
   return (
-    <View style={[styles.slideCard, { width: CLIENT_SLIDE_WIDTH, height: 290 }]}>
+    <View style={[styles.slideCard, { width: CLIENT_SLIDE_WIDTH, height: 238 }]}>
       <View style={styles.slideDecorCircleOne} />
       <View style={styles.slideDecorCircleTwo} />
 
@@ -700,7 +701,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.wrapper}>
+    <SafeAreaView style={styles.wrapper} edges={['top']}>
       {isOffline && (
         <View style={styles.offlineBanner}>
           <Ionicons name="cloud-offline-outline" size={16} color="#FFF" />
@@ -723,7 +724,7 @@ export default function HomeScreen({ navigation }) {
             <Image source={logo} style={styles.logo} />
             <View>
               <Text style={styles.helloText}>Olá, {primeiroNome} 👋</Text>
-              <Text style={styles.pageTitle}>O que você precisa hoje?</Text>
+              <Text style={styles.pageTitle} numberOfLines={2}>O que você precisa hoje?</Text>
             </View>
           </View>
 
@@ -854,11 +855,9 @@ export default function HomeScreen({ navigation }) {
             </View>
 
             <View style={styles.heroTextBox}>
-              <Text style={styles.heroTitle}>
-                Tudo para facilitar seu atendimento
-              </Text>
+              <Text style={styles.heroTitle}>Acesso rápido</Text>
               <Text style={styles.heroSubtitle}>
-                Explore categorias, descubra profissionais bem avaliados e acompanhe seus pedidos com facilidade.
+                Seus principais atalhos em um só lugar.
               </Text>
             </View>
           </View>
@@ -1011,7 +1010,7 @@ export default function HomeScreen({ navigation }) {
         visible={showTutorial}
         onComplete={() => setShowTutorial(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -1043,8 +1042,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 16,
-    paddingBottom: 28,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 36,
   },
 
   loadingContainer: {
@@ -1064,17 +1064,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
-    backgroundColor: colors.primary,
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    marginBottom: 14,
+    backgroundColor: '#0F2A56',
+    borderRadius: 26,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    minHeight: 112,
     overflow: 'hidden',
-    shadowColor: colors.primary,
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowColor: '#0F2A56',
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7,
   },
 
   headerCircle: {
@@ -1105,39 +1106,42 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
-    marginRight: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    marginRight: 11,
     backgroundColor: 'rgba(255,255,255,0.16)',
   },
 
   helloText: {
-    fontSize: 13,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.80)',
     marginBottom: 2,
   },
 
   pageTitle: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '800',
     color: '#FFF',
+    lineHeight: 25,
+    maxWidth: 210,
   },
 
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 2,
+    marginLeft: 8,
   },
 
   notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#FFF',
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.96)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 8,
     position: 'relative',
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -1168,10 +1172,10 @@ const styles = StyleSheet.create({
   },
 
   profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#FFF',
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.96)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1185,15 +1189,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    height: 56,
-    marginBottom: 20,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 54,
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: '#E4EAF2',
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
@@ -1202,6 +1206,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 10,
     color: colors.textDark,
+    fontSize: 15,
   },
 
   searchActionButton: {
@@ -1217,12 +1222,12 @@ const styles = StyleSheet.create({
   },
 
   slideCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: 26,
-    padding: 20,
+    backgroundColor: '#101B32',
+    borderRadius: 24,
+    padding: 22,
     marginRight: 12,
     overflow: 'hidden',
-    elevation: 4,
+    elevation: 6,
     shadowColor: '#0F172A',
     shadowOpacity: 0.16,
     shadowRadius: 10,
@@ -1279,7 +1284,7 @@ const styles = StyleSheet.create({
   },
 
   slideTitle: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: '#FFF',
     marginBottom: 8,
@@ -1310,24 +1315,26 @@ const styles = StyleSheet.create({
   },
 
   slideIconBox: {
-    width: 68,
-    height: 68,
-    borderRadius: 22,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   heroCard: {
-    backgroundColor: colors.primary,
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 18,
     marginBottom: 24,
-    elevation: 5,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
+    elevation: 3,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
 
   heroTop: {
@@ -1336,10 +1343,10 @@ const styles = StyleSheet.create({
   },
 
   heroIconBox: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -1350,14 +1357,14 @@ const styles = StyleSheet.create({
   },
 
   heroTitle: {
-    color: '#FFF',
+    color: '#0F172A',
     fontSize: 18,
     fontWeight: '800',
     lineHeight: 24,
   },
 
   heroSubtitle: {
-    color: 'rgba(255,255,255,0.92)',
+    color: '#64748B',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 6,
@@ -1365,24 +1372,25 @@ const styles = StyleSheet.create({
 
   heroDivider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: '#E2E8F0',
     marginVertical: 16,
   },
 
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
+    gap: 8,
   },
 
   statCard: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    marginHorizontal: 6,
-    backgroundColor: '#FFF',
-    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    marginHorizontal: 0,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E8EDF5',
     shadowColor: '#000',
@@ -1393,9 +1401,9 @@ const styles = StyleSheet.create({
   },
 
   statIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -1411,13 +1419,21 @@ const styles = StyleSheet.create({
   },
 
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: colors.secondary,
     marginTop: 2,
   },
 
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: 14,
+  },
+
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: colors.textDark,
   },
@@ -1447,8 +1463,8 @@ const styles = StyleSheet.create({
   categoryCard: {
     width: '31.5%',
     backgroundColor: '#FFF',
-    borderRadius: 20,
-    paddingVertical: 18,
+    borderRadius: 18,
+    paddingVertical: 16,
     paddingHorizontal: 10,
     alignItems: 'center',
     marginBottom: 12,
@@ -1461,7 +1477,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  categoryIconCircle: {
+  categoryIconBox: {
     width: 54,
     height: 54,
     borderRadius: 18,
@@ -1500,10 +1516,10 @@ const styles = StyleSheet.create({
   },
 
   featureCard: {
-    width: 260,
+    width: Math.min(SCREEN_WIDTH - 52, 330),
     flexDirection: 'row',
     backgroundColor: '#FFF',
-    borderRadius: 20,
+    borderRadius: 18,
     paddingVertical: 18,
     paddingHorizontal: 16,
     alignItems: 'center',

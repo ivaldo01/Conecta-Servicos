@@ -124,25 +124,7 @@ export default function BannerAd({ tipo, className = '', fallback = null }: Bann
   }
 
   if (!anuncio) {
-    return (
-      <div 
-        className="banner-ad-empty"
-        style={{
-          width: '100%',
-          maxWidth: 728,
-          height: 90,
-          background: '#f0f0f0',
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#999',
-          fontSize: 12
-        }}
-      >
-        Espaço para anúncio
-      </div>
-    );
+    return fallback;
   }
 
   // Estilos por tipo

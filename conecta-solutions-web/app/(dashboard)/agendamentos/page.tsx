@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
 import Link from 'next/link';
-import { Calendar, Clock, X, RotateCcw, CheckCircle, AlertCircle, Search, Filter, Eye } from 'lucide-react';
+import { Calendar, Clock, X, CheckCircle, AlertCircle, Search, Filter, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import '@/styles/agendamentos.css';
 
@@ -96,6 +96,9 @@ export default function AgendamentosPage() {
     { key: 'cancelado', label: 'Cancelados' },
   ];
 
+  const contagem = (status: FiltroStatus) =>
+    status === 'todos' ? agendamentos.length : agendamentos.filter(ag => ag.status === status).length;
+
   const IconeStatus = ({ status = '' }: { status?: string }) => ({
     confirmado: <CheckCircle size={14} />,
     concluido:  <CheckCircle size={14} />,
@@ -111,6 +114,20 @@ export default function AgendamentosPage() {
       />
 
       <div className="ags-body">
+        <section className="ags-overview">
+          <div className="ags-overview-copy">
+            <span className="ags-eyebrow">MINHA AGENDA</span>
+            <h1>Acompanhe seus serviços com clareza.</h1>
+            <p>Consulte datas, valores e o andamento de cada agendamento.</p>
+          </div>
+          <div className="ags-metrics">
+            <div><span>Total</span><strong>{contagem('todos')}</strong></div>
+            <div><span>Pendentes</span><strong className="ags-number--warning">{contagem('pendente')}</strong></div>
+            <div><span>Confirmados</span><strong className="ags-number--success">{contagem('confirmado')}</strong></div>
+            <div><span>Concluídos</span><strong className="ags-number--primary">{contagem('concluido')}</strong></div>
+          </div>
+        </section>
+
         <div className="ags-toolbar">
           <div className="ags-busca-wrap">
             <Search size={15} className="ags-busca-icon" />
@@ -123,7 +140,7 @@ export default function AgendamentosPage() {
               <button key={f.key}
                 className={`ags-filtro-btn ${filtro === f.key ? 'ags-filtro-btn--ativo' : ''}`}
                 onClick={() => setFiltro(f.key)}>
-                {f.label}
+                {f.label} <span>{contagem(f.key)}</span>
               </button>
             ))}
           </div>
@@ -196,7 +213,7 @@ export default function AgendamentosPage() {
         </div>
 
         <p className="ags-contador">
-          {agendamentosFiltrados.length} agendamento(s) encontrado(s)
+          {agendamentosFiltrados.length} {agendamentosFiltrados.length === 1 ? 'agendamento encontrado' : 'agendamentos encontrados'}
         </p>
       </div>
     </div>

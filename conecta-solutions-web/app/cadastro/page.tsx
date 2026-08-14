@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '@/lib/firebase';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Building2, Briefcase, MapPin, FileText, AlignLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Image from 'next/image';
@@ -98,6 +99,24 @@ export default function CadastroPage() {
 
     setLoading(true);
     try {
+      const verificarDuplicidade = httpsCallable<
+        { documento: string; telefone: string },
+        { existe: boolean; tipo?: 'documento' | 'telefone' }
+      >(functions, 'verificarDadosDuplicados');
+      const duplicidade = await verificarDuplicidade({
+        documento: form.cpfCnpj.trim(),
+        telefone: form.telefone.trim(),
+      });
+
+      if (duplicidade.data.existe) {
+        toast.error(
+          duplicidade.data.tipo === 'documento'
+            ? 'Este CPF/CNPJ já está vinculado a outra conta.'
+            : 'Este telefone/WhatsApp já está vinculado a outra conta.',
+        );
+        return;
+      }
+
       // 1. Cria usuário no Firebase Auth
       const { user } = await createUserWithEmailAndPassword(auth, form.email.trim(), form.senha);
 

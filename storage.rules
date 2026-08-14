@@ -1,16 +1,11 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permitir que usuários autenticados façam upload para a pasta suporte/
-    match /suporte/{userId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Permitir uploads gerais para usuários autenticados
+    // O codigo atual envia imagens e anexos ao Cloudinary e nao utiliza o
+    // Firebase Storage. Mantemos o bucket fechado ate existir um fluxo com
+    // caminhos, ownership, MIME type e tamanho explicitamente definidos.
     match /{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

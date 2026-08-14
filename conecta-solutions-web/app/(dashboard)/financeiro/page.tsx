@@ -173,18 +173,21 @@ export default function FinanceiroPage() {
       <Topbar title="Gestão Financeira" subtitle="Controle analítico de receitas e fluxo de capital" />
 
       <div className="financeiro-container-premium">
+        <section className="fin-hero-enterprise">
+          <div>
+            <span className="fin-hero-kicker">CENTRAL FINANCEIRA</span>
+            <h1>Clareza para decidir. Controle para crescer.</h1>
+            <p>Acompanhe seu caixa, analise a performance dos serviços e mantenha cada movimentação sob controle.</p>
+          </div>
+          <div className="fin-hero-balance">
+            <span>Saldo disponível</span>
+            <strong>{fmtBRL(saldo)}</strong>
+            <small>Atualizado com suas movimentações</small>
+          </div>
+        </section>
 
         {/* ===== TAXA DE SERVIÇO DO PLANO VIP ===== */}
-        <div style={{ 
-          background: '#FEF3C7', 
-          borderLeft: '4px solid #F59E0B', 
-          padding: '12px 16px', 
-          borderRadius: '8px', 
-          marginBottom: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        <div className="fin-plan-notice">
           <span style={{ fontSize: '18px' }}>⚠️</span>
           <span style={{ fontSize: '13px', color: '#92400E' }}>
             Plano <strong>{dadosUsuario?.planoAtivo || 'Bronze'}</strong>: Taxa de <strong>{taxaServico}%</strong> sobre cada pagamento

@@ -6,11 +6,11 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
 import { 
-  User, Mail, MapPin, Shield, Camera, 
-  Save, Briefcase, Lock, MessageCircle, Copy, Hash,
-  Loader2, CheckCircle2, AlertCircle, Eye, EyeOff
+  Mail, MapPin, Shield, Camera, Save, Briefcase, MessageCircle, Copy, Hash,
+  Loader2, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Image from 'next/image';
 import '@/styles/perfil.css';
 import { validarPerfilForm, formatarTelefone, removerMascaraTelefone, ValidationErrors } from '@/lib/validation';
 
@@ -23,6 +23,19 @@ function gerarPlatformUID(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const rand = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
   return `CS-${rand(4)}-${rand(6)}`;
+}
+
+interface ProfileFormData {
+  nome: string;
+  email: string;
+  whatsapp: string;
+  telefone: string;
+  cidade: string;
+  estado: string;
+  especialidade: string;
+  bio: string;
+  fotoUrl: string;
+  fotoBanner: string;
 }
 
 // Componente de input validado
@@ -130,7 +143,7 @@ export default function PerfilPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [platformUID, setPlatformUID] = useState<string>('');
 
-  const [formData, setFormData] = useState<any>({
+  const [formData, setFormData] = useState<ProfileFormData>({
     nome: '',
     email: '',
     whatsapp: '',
@@ -144,7 +157,7 @@ export default function PerfilPage() {
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
-  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [, setTouchedFields] = useState<Set<string>>(new Set());
 
   // Validação em tempo real
   const validateField = useCallback((field: string, value: string) => {
@@ -270,7 +283,7 @@ export default function PerfilPage() {
         
         await updateDoc(uRef, { ...updateFields, atualizadoEm: serverTimestamp() });
         
-        setFormData((prev: any) => ({ 
+        setFormData((prev: ProfileFormData) => ({ 
           ...prev, 
           [tipo === 'perfil' ? 'fotoUrl' : 'fotoBanner']: url 
         }));
@@ -342,12 +355,12 @@ export default function PerfilPage() {
 
   return (
     <div className="profile-page">
-      <Topbar title="Meu Perfil" subtitle="Identidade Visual Enterprise" />
+      <Topbar title="Meu Perfil" subtitle="Gerencie sua identidade e seus dados de acesso" />
 
       <div className="profile-container">
         <section className="profile-header-premium">
           <div className="profile-banner">
-            {formData.fotoBanner ? <img src={formData.fotoBanner as string} alt="Banner" className="banner-img" /> : <div className="banner-placeholder" />}
+            {formData.fotoBanner ? <Image src={formData.fotoBanner as string} alt="Banner" className="banner-img" fill sizes="(max-width: 900px) 100vw, 1200px" unoptimized /> : <div className="banner-placeholder" />}
             <label className="btn-edit-banner">
               <Camera size={16} /> {uploading === 'banner' ? 'Enviando...' : 'Mudar Banner'}
               <input type="file" hidden onChange={(e) => handleFileUpload(e, 'banner')} accept="image/*" />
@@ -357,7 +370,7 @@ export default function PerfilPage() {
           <div className="profile-identity-strip">
             <div className="profile-avatar-premium">
               <div className="avatar-circle">
-                {formData.fotoUrl ? <img src={formData.fotoUrl as string} alt="Foto" /> : ((formData.nome as string)?.charAt(0).toUpperCase() || 'U')}
+                {formData.fotoUrl ? <Image src={formData.fotoUrl as string} alt="Foto" width={118} height={118} unoptimized /> : ((formData.nome as string)?.charAt(0).toUpperCase() || 'U')}
                 {uploading === 'perfil' && <div className="avatar-loading">...</div>}
               </div>
               <label className="btn-edit-avatar"><Camera size={14} /><input type="file" hidden onChange={(e) => handleFileUpload(e, 'perfil')} accept="image/*" /></label>
@@ -376,9 +389,9 @@ export default function PerfilPage() {
         <div className="profile-content-enterprise">
           <aside className="profile-aside-info">
             <div className="aside-card">
-              <h5 className="aside-card-title">Resumo Corporativo</h5>
+              <h5 className="aside-card-title">Resumo do Perfil</h5>
               <div className="aside-info-item"><Mail size={14} /> <span>{formData.email}</span></div>
-              <div className="aside-info-item"><Briefcase size={14} /> <span>{formData.especialidade || 'Expert'}</span></div>
+              <div className="aside-info-item"><Briefcase size={14} /> <span>{formData.especialidade || (ehProfissional ? 'Profissional' : 'Cliente')}</span></div>
               <div className="aside-info-item"><MapPin size={14} /> <span>{formData.cidade || 'Perto de você'}</span></div>
               {platformUID && (
                 <div className="aside-uid-badge">
@@ -401,6 +414,11 @@ export default function PerfilPage() {
           <main className="profile-form-main">
             {activeTab === 'dados' ? (
               <form onSubmit={handleSave} className="enterprise-form">
+                <div className="profile-form-heading">
+                  <span>INFORMAÇÕES PESSOAIS</span>
+                  <h2>Mantenha seus dados atualizados</h2>
+                  <p>Essas informações ajudam a personalizar sua experiência na plataforma.</p>
+                </div>
                 <div className="form-grid">
                   <ValidatedInput
                     label="Nome Completo / Razão Social"
@@ -424,7 +442,7 @@ export default function PerfilPage() {
                   />
                   
                   <ValidatedInput
-                    label="WhatsApp Profissional"
+                    label={ehProfissional || ehColaborador ? 'WhatsApp Profissional' : 'WhatsApp para contato'}
                     value={formData.whatsapp}
                     onChange={handleWhatsAppChange}
                     error={errors.whatsapp}
@@ -479,7 +497,7 @@ export default function PerfilPage() {
                   {saving ? (
                     <><Loader2 size={18} className="animate-spin" /> Salvando...</>
                   ) : (
-                    <><Save size={18} /> Atualizar Perfil Corporate</>
+                    <><Save size={18} /> Salvar alterações</>
                   )}
                 </button>
               </form>

@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { db, admin } = require('../lib/firebaseAdmin'); // 'admin' necessário para serverTimestamp e increment
+const { authenticateRequest } = require('../lib/authenticateRequest');
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
@@ -22,7 +23,15 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Método não permitido' });
     }
 
-    const { valor, pixKey, pixKeyType, userId } = req.body;
+    const authUser = await authenticateRequest(req, res, admin);
+    if (!authUser) return;
+
+    const { valor, pixKey, pixKeyType, userId: requestedUserId } = req.body;
+    const userId = authUser.uid;
+
+    if (requestedUserId && requestedUserId !== userId && authUser.admin !== true) {
+        return res.status(403).json({ error: 'Não é permitido sacar para outro usuário' });
+    }
 
     if (!valor || !pixKey || !userId) {
         return res.status(400).json({ error: 'Campos obrigatórios: valor, pixKey, userId' });

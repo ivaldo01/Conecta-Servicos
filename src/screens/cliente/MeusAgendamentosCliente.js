@@ -436,24 +436,16 @@ export default function MeusAgendamentosCliente({ navigation }) {
                         </View>
                     </View>
 
-                    <View
-                        style={[
-                            styles.statusBadge,
-                            { backgroundColor: statusStyle.bg },
-                        ]}
-                    >
-                        <Ionicons
-                            name={statusStyle.icon}
-                            size={14}
-                            color={statusStyle.color}
-                        />
+                </View>
+
+                <View style={styles.badgesRow}>
+                    <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                        <Ionicons name={statusStyle.icon} size={13} color={statusStyle.color} />
                         <Text style={[styles.statusText, { color: statusStyle.color }]}>
                             {statusStyle.label}
                         </Text>
                     </View>
-                </View>
 
-                <View style={styles.badgesRow}>
                     <View
                         style={[
                             styles.origemBadge,
@@ -499,21 +491,21 @@ export default function MeusAgendamentosCliente({ navigation }) {
 
                 <View style={styles.infoBox}>
                     <View style={styles.infoRow}>
-                        <Ionicons name="calendar-outline" size={16} color="#666" />
+                        <Ionicons name="calendar-outline" size={16} color={colors.primary} />
                         <Text style={styles.infoText}>
                             {item.data} às {item.horario}
                         </Text>
                     </View>
 
                     <View style={styles.infoRow}>
-                        <Ionicons name="bag-outline" size={16} color="#666" />
+                        <Ionicons name="bag-outline" size={16} color={colors.primary} />
                         <Text style={styles.infoText} numberOfLines={2}>
                             {servicosDescricao}
                         </Text>
                     </View>
 
                     <View style={styles.infoRow}>
-                        <Ionicons name="card-outline" size={16} color="#666" />
+                        <Ionicons name="card-outline" size={16} color={colors.primary} />
                         <Text style={styles.infoText}>
                             {item.formaPagamentoLabel || 'Pix'}
                         </Text>
@@ -533,17 +525,6 @@ export default function MeusAgendamentosCliente({ navigation }) {
                         <Ionicons name="wallet-outline" size={18} color="#FFF" />
                         <Text style={styles.pagamentoButtonText}>Ver cobrança</Text>
                     </TouchableOpacity>
-                </View>
-
-                <View style={styles.footerCard}>
-                    <View style={styles.detailsHint}>
-                        <Ionicons
-                            name="chevron-forward-outline"
-                            size={16}
-                            color={colors.secondary}
-                        />
-                        <Text style={styles.detailsHintText}>Ver detalhes</Text>
-                    </View>
                 </View>
 
                 {podeCancelar(item.status) && (
@@ -595,9 +576,13 @@ export default function MeusAgendamentosCliente({ navigation }) {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.headerArea}>
+                <View style={styles.headerEyebrowRow}>
+                    <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.76)" />
+                    <Text style={styles.headerEyebrow}>MINHA AGENDA</Text>
+                </View>
                 <Text style={styles.title}>Meus Agendamentos</Text>
                 <Text style={styles.subtitle}>
-                    {agendamentosFiltrados.length} agendamento(s) em{' '}
+                    {agendamentosFiltrados.length} {agendamentosFiltrados.length === 1 ? 'agendamento' : 'agendamentos'} em{' '}
                     {filtros
                         .find((f) => f.key === filtroStatus)
                         ?.label.toLowerCase()}
@@ -654,20 +639,34 @@ export default function MeusAgendamentosCliente({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F0F3F8',
+        backgroundColor: colors.background,
     },
 
     headerArea: {
         paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 18,
-        backgroundColor: colors.primary,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        paddingTop: 14,
+        paddingBottom: 20,
+        backgroundColor: colors.primaryDark,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+
+    headerEyebrowRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 7,
+    },
+
+    headerEyebrow: {
+        marginLeft: 6,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1,
+        color: 'rgba(255,255,255,0.76)',
     },
 
     title: {
-        fontSize: 24,
+        fontSize: 23,
         fontWeight: '800',
         color: '#FFF',
     },
@@ -680,22 +679,22 @@ const styles = StyleSheet.create({
 
     summaryCard: {
         marginHorizontal: 16,
-        marginTop: 12,
-        marginBottom: 10,
-        backgroundColor: '#FFF',
-        borderRadius: 20,
-        paddingVertical: 16,
+        marginTop: 14,
+        marginBottom: 12,
+        backgroundColor: colors.surface,
+        borderRadius: 18,
+        paddingVertical: 14,
         paddingHorizontal: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         borderWidth: 1,
-        borderColor: '#E8EDF5',
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
+        borderColor: colors.border,
+        elevation: 2,
+        shadowColor: colors.shadow,
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 5 },
     },
 
     summaryItem: {
@@ -704,7 +703,7 @@ const styles = StyleSheet.create({
     },
 
     summaryValue: {
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: '800',
         color: colors.textDark,
     },
@@ -719,27 +718,27 @@ const styles = StyleSheet.create({
     summaryDivider: {
         width: 1,
         height: 34,
-        backgroundColor: '#E8EDF5',
+        backgroundColor: colors.border,
     },
 
     filtrosWrapper: {
-        marginBottom: 6,
+        marginBottom: 4,
     },
 
     filtrosContainer: {
         paddingHorizontal: 16,
         paddingBottom: 8,
-        paddingTop: 4,
+        paddingTop: 2,
     },
 
     filtroChip: {
-        backgroundColor: '#FFF',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 20,
-        marginRight: 10,
+        backgroundColor: colors.surface,
+        paddingHorizontal: 15,
+        paddingVertical: 9,
+        borderRadius: 14,
+        marginRight: 8,
         borderWidth: 1,
-        borderColor: '#E4EAF2',
+        borderColor: colors.border,
     },
 
     filtroChipAtivo: {
@@ -747,7 +746,7 @@ const styles = StyleSheet.create({
     },
 
     filtroChipText: {
-        color: '#555',
+        color: colors.textSecondary,
         fontWeight: '700',
         fontSize: 13,
     },
@@ -758,27 +757,27 @@ const styles = StyleSheet.create({
 
     listContent: {
         paddingHorizontal: 16,
-        paddingBottom: 24,
+        paddingBottom: 40,
         flexGrow: 1,
     },
 
     card: {
-        backgroundColor: '#FFF',
+        backgroundColor: colors.surface,
         padding: 16,
-        borderRadius: 18,
-        marginBottom: 14,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
+        borderRadius: 20,
+        marginBottom: 12,
+        elevation: 2,
+        shadowColor: colors.shadow,
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
         borderWidth: 1,
-        borderColor: '#E8EDF5',
+        borderColor: colors.border,
     },
 
     topRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'space-between',
     },
 
@@ -786,20 +785,20 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-        paddingRight: 10,
+        paddingRight: 0,
     },
 
     avatar: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
+        width: 52,
+        height: 52,
+        borderRadius: 16,
         backgroundColor: '#EDEFF3',
     },
 
     avatarFallback: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
+        width: 52,
+        height: 52,
+        borderRadius: 16,
         backgroundColor: `${colors.primary}18`,
         alignItems: 'center',
         justifyContent: 'center',
@@ -817,7 +816,7 @@ const styles = StyleSheet.create({
     },
 
     profissionalNome: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '800',
         color: colors.textDark,
     },
@@ -831,13 +830,15 @@ const styles = StyleSheet.create({
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 16,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
+        borderRadius: 999,
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+        marginRight: 7,
+        marginBottom: 7,
     },
 
     statusText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         marginLeft: 5,
     },
@@ -845,22 +846,22 @@ const styles = StyleSheet.create({
     badgesRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginTop: 14,
-        marginBottom: 12,
+        marginTop: 13,
+        marginBottom: 6,
     },
 
     origemBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 14,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        marginRight: 8,
-        marginBottom: 8,
+        borderRadius: 999,
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+        marginRight: 7,
+        marginBottom: 7,
     },
 
     origemBadgeText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         marginLeft: 5,
     },
@@ -868,46 +869,47 @@ const styles = StyleSheet.create({
     pagamentoBadgeMini: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 14,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        marginBottom: 8,
+        borderRadius: 999,
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+        marginBottom: 7,
     },
 
     pagamentoBadgeMiniText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         marginLeft: 5,
     },
 
     infoBox: {
-        backgroundColor: '#FAFBFD',
+        backgroundColor: colors.surfaceMuted,
         borderRadius: 14,
-        padding: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         borderWidth: 1,
-        borderColor: '#EEF2F6',
+        borderColor: colors.border,
     },
 
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 7,
     },
 
     infoText: {
         fontSize: 14,
-        color: '#666',
+        color: colors.textSecondary,
         marginLeft: 8,
         flex: 1,
     },
 
     financeBox: {
-        marginTop: 14,
-        backgroundColor: '#F8FAFD',
-        borderRadius: 16,
+        marginTop: 12,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#E7ECF3',
-        padding: 14,
+        borderColor: colors.border,
+        padding: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -921,16 +923,16 @@ const styles = StyleSheet.create({
     },
 
     financeValue: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '800',
         color: '#27AE60',
     },
 
     pagamentoButton: {
         backgroundColor: colors.primary,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+        borderRadius: 11,
+        paddingHorizontal: 13,
+        paddingVertical: 10,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',

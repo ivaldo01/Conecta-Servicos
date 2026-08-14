@@ -314,7 +314,10 @@ export default function SuporteScreen({ navigation }) {
                 </TouchableOpacity>
                 <View style={styles.headerInfo}>
                     <Text style={styles.headerTitle}>Central de Suporte</Text>
-                    <Text style={styles.headerStatus}>Nossa equipe está online</Text>
+                    <View style={styles.headerStatusRow}>
+                        <View style={styles.onlineDot} />
+                        <Text style={styles.headerStatus}>Equipe disponível para ajudar</Text>
+                    </View>
                 </View>
             </View>
 
@@ -326,6 +329,22 @@ export default function SuporteScreen({ navigation }) {
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    ListEmptyComponent={
+                        <View style={styles.emptyChat}>
+                            <View style={styles.emptyChatIcon}>
+                                <Ionicons name="headset-outline" size={30} color={colors.primary} />
+                            </View>
+                            <Text style={styles.emptyChatEyebrow}>CONECTA SUPORTE</Text>
+                            <Text style={styles.emptyChatTitle}>Como podemos ajudar?</Text>
+                            <Text style={styles.emptyChatText}>
+                                Envie sua dúvida ou descreva o problema. Nossa equipe responderá por aqui.
+                            </Text>
+                            <View style={styles.responseInfo}>
+                                <Ionicons name="time-outline" size={15} color={colors.primary} />
+                                <Text style={styles.responseInfoText}>Atendimento acompanhado pela equipe Conecta</Text>
+                            </View>
+                        </View>
+                    }
                 />
             </View>
 
@@ -338,7 +357,7 @@ export default function SuporteScreen({ navigation }) {
 
             <View style={[styles.inputContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
                 <TouchableOpacity style={styles.attachButton} onPress={() => setModalAnexoVisivel(true)}>
-                    <Ionicons name="add-circle" size={28} color={colors.secondary} />
+                    <Ionicons name="attach-outline" size={22} color={colors.primary} />
                 </TouchableOpacity>
 
                 <TextInput
@@ -394,7 +413,7 @@ export default function SuporteScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.primary,
+        backgroundColor: colors.primaryDark,
     },
     loadingContainer: {
         flex: 1,
@@ -405,41 +424,77 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-        backgroundColor: colors.primary,
+        paddingHorizontal: 16,
+        paddingBottom: 18,
+        backgroundColor: colors.primaryDark,
         elevation: 0,
     },
     backButton: {
-        padding: 5,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 12,
-        marginRight: 15
+        width: 42,
+        height: 42,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderRadius: 13,
+        marginRight: 12
     },
     headerInfo: {
         flex: 1,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontWeight: '800',
         color: '#FFF',
     },
+    headerStatusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80', marginRight: 6 },
     headerStatus: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.8)',
-        marginTop: 2
+        color: 'rgba(255,255,255,0.72)',
     },
     chatArea: {
         flex: 1,
-        backgroundColor: '#E5DDD5',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
+        backgroundColor: colors.background,
+        borderTopLeftRadius: 26,
+        borderTopRightRadius: 26,
         overflow: 'hidden'
     },
     listContent: {
         padding: 16,
         paddingBottom: 20,
+        flexGrow: 1,
     },
+    emptyChat: {
+        width: '100%',
+        marginTop: 34,
+        paddingVertical: 30,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: colors.shadow,
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 2,
+    },
+    emptyChatIcon: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.primarySoft,
+        marginBottom: 16,
+    },
+    emptyChatEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: colors.primary, marginBottom: 6 },
+    emptyChatTitle: { fontSize: 20, fontWeight: '800', color: colors.textDark, textAlign: 'center' },
+    emptyChatText: { marginTop: 8, fontSize: 14, lineHeight: 21, color: colors.textSecondary, textAlign: 'center' },
+    responseInfo: { flexDirection: 'row', alignItems: 'center', marginTop: 18, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, backgroundColor: colors.primarySoft },
+    responseInfoText: { flex: 1, marginLeft: 7, fontSize: 11, fontWeight: '600', color: colors.primaryDark },
     messageContainer: {
         flexDirection: 'row',
         marginBottom: 12,
@@ -473,7 +528,7 @@ const styles = StyleSheet.create({
         shadowRadius: 1,
     },
     myBubble: {
-        backgroundColor: colors.primary,
+        backgroundColor: colors.primaryDark,
         borderBottomRightRadius: 4,
         marginLeft: 40
     },
@@ -566,30 +621,37 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-end',
         paddingHorizontal: 12,
-        paddingVertical: 12,
+        paddingTop: 10,
         backgroundColor: '#FFF',
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
     },
     attachButton: {
-        padding: 8,
+        width: 42,
+        height: 42,
+        borderRadius: 13,
+        backgroundColor: colors.primarySoft,
         justifyContent: 'center',
         alignItems: 'center'
     },
     input: {
         flex: 1,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 24,
+        backgroundColor: colors.surfaceMuted,
+        borderRadius: 16,
         paddingHorizontal: 16,
         paddingVertical: 10,
         paddingTop: 12,
         fontSize: 15,
         maxHeight: 120,
-        color: '#1A202C',
-        marginHorizontal: 8
+        color: colors.textDark,
+        marginHorizontal: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     sendButton: {
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: 14,
         backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',

@@ -16,9 +16,12 @@ import { Platform } from 'react-native';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
-import mobileAds, { AdsConsent } from 'react-native-google-mobile-ads';
+import { initializeAds, requestAdsConsent } from './src/services/adService';
+
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+const Notifications = isExpoGo ? null : require('expo-notifications');
 
 
 
@@ -127,7 +130,7 @@ export const navigationRef = createNavigationContainerRef();
 
 
 
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
 
   handleNotification: async () => ({
 
@@ -147,7 +150,7 @@ Notifications.setNotificationHandler({
 
 // Configuração de Canais para Android (Sons específicos)
 
-if (Platform.OS === 'android') {
+if (Platform.OS === 'android' && Notifications) {
 
   Notifications.setNotificationChannelAsync('suporte-admin', {
 
@@ -431,15 +434,37 @@ function getClienteTabScreenOptions(route, insets) {
 
     tabBarInactiveTintColor: '#8E8E93',
 
+    tabBarLabelStyle: {
+      fontSize: 11,
+      fontWeight: '700',
+      paddingTop: 2,
+    },
+
+    tabBarItemStyle: {
+      paddingTop: 7,
+    },
+
     tabBarHideOnKeyboard: true,
 
     tabBarStyle: {
 
-      height: 60 + insets.bottom,
+      height: 66 + insets.bottom,
 
       paddingBottom: insets.bottom,
 
-      backgroundColor: '#fff',
+      backgroundColor: '#FFFFFF',
+
+      borderTopWidth: 1,
+
+      borderTopColor: '#E2E8F0',
+
+      shadowColor: '#0F172A',
+
+      shadowOpacity: 0.08,
+
+      shadowRadius: 16,
+
+      elevation: 12,
 
     },
 
@@ -481,15 +506,37 @@ function getProfissionalTabScreenOptions(route, insets) {
 
     tabBarInactiveTintColor: '#8E8E93',
 
+    tabBarLabelStyle: {
+      fontSize: 11,
+      fontWeight: '700',
+      paddingTop: 2,
+    },
+
+    tabBarItemStyle: {
+      paddingTop: 7,
+    },
+
     tabBarHideOnKeyboard: true,
 
     tabBarStyle: {
 
-      height: 60 + insets.bottom,
+      height: 66 + insets.bottom,
 
       paddingBottom: insets.bottom,
 
-      backgroundColor: '#fff',
+      backgroundColor: '#FFFFFF',
+
+      borderTopWidth: 1,
+
+      borderTopColor: '#E2E8F0',
+
+      shadowColor: '#0F172A',
+
+      shadowOpacity: 0.08,
+
+      shadowRadius: 16,
+
+      elevation: 12,
 
     },
 
@@ -866,7 +913,7 @@ function AppNavigator() {
 
       try {
 
-        const consentInfo = await AdsConsent.getConsentInfo();
+        const consentInfo = await requestAdsConsent();
 
         const canRequestAds = consentInfo?.canRequestAds;
 
@@ -882,7 +929,7 @@ function AppNavigator() {
 
         mobileAdsStartedRef.current = true;
 
-        await mobileAds().initialize();
+        await initializeAds();
 
         console.log('Google Mobile Ads inicializado com sucesso.');
 
@@ -896,7 +943,7 @@ function AppNavigator() {
 
 
 
-    AdsConsent.gatherConsent()
+    requestAdsConsent()
 
       .then(startGoogleMobileAdsSDK)
 
@@ -953,6 +1000,8 @@ function AppNavigator() {
 
 
   useEffect(() => {
+
+    if (!Notifications) return undefined;
 
     notificationListener.current = Notifications.addNotificationReceivedListener(() => { });
 

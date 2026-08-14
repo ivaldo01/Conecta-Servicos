@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import Topbar from '@/components/layout/Topbar';
-import { Star, User, MessageSquare, Calendar } from 'lucide-react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Star, User, MessageSquare, Calendar, ArrowRight, ShieldCheck, TrendingUp } from 'lucide-react';
 import '@/styles/avaliacoes-page.css';
 
 interface Avaliacao {
@@ -15,7 +17,7 @@ interface Avaliacao {
   clienteFoto?: string;
   nota: number;
   comentario?: string;
-  data: any;
+  data?: { seconds?: number };
   servico?: string;
 }
 
@@ -65,6 +67,10 @@ export default function AvaliacoesPage() {
     );
   };
 
+  const media = avaliacoes.length
+    ? avaliacoes.reduce((total, avaliacao) => total + (Number(avaliacao.nota) || 0), 0) / avaliacoes.length
+    : 0;
+
   return (
     <div className="avaliacoes-page">
       <Topbar 
@@ -73,6 +79,18 @@ export default function AvaliacoesPage() {
       />
 
       <div className="avaliacoes-body-premium">
+        <section className="ap-hero">
+          <div>
+            <span className="ap-eyebrow">QUALIDADE E CONFIANÇA</span>
+            <h1>{ehProfissional ? 'Sua reputação constrói novas oportunidades.' : 'Suas experiências ajudam a melhorar cada serviço.'}</h1>
+            <p>{ehProfissional ? 'Acompanhe o reconhecimento dos clientes e identifique pontos de evolução.' : 'Consulte as avaliações que você compartilhou após seus atendimentos.'}</p>
+          </div>
+          <div className="ap-metricas">
+            <div><MessageSquare size={17} /><span>Total</span><strong>{avaliacoes.length}</strong></div>
+            <div><Star size={17} /><span>Média</span><strong>{media.toFixed(1)}</strong></div>
+          </div>
+        </section>
+
         {loading ? (
           <div className="ap-loading-enterprise">
             <div className="ap-spinner"></div>
@@ -80,8 +98,17 @@ export default function AvaliacoesPage() {
           </div>
         ) : avaliacoes.length === 0 ? (
           <div className="ap-vazio-enterprise">
-            <MessageSquare size={64} className="mb-6 opacity-10" />
-            <p>Nenhuma interação de feedback registrada até o momento.</p>
+            <div className="ap-vazio-icon"><MessageSquare size={30} /></div>
+            <span className="ap-vazio-eyebrow">HISTÓRICO DE EXPERIÊNCIAS</span>
+            <h2>Nenhuma avaliação registrada</h2>
+            <p>{ehProfissional ? 'As avaliações aparecerão aqui depois que seus clientes concluírem e avaliarem um atendimento.' : 'Depois de concluir um atendimento, você poderá compartilhar sua experiência e consultar o registro aqui.'}</p>
+            <div className="ap-vazio-beneficios">
+              <span><ShieldCheck size={16} /> Avaliações vinculadas a atendimentos</span>
+              <span><TrendingUp size={16} /> Qualidade acompanhada com transparência</span>
+            </div>
+            <Link href={ehProfissional ? '/dashboard' : '/agendamentos'} className="ap-vazio-cta">
+              {ehProfissional ? 'Voltar ao painel' : 'Ver meus agendamentos'} <ArrowRight size={17} />
+            </Link>
           </div>
         ) : (
           <div className="ap-grid-premium">
@@ -90,7 +117,7 @@ export default function AvaliacoesPage() {
                 <div className="ap-card-header">
                   <div className="ap-autor">
                     <div className="ap-avatar-wrap">
-                      {av.clienteFoto ? <img src={av.clienteFoto} alt="Avatar" /> : <div className="ap-avatar-placeholder"><User size={20} /></div>}
+                      {av.clienteFoto ? <Image src={av.clienteFoto} alt="Avatar" width={48} height={48} unoptimized /> : <div className="ap-avatar-placeholder"><User size={20} /></div>}
                     </div>
                     <div>
                       <p className="ap-nome">{ehProfissional ? av.clienteNome : `Para: ${av.profissionalNome || 'Profissional'}`}</p>
@@ -105,7 +132,7 @@ export default function AvaliacoesPage() {
 
                 {av.comentario && (
                   <div className="ap-comentario-box">
-                    <p>"{av.comentario}"</p>
+                    <p>“{av.comentario}”</p>
                   </div>
                 )}
 

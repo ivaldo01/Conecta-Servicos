@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { collection, query, where, getDocs, limit as firestoreLimit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
@@ -9,9 +10,8 @@ import BannerAd from '@/components/ads/BannerAd';
 import {
   Calendar, Users, Clock, DollarSign, Star, ArrowRight,
   Zap, Shield, MapPin, Wrench, Activity, 
-  Trash, Search, Settings, User, ChevronRight, CheckCircle,
-  TrendingUp, TrendingDown, Plus, Wallet, BarChart3, Sparkles,
-  Percent
+  Trash, Search, User, ChevronRight, CheckCircle,
+  TrendingUp, Plus, Wallet, BarChart3, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -44,37 +44,31 @@ interface Profissional {
   totalAvaliacoes?: number;
 }
 
-interface Avaliacao {
-  id: string;
-  nota: number;
-  comentario?: string;
-  clienteNome?: string;
-  clienteFoto?: string;
-  createdAt?: Timestamp;
-}
-
 // ============================================================
 // DASHBOARD PRINCIPAL
 // ============================================================
 export default function DashboardPage() {
-  const { user, dadosUsuario, ehProfissional, ehColaborador, loading: authLoading } = useAuth();
+  const { user, dadosUsuario, ehAdmin, ehProfissional, ehColaborador, loading: authLoading } = useAuth();
   const router = useRouter();
   
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [profs, setProfs]             = useState<Profissional[]>([]);
-  const [avaliacoes, setAvaliacoes]   = useState<Avaliacao[]>([]);
   const [loading, setLoading]           = useState(true);
-  const [dadosProfissional, setDadosProfissional] = useState<Profissional | null>(null);
 
   const hoje = new Date();
   const hojeStr = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   useEffect(() => {
-    if (authLoading || !user?.uid) return;
+    if (!authLoading && ehAdmin) {
+      router.replace('/admin');
+    }
+  }, [authLoading, ehAdmin, router]);
+
+  useEffect(() => {
+    if (authLoading || !user?.uid || ehAdmin) return;
 
     // Não criar listeners para colaboradores
     if (ehColaborador) {
-      setLoading(false);
       return;
     }
 
@@ -114,9 +108,10 @@ export default function DashboardPage() {
             );
             const snapProfs = await getDocs(qProfs);
             setProfs(snapProfs.docs.map(d => ({ id: d.id, ...d.data() } as Profissional)));
-          } catch (err: any) {
-            console.error('[Permission Error] Profissionais:', err.message, err.code);
-            if (err.code === 'permission-denied') {
+          } catch (err: unknown) {
+            const firebaseError = err as { message?: string; code?: string };
+            console.error('[Permission Error] Profissionais:', firebaseError.message, firebaseError.code);
+            if (firebaseError.code === 'permission-denied') {
               console.error('[Permission Error] Usuário não tem permissão para listar profissionais');
             }
           }
@@ -130,7 +125,7 @@ export default function DashboardPage() {
     
     carregarDados();
     return () => { if (unsubscribe) unsubscribe(); };
-  }, [user?.uid, ehProfissional, authLoading]);
+  }, [user?.uid, ehAdmin, ehProfissional, ehColaborador, authLoading]);
 
   // --- COMPONENTE: DASHBOARD DO COLABORADOR ---
   const renderDashboardColaborador = () => {
@@ -140,17 +135,10 @@ export default function DashboardPage() {
 
     // Cálculos financeiros
     const atendimentosConcluidos = agendamentos.filter(a => a.status === 'concluido');
-    const atendimentosHoje = agendamentos.filter(a => {
-      const dataHora = a.dataHora?.toDate ? a.dataHora.toDate() : new Date(a.dataHora as any);
-      return dataHora.toDateString() === new Date().toDateString();
-    });
-    
     // Comissão estimada (assumindo 50% como padrão, pode vir do perfil)
     const comissaoPercentual = dadosUsuario?.comissaoPercentual || 50;
     const totalReceita = atendimentosConcluidos.reduce((acc, a) => acc + (Number(a.valor) || 0), 0);
     const totalComissao = totalReceita * (comissaoPercentual / 100);
-    const receitaHoje = atendimentosHoje.reduce((acc, a) => acc + (Number(a.valor) || 0), 0);
-    const comissaoHoje = receitaHoje * (comissaoPercentual / 100);
 
     return (
       <div className="dashboard-profissional">
@@ -287,7 +275,7 @@ export default function DashboardPage() {
               <p className="appointments-empty">Sem agendamentos para você.</p>
             ) : (
               proximos.map(ag => {
-                const dataHora = ag.dataHora?.toDate ? ag.dataHora.toDate() : new Date(ag.dataHora as any);
+                const dataHora = ag.dataHora?.toDate() || new Date();
                 const dataStr = dataHora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                 const horaStr = dataHora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                 
@@ -319,6 +307,27 @@ export default function DashboardPage() {
   // --- COMPONENTE: HOME DO CLIENTE ---
   const renderHomeCliente = () => (
     <div className="home-cliente">
+      <section className="hc-hero-dashboard">
+        <div className="hc-hero-copy">
+          <span className="hc-eyebrow">CONECTA SOLUTIONS</span>
+          <h1>Encontre o profissional certo para o que você precisa.</h1>
+          <p>Compare especialistas, escolha o melhor horário e acompanhe seus serviços em um só lugar.</p>
+          <div className="hc-hero-actions">
+            <button onClick={() => router.push('/busca')} className="hc-primary-action">
+              <Search size={18} /> Buscar profissionais
+            </button>
+            <button onClick={() => router.push('/agenda')} className="hc-secondary-action">
+              <Calendar size={18} /> Meus agendamentos
+            </button>
+          </div>
+        </div>
+        <div className="hc-hero-metrics">
+          <div><strong>{profs.length}</strong><span>especialistas em destaque</span></div>
+          <div><strong>100%</strong><span>perfis verificados</span></div>
+          <div><strong>24h</strong><span>acesso à plataforma</span></div>
+        </div>
+      </section>
+
       <div className="hc-banners">
         <div className="hc-banner-card">
           <div className="hc-banner-icon"><Zap size={20} /></div>
@@ -363,11 +372,11 @@ export default function DashboardPage() {
         {profs.map(p => (
           <div key={p.id} className="hc-prof-card-enterprise" onClick={() => router.push(`/perfil-profissional/${p.id}`)}>
             <div className="hc-prof-card-banner">
-              {p.bannerPerfil ? <img src={p.bannerPerfil} alt="Banner" /> : <div className="hc-banner-placeholder-gradient" />}
+              {p.bannerPerfil ? <Image src={p.bannerPerfil} alt="Banner" fill sizes="380px" unoptimized /> : <div className="hc-banner-placeholder-gradient" />}
             </div>
             <div className="hc-prof-card-content">
               <div className="hc-prof-avatar-overlap">
-                {p.fotoPerfil ? <img src={p.fotoPerfil} alt={p.nome} /> : <div className="hc-avatar-fallback">{p.nome?.[0]}</div>}
+                {p.fotoPerfil ? <Image src={p.fotoPerfil} alt={p.nome} width={60} height={60} unoptimized /> : <div className="hc-avatar-fallback">{p.nome?.[0]}</div>}
                 <div className="hc-badge-verified-mini">
                   <CheckCircle size={10} />
                 </div>
@@ -386,7 +395,7 @@ export default function DashboardPage() {
                   <span>{p.avaliacaoMedia?.toFixed(1) || '5.0'}</span>
                 </div>
                 <div className="hc-prof-price-box">
-                  <span className="hc-price-val">R$ 70/h</span>
+                  <span className="hc-price-val">Ver perfil <ArrowRight size={14} /></span>
                 </div>
               </div>
             </div>
@@ -425,7 +434,15 @@ export default function DashboardPage() {
     const totalAvaliacoes = dadosUsuario?.totalAvaliacoes || 0;
 
     return (
-      <div className="dashboard-body">
+      <div className="dashboard-body dashboard-body--professional">
+        <section className="professional-hero">
+          <div>
+            <span className="professional-eyebrow">VISÃO GERAL DO NEGÓCIO</span>
+            <h1>Olá, {dadosUsuario?.nome?.split(' ')[0] || 'profissional'}.</h1>
+            <p>Acompanhe sua operação, organize os próximos atendimentos e mantenha seus serviços sempre disponíveis.</p>
+          </div>
+          <Link href="/agenda" className="professional-hero-cta">Abrir agenda <ArrowRight size={16} /></Link>
+        </section>
         {/* KPI Cards */}
         <div className="kpi-grid">
           <Link href="/agendamentos" className="kpi-card kpi-card--blue">
@@ -653,10 +670,15 @@ export default function DashboardPage() {
           </div>
           <div className="appointments-list">
             {proximos.length === 0 ? (
-              <p className="appointments-empty">Sem atividades recentes.</p>
+              <div className="appointments-empty">
+                <div className="appointments-empty-icon"><Calendar size={24} /></div>
+                <strong>Sua agenda está livre</strong>
+                <p>Novos atendimentos pendentes ou confirmados aparecerão aqui.</p>
+                <Link href="/agenda">Gerenciar disponibilidade <ArrowRight size={14} /></Link>
+              </div>
             ) : (
               proximos.map(ag => {
-                const dataHora = ag.dataHora?.toDate ? ag.dataHora.toDate() : new Date(ag.dataHora as any);
+                const dataHora = ag.dataHora?.toDate() || new Date();
                 const dataStr = dataHora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                 const horaStr = dataHora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                 
@@ -698,7 +720,7 @@ export default function DashboardPage() {
             <BannerAd tipo="banner_superior" />
           </div>
         )}
-        {loading ? <p>Carregando...</p> : (
+        {loading && !ehColaborador ? <p>Carregando...</p> : (
           ehColaborador ? renderDashboardColaborador() : 
           ehProfissional ? renderDashboardProf() : 
           renderHomeCliente()

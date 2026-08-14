@@ -1,23 +1,29 @@
-// colors.js - Versão Atualizada baseada nas referências visuais
+// Sistema visual mobile — Conecta Enterprise
+// Mantém as chaves antigas para compatibilidade com todas as telas.
 export default {
-  // Cores Principais
-  primary: "#1A73E8",    // Um azul mais moderno (estilo Google/Material Design)
-  secondary: "#5F6368",  // Cinza intermediário para textos secundários
+  primary: "#2563EB",
+  primaryDark: "#0F2A56",
+  primarySoft: "#EAF2FF",
+  secondary: "#64748B",
 
-  // Estados e Ações
-  success: "#34A853",    // Verde mais limpo para confirmações
-  danger: "#EA4335",     // Vermelho para erros e exclusões
-  warning: "#FBBC04",    // Amarelo/Dourado para alertas e estrelas
-  info: "#4285F4",       // Azul claro para informações extras
+  success: "#16A34A",
+  danger: "#DC2626",
+  warning: "#F59E0B",
+  info: "#3B82F6",
 
-  // Neutros e Interface (Essencial para o visual das fotos)
-  background: "#F8F9FA", // Fundo levemente acinzentado (dá destaque aos cards brancos)
-  card: "#FFFFFF",       // Fundo dos cards (branco puro para contraste)
-  textDark: "#202124",   // Quase preto para melhor leitura
-  textLight: "#FFFFFF",  // Texto sobre fundos coloridos
-  border: "#DADCE0",     // Cor suave para bordas e divisores
-  inputFill: "#F1F3F4",  // Fundo para campos de digitação
+  background: "#F1F5F9",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F8FAFC",
+  card: "#FFFFFF",
+  textDark: "#0F172A",
+  textPrimary: "#0F172A",
+  textSecondary: "#64748B",
+  textMuted: "#94A3B8",
+  textLight: "#FFFFFF",
+  border: "#E2E8F0",
+  borderStrong: "#CBD5E1",
+  inputFill: "#F8FAFC",
 
-  // Efeito de Profundidade (Sombra)
-  shadow: "#000000"
+  shadow: "#0F172A",
+  overlay: "rgba(15, 23, 42, 0.56)",
 };

@@ -1,5 +1,6 @@
 const { db, admin } = require('../lib/firebaseAdmin');
 const axios = require('axios');
+const { authenticateRequest } = require('../lib/authenticateRequest');
 
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://www.asaas.com/api/v3';
@@ -19,9 +20,16 @@ module.exports = async (req, res) => {
         return;
     }
 
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Método não permitido' });
+    }
+
+    const authUser = await authenticateRequest(req, res, admin);
+    if (!authUser) return;
+
     try {
         const {
-            userId,
+            userId: requestedUserId,
             planoId,
             valor,
             nomePlano,
@@ -30,6 +38,11 @@ module.exports = async (req, res) => {
             creditCardHolderInfo,
             discount
         } = req.body;
+
+        const userId = authUser.uid;
+        if (requestedUserId && requestedUserId !== userId && authUser.admin !== true) {
+            return res.status(403).json({ error: 'Não é permitido assinar para outro usuário' });
+        }
 
         if (!userId || !planoId || !valor) {
             return res.status(400).json({ error: 'Dados incompletos para assinatura' });

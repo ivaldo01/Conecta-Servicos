@@ -180,3 +180,96 @@
 }
 
 .ct-vazio svg { margin-bottom: 16px; }
+
+/* Visual premium da área de contratos */
+.ct-page {
+    min-height: 100vh;
+    padding: 0;
+    background: #f4f7fb;
+}
+
+.ct-body {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 34px 40px 56px;
+}
+
+.ct-hero {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 28px;
+    margin-bottom: 18px;
+    padding: 27px 30px;
+    border-radius: 20px;
+    color: #fff;
+    background: linear-gradient(125deg, #0f2a56 0%, #17458c 62%, #2563eb 100%);
+    box-shadow: 0 15px 34px rgba(15, 42, 86, .18);
+}
+
+.ct-hero::after {
+    content: '';
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    right: -72px;
+    top: -115px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .07);
+}
+
+.ct-eyebrow, .ct-vazio-eyebrow {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+}
+
+.ct-eyebrow { color: #9fc4ff; }
+.ct-hero h1 { margin: 8px 0 6px; font-size: 27px; letter-spacing: -.7px; }
+.ct-hero p { max-width: 650px; margin: 0; color: #d8e7ff; font-size: 13px; line-height: 1.55; }
+.ct-hero-icon { z-index: 1; display: grid; place-items: center; width: 58px; height: 58px; flex: 0 0 58px; border: 1px solid rgba(255,255,255,.22); border-radius: 17px; background: rgba(255,255,255,.12); }
+
+.ct-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.ct-resumo-card { position: relative; padding: 18px 22px; border: 1px solid #dfe7f1; border-radius: 17px; box-shadow: 0 8px 24px rgba(15, 23, 42, .05); text-align: left; }
+.ct-resumo-card:hover { transform: none; border-color: #bfd1ea; }
+.ct-resumo-card::before { content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 4px; border-radius: 0 5px 5px 0; }
+.ct-resumo-card--verde::before { background: #22c55e; }
+.ct-resumo-card--azul::before { background: #2563eb; }
+.ct-resumo-num { margin: 0 0 5px; font-size: 25px; }
+.ct-resumo-label { margin: 0; font-size: 10px; letter-spacing: .8px; }
+
+.ct-vazio {
+    min-height: 330px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+    padding: 42px 28px;
+    border: 1px solid #dfe7f1;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, .06);
+    color: #64748b;
+}
+.ct-vazio-icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 16px; border-radius: 19px; background: #eaf2ff; color: #2563eb; }
+.ct-vazio-icon svg { margin: 0; }
+.ct-vazio-eyebrow { color: #2563eb; }
+.ct-vazio h2 { margin: 8px 0 7px; color: #0f172a; font-size: 23px; letter-spacing: -.4px; }
+.ct-vazio > p { max-width: 560px; margin: 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+.ct-vazio-beneficios { display: flex; gap: 10px; margin: 22px 0; }
+.ct-vazio-beneficios span { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 11px; font-weight: 700; }
+.ct-vazio-beneficios svg { margin: 0; color: #2563eb; }
+.ct-vazio-cta { display: inline-flex; align-items: center; gap: 9px; padding: 12px 17px; border-radius: 11px; background: #2563eb; color: #fff; font-size: 12px; font-weight: 800; text-decoration: none; box-shadow: 0 8px 18px rgba(37, 99, 235, .22); }
+.ct-vazio-cta:hover { background: #1d4ed8; transform: translateY(-1px); }
+
+@media (max-width: 760px) {
+    .ct-body { padding: 24px 18px; }
+    .ct-hero { padding: 24px; }
+    .ct-hero h1 { font-size: 23px; }
+    .ct-hero-icon { display: none; }
+    .ct-resumo { grid-template-columns: 1fr; }
+    .ct-vazio-beneficios { flex-direction: column; }
+}

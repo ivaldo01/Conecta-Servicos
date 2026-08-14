@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from "../../services/firebaseConfig";
 import { doc, getDoc, updateDoc, deleteDoc, Timestamp, onSnapshot } from "firebase/firestore";
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from "../../constants/colors";
 import {
   uploadFotoPerfil,
@@ -473,11 +474,12 @@ export default function PerfilScreen({ navigation }) {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
       <TouchableOpacity
         style={styles.bannerWrapper}
         onPress={atualizarBanner}
@@ -589,29 +591,12 @@ export default function PerfilScreen({ navigation }) {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.photoBtn}
-          onPress={atualizarFotoPerfil}
-          disabled={uploadingFoto}
-        >
-          <Ionicons name="image-outline" size={18} color={colors.primary} />
-          <Text style={styles.photoBtnText}>
-            {uploadingFoto ? "Enviando foto..." : "Trocar foto de perfil"}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Card de Dados de Registro */}
       <View style={styles.dadosRegistroCard}>
         <View style={styles.dadosRegistroHeader}>
           <Text style={styles.dadosRegistroTitle}>Dados de Registro</Text>
-          <TouchableOpacity
-            style={styles.editarDadosBtn}
-            onPress={() => navigation.navigate("EditarPerfil")}
-          >
-            <Ionicons name="create-outline" size={16} color={colors.primary} />
-            <Text style={styles.editarDadosText}>Editar</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.dadosRegistroContent}>
@@ -951,24 +936,19 @@ export default function PerfilScreen({ navigation }) {
         <Text style={styles.deleteAccountButtonText}>Excluir minha conta</Text>
       </TouchableOpacity>
 
-      <View style={styles.tipCard}>
-        <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-        <Text style={styles.tipText}>
-          Agora o cliente e o profissional já podem usar foto de perfil, o profissional já pode trocar o banner e também montar sua galeria de trabalhos.
-        </Text>
-      </View>
-    </ScrollView >
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F3F8',
+    backgroundColor: colors.background,
   },
 
   content: {
-    paddingBottom: 28,
+    paddingBottom: 40,
   },
 
   center: {
@@ -980,7 +960,7 @@ const styles = StyleSheet.create({
 
   bannerWrapper: {
     width: '100%',
-    height: 210,
+    height: 160,
     backgroundColor: '#DCE7F7',
     position: 'relative',
   },
@@ -1032,32 +1012,32 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    backgroundColor: '#FFF',
-    marginTop: -30,
+    backgroundColor: colors.surface,
+    marginTop: -22,
     marginHorizontal: 16,
     paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingTop: 18,
+    paddingBottom: 20,
     alignItems: 'center',
-    borderRadius: 24,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    borderRadius: 22,
+    elevation: 3,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 7 },
     borderWidth: 1,
     borderColor: '#E8EDF5',
   },
 
   avatarOuter: {
-    marginTop: -58,
-    marginBottom: 14,
+    marginTop: -52,
+    marginBottom: 12,
   },
 
   avatarContainer: {
-    width: 116,
-    height: 116,
-    borderRadius: 58,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#EEE',
     overflow: 'hidden',
     borderWidth: 4,
@@ -1101,7 +1081,7 @@ const styles = StyleSheet.create({
   },
 
   userName: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '800',
     color: colors.textDark,
     textAlign: 'center',
@@ -1132,10 +1112,10 @@ const styles = StyleSheet.create({
   },
 
   editBtn: {
-    marginTop: 16,
-    paddingHorizontal: 18,
+    marginTop: 15,
+    paddingHorizontal: 20,
     paddingVertical: 11,
-    borderRadius: 18,
+    borderRadius: 13,
     backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1176,15 +1156,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E8EDF5',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
 
@@ -1192,10 +1172,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: 14,
+    paddingBottom: 11,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8EDF5',
+    borderBottomColor: colors.border,
   },
 
   dadosRegistroTitle: {
@@ -1228,7 +1208,8 @@ const styles = StyleSheet.create({
 
   dadoItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    minHeight: 30,
   },
 
   dadoLabel: {
@@ -1247,37 +1228,48 @@ const styles = StyleSheet.create({
   },
 
   menuContainer: {
-    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 0,
+    paddingTop: 16,
+    paddingBottom: 0,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
 
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: colors.textDark,
-    marginBottom: 15,
-    marginLeft: 5,
+    marginBottom: 10,
+    marginLeft: 16,
   },
 
   menuItem: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    borderWidth: 1,
-    borderColor: '#E8EDF5',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 0,
+    marginBottom: 0,
+    elevation: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
 
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1289,8 +1281,8 @@ const styles = StyleSheet.create({
 
   menuText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#444',
+    fontWeight: '800',
+    color: colors.textDark,
   },
 
   menuSubText: {
@@ -1432,8 +1424,8 @@ const styles = StyleSheet.create({
 
   deleteAccountButton: {
     marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
+    marginTop: 20,
+    marginBottom: 18,
     paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: '#FEF2F2',

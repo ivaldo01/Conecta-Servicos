@@ -1,11 +1,13 @@
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 
-Notifications.setNotificationHandler({
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+const Notifications = isExpoGo ? null : require('expo-notifications');
+
+Notifications?.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowBanner: true,
         shouldShowList: true,
@@ -24,6 +26,11 @@ function getProjectId() {
 
 export async function registrarPushTokenUsuario(userId) {
     try {
+        if (!Notifications) {
+            console.log('Push: indisponível no Expo Go; use uma development build.');
+            return null;
+        }
+
         if (!userId) {
             console.log('Push: userId ausente.');
             return null;

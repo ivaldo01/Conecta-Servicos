@@ -4,6 +4,7 @@
 // ============================================================
 
 const admin = require('firebase-admin');
+const { authenticateRequest } = require('../../lib/authenticateRequest');
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -31,6 +32,9 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const authUser = await authenticateRequest(req, res, admin, { admin: true });
+  if (!authUser) return;
 
   try {
     const { 

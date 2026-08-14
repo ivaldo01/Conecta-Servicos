@@ -14,18 +14,16 @@ export default function InfoCard({ title, value, subtitle }) {
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#FFF',
-        borderRadius: 18,
-        padding: 16,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        backgroundColor: colors.surface,
+        borderRadius: 20,
+        padding: 18,
+        elevation: 2,
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.06,
         shadowRadius: 10,
         borderWidth: 1,
-        borderColor: '#E8EDF5',
-        borderTopWidth: 4,
-        borderTopColor: colors.primary,
+        borderColor: colors.border,
     },
     title: {
         fontSize: 12,
@@ -42,7 +40,7 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 12,
-        color: '#7A8596',
+        color: colors.textSecondary,
         marginTop: 6,
         lineHeight: 18,
     },
